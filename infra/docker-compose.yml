@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  # Redis for job queue
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    networks:
+      - audiobook-network
+
+  # Ollama for LLM serving
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    networks:
+      - audiobook-network
+
+  # Go API (REST)
+  api:
+    build:
+      context: ../api
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - OLLAMA_URL=http://ollama:11434
+      - JOBS_PREFIX=audiobooks
+    depends_on:
+      - redis
+      - ollama
+    networks:
+      - audiobook-network
+
+  # Go worker (summarize jobs)
+  worker:
+    build:
+      context: ../worker
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - OLLAMA_URL=http://ollama:11434
+      - JOBS_PREFIX=audiobooks
+    depends_on:
+      - redis
+      - ollama
+    networks:
+      - audiobook-network
+
+  # Python Whisper worker
+  transcriber:
+    build:
+      context: ../transcriber
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - JOBS_PREFIX=audiobooks
+    depends_on:
+      - redis
+    networks:
+      - audiobook-network
+
+  # Go orchestrator worker
+  ai_orchestrator:
+    build:
+      context: ../ai_orchestrator
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - OLLAMA_URL=http://ollama:11434
+      - JOBS_PREFIX=audiobooks
+    depends_on:
+      - redis
+      - ollama
+    networks:
+      - audiobook-network
+
+  # Next.js web app
+  web:
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://api:8080
+    depends_on:
+      - api
+    networks:
+      - audiobook-network
+
+volumes:
+  redisdata:
+  ollama:
+
+networks:
+  audiobook-network:
+    driver: bridge
