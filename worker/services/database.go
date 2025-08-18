@@ -1,7 +1,7 @@
 package services
 
 import (
-	"database/sql"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -10,32 +10,48 @@ import (
 	"audio-book-ai/worker/models"
 
 	"github.com/google/uuid"
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // DatabaseService handles database operations
 type DatabaseService struct {
-	db *sql.DB
+	pool *pgxpool.Pool
 }
 
 // NewDatabaseService creates a new database service
 func NewDatabaseService(dbURL string) (*DatabaseService, error) {
-	db, err := sql.Open("postgres", dbURL)
+	// First, test the connection with pgx.Connect to handle early fallback gracefully
+	conn, err := pgx.Connect(context.Background(), dbURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %v", err)
 	}
+	defer conn.Close(context.Background())
 
 	// Test database connection
-	if err := db.Ping(); err != nil {
+	if err := conn.Ping(context.Background()); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %v", err)
 	}
 
-	return &DatabaseService{db: db}, nil
+	// Now create the connection pool
+	pool, err := pgxpool.New(context.Background(), dbURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connection pool: %v", err)
+	}
+
+	// Test the pool connection as well
+	if err := pool.Ping(context.Background()); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("failed to ping connection pool: %v", err)
+	}
+
+	return &DatabaseService{pool: pool}, nil
 }
 
 // Close closes the database connection
 func (d *DatabaseService) Close() error {
-	return d.db.Close()
+	d.pool.Close()
+	return nil
 }
 
 // GetPendingJobs retrieves pending AI processing jobs from database
@@ -49,7 +65,7 @@ func (d *DatabaseService) GetPendingJobs(limit int) ([]models.Job, error) {
 		LIMIT $5
 	`
 
-	rows, err := d.db.Query(query,
+	rows, err := d.pool.Query(context.Background(), query,
 		models.JobTypeSummarize,
 		models.JobTypeTag,
 		models.JobTypeEmbed,
@@ -97,7 +113,7 @@ func (d *DatabaseService) UpdateJobStatus(jobID uuid.UUID, status string, errorM
 		args = []interface{}{status, errorMessage, jobID}
 	}
 
-	_, err := d.db.Exec(query, args...)
+	_, err := d.pool.Exec(context.Background(), query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update job status: %v", err)
 	}
@@ -117,9 +133,9 @@ func (d *DatabaseService) GetTranscript(audiobookID uuid.UUID) (string, error) {
 	`
 
 	var content string
-	err := d.db.QueryRow(query, audiobookID).Scan(&content)
+	err := d.pool.QueryRow(context.Background(), query, audiobookID).Scan(&content)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err.Error() == "no rows in result set" {
 			return "", fmt.Errorf("no transcript found for audiobook %s", audiobookID)
 		}
 		return "", fmt.Errorf("failed to get transcript: %v", err)
@@ -145,7 +161,7 @@ func (d *DatabaseService) SaveAIOutput(output *models.AIOutput) error {
 			created_at = EXCLUDED.created_at
 	`
 
-	_, err = d.db.Exec(query,
+	_, err = d.pool.Exec(context.Background(), query,
 		uuid.New(),
 		output.AudiobookID,
 		output.OutputType,
