@@ -8,13 +8,13 @@ WORKDIR /app
 RUN apk add --no-cache git ca-certificates
 
 # Copy go mod files
-COPY go.mod go.sum ./
+COPY api/go.mod api/go.sum ./
 
 # Download dependencies
 RUN go mod download
 
 # Copy source code
-COPY . .
+COPY api/ .
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
@@ -35,8 +35,8 @@ WORKDIR /app
 # Copy binary from builder stage
 COPY --from=builder /app/main .
 
-# Copy .env file from the infra directory
-COPY ../infra/.env .env
+# Copy .env file from the api directory
+COPY api/.env .env
 
 # Change ownership to non-root user
 RUN chown -R appuser:appgroup /app

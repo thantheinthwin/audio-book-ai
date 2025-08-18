@@ -7,13 +7,13 @@ RUN apk add --no-cache git ca-certificates
 WORKDIR /app
 
 # Copy go mod files
-COPY go.mod go.sum ./
+COPY ai_orchestrator/go.mod ai_orchestrator/go.sum ./
 
 # Download dependencies
 RUN go mod download
 
 # Copy source code
-COPY . .
+COPY ai_orchestrator/ .
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
@@ -29,8 +29,8 @@ WORKDIR /root/
 # Copy the binary from builder stage
 COPY --from=builder /app/main .
 
-# Copy .env file from the infra directory
-COPY ../infra/.env .env
+# Copy .env file from the ai_orchestrator directory
+COPY ai_orchestrator/.env .env
 
 # Run the binary
 CMD ["./main"]

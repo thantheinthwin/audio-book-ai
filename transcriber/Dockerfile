@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy requirements and install Python dependencies
-COPY requirements.txt .
+COPY transcriber/requirements.txt .
 RUN pip install --no-cache-dir --timeout 300 --retries 3 -r requirements.txt
 
 # Final stage
@@ -29,10 +29,10 @@ COPY --from=deps /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.
 COPY --from=deps /usr/local/bin /usr/local/bin
 
 # Copy application code
-COPY . .
+COPY transcriber/ .
 
-# Copy .env file from the infra directory
-COPY ../infra/.env .env
+# Copy .env file from the transcriber directory
+COPY transcriber/.env .env
 
 # Run the transcriber
 CMD ["python", "main.py"]
