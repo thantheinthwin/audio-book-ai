@@ -82,18 +82,18 @@ services:
       - audiobook-network
 
   # Next.js web app
-  web:
-    build:
-      context: ../web
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://api:8080
-    depends_on:
-      - api
-    networks:
-      - audiobook-network
+  # web:
+  #   build:
+  #     context: ../web
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - NEXT_PUBLIC_API_URL=http://api:8080
+  #   depends_on:
+  #     - api
+  #   networks:
+  #     - audiobook-network
 
 volumes:
   redisdata:

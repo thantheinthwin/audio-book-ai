@@ -1,4 +1,4 @@
-.PHONY: up down pull-models migrate logs status clean rebuild
+.PHONY: up down pull-models migrate logs status clean rebuild build-with-retry
 
 # Start all services
 up:
@@ -33,6 +33,16 @@ clean:
 # Rebuild all services
 rebuild:
 	docker-compose down
+	docker-compose build --no-cache
+	docker-compose up -d
+
+# Build with retry logic for network issues
+build-with-retry:
+	@echo "Building services with retry logic..."
+	docker-compose down
+	@echo "Building transcriber service first (most likely to fail)..."
+	docker-compose build --no-cache transcriber || (echo "Retrying transcriber build..." && docker-compose build --no-cache transcriber)
+	@echo "Building remaining services..."
 	docker-compose build --no-cache
 	docker-compose up -d
 
@@ -96,6 +106,7 @@ help:
 	@echo "  status          - Show status of all services"
 	@echo "  clean           - Clean up everything"
 	@echo "  rebuild         - Rebuild all services"
+	@echo "  build-with-retry - Rebuild with retry logic for network issues"
 	@echo ""
 	@echo "Service-specific logs:"
 	@echo "  logs-api        - Show API logs"
