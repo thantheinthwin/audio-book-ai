@@ -60,8 +60,24 @@ export function LoginForm({
         password: data.password,
       });
       if (error) throw error;
-      // Update this route to redirect to an authenticated route. The user already has an active session.
-      router.push("/");
+
+      // Get user data to check role
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const userRole = user.user_metadata?.role || "user";
+
+        // Redirect based on role
+        if (userRole === "admin") {
+          router.push("/dashboard");
+        } else {
+          router.push("/");
+        }
+      } else {
+        // Fallback to root route if user data is not available
+        router.push("/");
+      }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {
@@ -134,7 +150,7 @@ export function LoginForm({
           </Form>
 
           <div className="mt-4 text-center text-sm">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link href="/auth/sign-up" className="underline underline-offset-4">
               Sign up
             </Link>

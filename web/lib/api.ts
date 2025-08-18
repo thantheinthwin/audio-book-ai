@@ -2,6 +2,54 @@ import { createClient } from "@/lib/supabase/client";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
+// Types for API responses
+interface ApiResponse<T = unknown> {
+  data?: T;
+  message?: string;
+  error?: string;
+}
+
+interface User {
+  id: string;
+  email: string;
+  role: string;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+  is_active: boolean;
+  is_verified: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+interface AudioBook {
+  id: string;
+  title: string;
+  author: string;
+  description?: string;
+  duration?: number;
+  file_url?: string;
+  cover_image?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ProfileUpdateData {
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+}
+
+interface AudioBookCreateData {
+  title: string;
+  author: string;
+  description?: string;
+  file_url?: string;
+  cover_image?: string;
+}
+
+interface AudioBookUpdateData extends Partial<AudioBookCreateData> {}
+
 // Helper function to get the current session token
 async function getAuthToken(): Promise<string | null> {
   const supabase = createClient();
@@ -12,7 +60,7 @@ async function getAuthToken(): Promise<string | null> {
 }
 
 // Generic API client with authentication
-export async function apiClient<T = any>(
+export async function apiClient<T = unknown>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
@@ -45,57 +93,61 @@ export async function apiClient<T = any>(
 // Auth API functions
 export const authAPI = {
   // Validate token
-  validateToken: () => apiClient("/auth/validate", { method: "POST" }),
+  validateToken: () =>
+    apiClient<ApiResponse>("/auth/validate", { method: "POST" }),
 
   // Get current user
-  getMe: () => apiClient("/auth/me"),
+  getMe: () => apiClient<ApiResponse<User>>("/auth/me"),
 
   // Health check
-  health: () => apiClient("/auth/health"),
+  health: () => apiClient<ApiResponse>("/auth/health"),
 };
 
 // Profile API functions
 export const profileAPI = {
-  getProfile: () => apiClient("/profile"),
+  getProfile: () => apiClient<ApiResponse<User>>("/profile"),
 
-  updateProfile: (data: any) =>
-    apiClient("/profile", {
+  updateProfile: (data: ProfileUpdateData) =>
+    apiClient<ApiResponse<User>>("/profile", {
       method: "PUT",
       body: JSON.stringify(data),
     }),
 
-  deleteProfile: () => apiClient("/profile", { method: "DELETE" }),
+  deleteProfile: () => apiClient<ApiResponse>("/profile", { method: "DELETE" }),
 };
 
 // Audio books API functions
 export const audiobooksAPI = {
-  getAudioBooks: () => apiClient("/audiobooks"),
+  getAudioBooks: () => apiClient<ApiResponse<AudioBook[]>>("/audiobooks"),
 
-  createAudioBook: (data: any) =>
-    apiClient("/audiobooks", {
+  createAudioBook: (data: AudioBookCreateData) =>
+    apiClient<ApiResponse<AudioBook>>("/audiobooks", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
-  getAudioBook: (id: string) => apiClient(`/audiobooks/${id}`),
+  getAudioBook: (id: string) =>
+    apiClient<ApiResponse<AudioBook>>(`/audiobooks/${id}`),
 
-  updateAudioBook: (id: string, data: any) =>
-    apiClient(`/audiobooks/${id}`, {
+  updateAudioBook: (id: string, data: AudioBookUpdateData) =>
+    apiClient<ApiResponse<AudioBook>>(`/audiobooks/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     }),
 
   deleteAudioBook: (id: string) =>
-    apiClient(`/audiobooks/${id}`, {
+    apiClient<ApiResponse>(`/audiobooks/${id}`, {
       method: "DELETE",
     }),
 };
 
 // Public audio books API functions
 export const publicAPI = {
-  getPublicAudioBooks: () => apiClient("/public/audiobooks"),
+  getPublicAudioBooks: () =>
+    apiClient<ApiResponse<AudioBook[]>>("/public/audiobooks"),
 
-  getPublicAudioBook: (id: string) => apiClient(`/public/audiobooks/${id}`),
+  getPublicAudioBook: (id: string) =>
+    apiClient<ApiResponse<AudioBook>>(`/public/audiobooks/${id}`),
 };
 
 // Library API functions

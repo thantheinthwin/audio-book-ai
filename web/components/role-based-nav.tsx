@@ -20,7 +20,9 @@ export function RoleBasedNav() {
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user) {
         setUser({
           id: user.id,
@@ -33,20 +35,20 @@ export function RoleBasedNav() {
 
     getUser();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session?.user) {
-          setUser({
-            id: session.user.id,
-            email: session.user.email || "",
-            role: (session.user.user_metadata?.role as string) || "user",
-          });
-        } else {
-          setUser(null);
-        }
-        setLoading(false);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        setUser({
+          id: session.user.id,
+          email: session.user.email || "",
+          role: (session.user.user_metadata?.role as string) || "user",
+        });
+      } else {
+        setUser(null);
       }
-    );
+      setLoading(false);
+    });
 
     return () => subscription.unsubscribe();
   }, [supabase.auth]);
@@ -119,13 +121,16 @@ export function RoleBasedNav() {
               <h3 className="font-medium mb-2">Admin Features</h3>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" asChild>
-                  <Link href="/">Manage Users</Link>
+                  <Link href="/dashboard">Admin Dashboard</Link>
                 </Button>
                 <Button variant="outline" size="sm" asChild>
-                  <Link href="/">Manage Audio Books</Link>
+                  <Link href="/dashboard">Manage Users</Link>
                 </Button>
                 <Button variant="outline" size="sm" asChild>
-                  <Link href="/">Analytics</Link>
+                  <Link href="/dashboard">Manage Audio Books</Link>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/dashboard">Analytics</Link>
                 </Button>
               </div>
             </div>

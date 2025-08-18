@@ -56,8 +56,24 @@ export function UpdatePasswordForm({
         password: data.password,
       });
       if (error) throw error;
-      // Update this route to redirect to an authenticated route. The user already has an active session.
-      router.push("/");
+
+      // Get user data to check role
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const userRole = user.user_metadata?.role || "user";
+
+        // Redirect based on role
+        if (userRole === "admin") {
+          router.push("/dashboard");
+        } else {
+          router.push("/");
+        }
+      } else {
+        // Fallback to root route if user data is not available
+        router.push("/");
+      }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {

@@ -85,7 +85,7 @@ export function ForgotPasswordForm({
           <CardHeader>
             <CardTitle className="text-2xl">Reset Your Password</CardTitle>
             <CardDescription>
-              Type in your email and we'll send you a link to reset your
+              Type in your email and we&apos;ll send you a link to reset your
               password
             </CardDescription>
           </CardHeader>
@@ -122,9 +122,9 @@ export function ForgotPasswordForm({
             </Form>
 
             <div className="mt-4 text-center text-sm">
-              Already have an account?{" "}
+              Remember your password?{" "}
               <Link href="/auth/login" className="underline underline-offset-4">
-                Login
+                Sign in
               </Link>
             </div>
           </CardContent>
