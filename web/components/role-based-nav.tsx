@@ -100,16 +100,16 @@ export function RoleBasedNav() {
             <h3 className="font-medium mb-2">User Features</h3>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" asChild>
-                <Link href="/protected">Dashboard</Link>
+                <Link href="/">Dashboard</Link>
               </Button>
               <Button variant="outline" size="sm" asChild>
-                <Link href="/protected">My Library</Link>
+                <Link href="/">My Library</Link>
               </Button>
               <Button variant="outline" size="sm" asChild>
-                <Link href="/protected">Playlists</Link>
+                <Link href="/">Playlists</Link>
               </Button>
               <Button variant="outline" size="sm" asChild>
-                <Link href="/protected">Progress</Link>
+                <Link href="/">Progress</Link>
               </Button>
             </div>
           </div>
@@ -119,13 +119,13 @@ export function RoleBasedNav() {
               <h3 className="font-medium mb-2">Admin Features</h3>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" asChild>
-                  <Link href="/protected">Manage Users</Link>
+                  <Link href="/">Manage Users</Link>
                 </Button>
                 <Button variant="outline" size="sm" asChild>
-                  <Link href="/protected">Manage Audio Books</Link>
+                  <Link href="/">Manage Audio Books</Link>
                 </Button>
                 <Button variant="outline" size="sm" asChild>
-                  <Link href="/protected">Analytics</Link>
+                  <Link href="/">Analytics</Link>
                 </Button>
               </div>
             </div>
