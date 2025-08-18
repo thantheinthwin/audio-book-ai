@@ -2,6 +2,12 @@ package models
 
 import "time"
 
+// Role constants
+const (
+	RoleUser  = "user"
+	RoleAdmin = "admin"
+)
+
 // UserContext represents the authenticated user context
 type UserContext struct {
 	ID    string `json:"id"`
@@ -18,6 +24,7 @@ type User struct {
 	Username   string    `json:"username"`
 	FirstName  string    `json:"first_name"`
 	LastName   string    `json:"last_name"`
+	Role       string    `json:"role"`
 	IsActive   bool      `json:"is_active"`
 	IsVerified bool      `json:"is_verified"`
 	CreatedAt  time.Time `json:"created_at"`

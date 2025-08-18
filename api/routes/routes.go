@@ -18,9 +18,13 @@ func SetupRoutes(app fiber.Router, cfg *config.Config) {
 	protected := app.Group("/", middleware.AuthMiddleware(cfg))
 	SetupProtectedRoutes(protected, cfg)
 
-	// Optional auth routes (authentication optional)
-	optional := app.Group("/", middleware.OptionalAuthMiddleware(cfg))
-	SetupOptionalRoutes(optional, cfg)
+	// Admin routes (admin authentication required)
+	admin := app.Group("/admin", middleware.AuthMiddleware(cfg), middleware.RequireAdmin())
+	SetupAdminRoutes(admin, cfg)
+
+	// Public routes (no authentication required)
+	public := app.Group("/")
+	SetupPublicRoutes(public, cfg)
 }
 
 // SetupAuthRoutes configures authentication routes
@@ -30,19 +34,19 @@ func SetupAuthRoutes(router fiber.Router, cfg *config.Config) {
 	router.Get("/health", handlers.HealthCheck)
 }
 
-// SetupProtectedRoutes configures protected routes
+// SetupProtectedRoutes configures protected routes (requires user or admin role)
 func SetupProtectedRoutes(router fiber.Router, cfg *config.Config) {
+	// Apply user role middleware
+	router.Use(middleware.RequireUser())
+
 	// User profile
 	router.Get("/profile", handlers.GetProfile)
 	router.Put("/profile", handlers.UpdateProfile)
 	router.Delete("/profile", handlers.DeleteProfile)
 
-	// Audio books
+	// Audio books (user operations)
 	router.Get("/audiobooks", handlers.GetAudioBooks)
-	router.Post("/audiobooks", handlers.CreateAudioBook)
 	router.Get("/audiobooks/:id", handlers.GetAudioBook)
-	router.Put("/audiobooks/:id", handlers.UpdateAudioBook)
-	router.Delete("/audiobooks/:id", handlers.DeleteAudioBook)
 
 	// Library
 	router.Get("/library", handlers.GetLibrary)
@@ -69,9 +73,23 @@ func SetupProtectedRoutes(router fiber.Router, cfg *config.Config) {
 	router.Delete("/bookmarks/:id", handlers.DeleteBookmark)
 }
 
-// SetupOptionalRoutes configures optional auth routes
-func SetupOptionalRoutes(router fiber.Router, cfg *config.Config) {
+// SetupAdminRoutes configures admin-only routes
+func SetupAdminRoutes(router fiber.Router, cfg *config.Config) {
+	// Audio books (admin operations)
+	router.Post("/audiobooks", handlers.CreateAudioBook)
+	router.Put("/audiobooks/:id", handlers.UpdateAudioBook)
+	router.Delete("/audiobooks/:id", handlers.DeleteAudioBook)
+
+	// User management
+	router.Get("/users", handlers.GetUsers)
+	router.Get("/users/:id", handlers.GetUser)
+	router.Put("/users/:id", handlers.UpdateUser)
+	router.Delete("/users/:id", handlers.DeleteUser)
+}
+
+// SetupPublicRoutes configures public routes (no authentication required)
+func SetupPublicRoutes(router fiber.Router, cfg *config.Config) {
 	// Public audio books
-	router.Get("/public/audiobooks", handlers.GetPublicAudioBooks)
-	router.Get("/public/audiobooks/:id", handlers.GetPublicAudioBook)
+	router.Get("/audiobooks", handlers.GetPublicAudioBooks)
+	router.Get("/audiobooks/:id", handlers.GetPublicAudioBook)
 }

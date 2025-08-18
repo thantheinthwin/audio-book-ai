@@ -53,7 +53,12 @@ func AuthMiddleware(cfg *config.Config) fiber.Handler {
 			userID, _ := claims["sub"].(string)
 			email, _ := claims["email"].(string)
 			aud, _ := claims["aud"].(string)
+			
+			// Get role from claims, default to "user" if not present
 			role, _ := claims["role"].(string)
+			if role == "" {
+				role = models.RoleUser
+			}
 
 			// Create user context
 			userContext := &models.UserContext{
@@ -107,7 +112,12 @@ func OptionalAuthMiddleware(cfg *config.Config) fiber.Handler {
 			userID, _ := claims["sub"].(string)
 			email, _ := claims["email"].(string)
 			aud, _ := claims["aud"].(string)
+			
+			// Get role from claims, default to "user" if not present
 			role, _ := claims["role"].(string)
+			if role == "" {
+				role = models.RoleUser
+			}
 
 			// Create user context
 			userContext := &models.UserContext{
@@ -136,6 +146,32 @@ func RequireRole(requiredRole string) fiber.Handler {
 		}
 
 		if user.Role != requiredRole {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "Insufficient permissions",
+			})
+		}
+
+		return c.Next()
+	}
+}
+
+// RequireAdmin middleware checks if user has admin role
+func RequireAdmin() fiber.Handler {
+	return RequireRole(models.RoleAdmin)
+}
+
+// RequireUser middleware checks if user has user role (or admin)
+func RequireUser() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		user := c.Locals("user").(*models.UserContext)
+		if user == nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Authentication required",
+			})
+		}
+
+		// Allow both user and admin roles
+		if user.Role != models.RoleUser && user.Role != models.RoleAdmin {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 				"error": "Insufficient permissions",
 			})

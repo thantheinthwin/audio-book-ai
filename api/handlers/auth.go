@@ -59,11 +59,18 @@ func ValidateToken(c *fiber.Ctx) error {
 		// Extract user information from claims
 		userID, _ := claims["sub"].(string)
 		email, _ := claims["email"].(string)
+		role, _ := claims["role"].(string)
+
+		// Default to user role if not specified
+		if role == "" {
+			role = models.RoleUser
+		}
 
 		// Create user object
 		user := &models.User{
 			ID:         userID,
 			Email:      email,
+			Role:       role,
 			IsActive:   true,
 			IsVerified: true, // Supabase handles email verification
 		}
@@ -92,6 +99,7 @@ func Me(c *fiber.Ctx) error {
 	profile := &models.User{
 		ID:         user.ID,
 		Email:      user.Email,
+		Role:       user.Role,
 		IsActive:   true,
 		IsVerified: true,
 	}
