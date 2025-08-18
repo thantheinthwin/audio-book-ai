@@ -43,16 +43,6 @@ services:
     networks:
       - audiobook-network
 
-  # Go AI orchestrator (tags and embeddings using Gemini)
-  ai_orchestrator:
-    build:
-      context: ..
-      dockerfile: ai_orchestrator/Dockerfile
-    depends_on:
-      - redis
-    networks:
-      - audiobook-network
-
   # Next.js web app
   # web:
   #   build:
