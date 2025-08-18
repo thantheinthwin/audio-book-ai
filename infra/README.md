@@ -124,8 +124,8 @@ Key environment variables needed:
 ### Supabase Configuration
 
 - `SUPABASE_URL`: Your Supabase project URL
-- `SUPABASE_ANON_KEY`: Supabase anonymous key
-- `SUPABASE_SERVICE_ROLE_KEY`: Supabase service role key
+- `SUPABASE_PUBLISHABLE_KEY`: Supabase publishable key (formerly anon key)
+- `SUPABASE_SECRET_KEY`: Supabase secret key (formerly service role key)
 - `SUPABASE_STORAGE_BUCKET`: Storage bucket name (default: "audio")
 
 ### Redis Configuration
