@@ -1,38 +1,51 @@
-# Multi-stage build to handle large dependencies
-FROM python:3.11-slim as deps
+# Build stage
+FROM golang:1.21-alpine AS builder
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+# Install git and ca-certificates (needed for go mod download)
+RUN apk add --no-cache git ca-certificates
 
 # Set working directory
 WORKDIR /app
 
-# Copy requirements and install Python dependencies
-COPY transcriber/requirements.txt .
-RUN pip install --no-cache-dir --timeout 300 --retries 3 -r requirements.txt
+# Copy go mod files
+COPY transcriber/go.mod transcriber/go.sum ./
 
-# Final stage
-FROM python:3.11-slim
+# Download dependencies
+RUN go mod download
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set working directory
-WORKDIR /app
-
-# Copy Python packages from deps stage
-COPY --from=deps /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=deps /usr/local/bin /usr/local/bin
-
-# Copy application code
+# Copy source code
 COPY transcriber/ .
 
-# Copy .env file from the transcriber directory
-COPY transcriber/.env .env
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
 
-# Run the transcriber
-CMD ["python", "main.py"]
+# Final stage
+FROM alpine:latest
+
+# Install ca-certificates for HTTPS requests
+RUN apk --no-cache add ca-certificates
+
+# Create app user
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
+
+# Set working directory
+WORKDIR /app
+
+# Copy the binary from builder stage
+COPY --from=builder /app/main .
+
+# Copy .env file if it exists
+COPY transcriber/.env* ./
+
+# Change ownership to app user
+RUN chown -R appuser:appgroup /app
+
+# Switch to app user
+USER appuser
+
+# Expose port (if needed)
+EXPOSE 8080
+
+# Run the application
+CMD ["./main"]
