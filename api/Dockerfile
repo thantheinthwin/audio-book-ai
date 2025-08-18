@@ -35,6 +35,9 @@ WORKDIR /app
 # Copy binary from builder stage
 COPY --from=builder /app/main .
 
+# Copy .env file from the infra directory
+COPY ../infra/.env .env
+
 # Change ownership to non-root user
 RUN chown -R appuser:appgroup /app
 

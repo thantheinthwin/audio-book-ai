@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # Redis for job queue
@@ -28,10 +28,10 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - OLLAMA_URL=http://ollama:11434
-      - JOBS_PREFIX=audiobooks
+    # environment:
+    #   - REDIS_URL=${REDIS_URL}
+    #   - OLLAMA_URL=${OLLAMA_URL}
+    #   - JOBS_PREFIX=${JOBS_PREFIX}
     depends_on:
       - redis
       - ollama
@@ -43,10 +43,10 @@ services:
     build:
       context: ../worker
       dockerfile: Dockerfile
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - OLLAMA_URL=http://ollama:11434
-      - JOBS_PREFIX=audiobooks
+    # environment:
+    #   - REDIS_URL=${REDIS_URL}
+    #   - OLLAMA_URL=${OLLAMA_URL}
+    #   - JOBS_PREFIX=${JOBS_PREFIX}
     depends_on:
       - redis
       - ollama
@@ -58,9 +58,9 @@ services:
     build:
       context: ../transcriber
       dockerfile: Dockerfile
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - JOBS_PREFIX=audiobooks
+    # environment:
+    #   - REDIS_URL=${REDIS_URL}
+    #   - JOBS_PREFIX=${JOBS_PREFIX}
     depends_on:
       - redis
     networks:
@@ -71,10 +71,10 @@ services:
     build:
       context: ../ai_orchestrator
       dockerfile: Dockerfile
-    environment:
-      - REDIS_URL=redis://redis:6379/0
-      - OLLAMA_URL=http://ollama:11434
-      - JOBS_PREFIX=audiobooks
+    # environment:
+    #   - REDIS_URL=${REDIS_URL}
+    #   - OLLAMA_URL=${OLLAMA_URL}
+    #   - JOBS_PREFIX=${JOBS_PREFIX}
     depends_on:
       - redis
       - ollama

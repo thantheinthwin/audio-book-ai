@@ -29,6 +29,9 @@ WORKDIR /root/
 # Copy the binary from builder stage
 COPY --from=builder /app/main .
 
+# Copy .env file from the infra directory
+COPY ../infra/.env .env
+
 # Run the binary
 CMD ["./main"]
 

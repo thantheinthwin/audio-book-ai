@@ -31,5 +31,8 @@ COPY --from=deps /usr/local/bin /usr/local/bin
 # Copy application code
 COPY . .
 
+# Copy .env file from the infra directory
+COPY ../infra/.env .env
+
 # Run the transcriber
 CMD ["python", "main.py"]
