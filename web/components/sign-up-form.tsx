@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/ui/overwrite/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -84,6 +84,7 @@ export function SignUpForm({
                 <Input
                   id="password"
                   type="password"
+                  showPasswordToggle={true}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -96,6 +97,7 @@ export function SignUpForm({
                 <Input
                   id="repeat-password"
                   type="password"
+                  showPasswordToggle={true}
                   required
                   value={repeatPassword}
                   onChange={(e) => setRepeatPassword(e.target.value)}

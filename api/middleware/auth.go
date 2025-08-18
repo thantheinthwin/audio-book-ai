@@ -9,7 +9,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/supabase-community/gotrue-go"
 )
 
 // AuthMiddleware handles Supabase JWT authentication
@@ -33,18 +32,7 @@ func AuthMiddleware(cfg *config.Config) fiber.Handler {
 		// Extract token
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
-		// Initialize Supabase client with token
-		client := gotrue.New(cfg.SupabaseURL, cfg.SupabasePublishableKey).WithToken(tokenString)
-
-		// Verify token with Supabase
-		user, err := client.GetUser()
-		if err != nil {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Invalid or expired token",
-			})
-		}
-
-		// Parse JWT to get additional claims
+		// Parse and validate JWT token
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			// Validate signing method
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -61,12 +49,18 @@ func AuthMiddleware(cfg *config.Config) fiber.Handler {
 
 		// Extract claims
 		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+			// Extract user information from claims
+			userID, _ := claims["sub"].(string)
+			email, _ := claims["email"].(string)
+			aud, _ := claims["aud"].(string)
+			role, _ := claims["role"].(string)
+
 			// Create user context
 			userContext := &models.UserContext{
-				ID:    user.User.ID.String(),
-				Email: user.User.Email,
-				Aud:   claims["aud"].(string),
-				Role:  claims["role"].(string),
+				ID:    userID,
+				Email: email,
+				Aud:   aud,
+				Role:  role,
 				Token: tokenString,
 			}
 
@@ -93,22 +87,40 @@ func OptionalAuthMiddleware(cfg *config.Config) fiber.Handler {
 		// Try to authenticate, but don't fail if it doesn't work
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
-		client := gotrue.New(cfg.SupabaseURL, cfg.SupabasePublishableKey).WithToken(tokenString)
+		// Parse and validate JWT token
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			// Validate signing method
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			return []byte(cfg.SupabasePublishableKey), nil
+		})
 
-		user, err := client.GetUser()
 		if err != nil {
 			// Continue without authentication
 			return c.Next()
 		}
 
-		// If we get here, we have a valid user
-		userContext := &models.UserContext{
-			ID:    user.User.ID.String(),
-			Email: user.User.Email,
-			Token: tokenString,
+		// Extract claims
+		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+			// Extract user information from claims
+			userID, _ := claims["sub"].(string)
+			email, _ := claims["email"].(string)
+			aud, _ := claims["aud"].(string)
+			role, _ := claims["role"].(string)
+
+			// Create user context
+			userContext := &models.UserContext{
+				ID:    userID,
+				Email: email,
+				Aud:   aud,
+				Role:  role,
+				Token: tokenString,
+			}
+
+			c.Locals("user", userContext)
 		}
 
-		c.Locals("user", userContext)
 		return c.Next()
 	}
 }

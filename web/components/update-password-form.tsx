@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/ui/overwrite/input";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -59,6 +59,7 @@ export function UpdatePasswordForm({
                 <Input
                   id="password"
                   type="password"
+                  showPasswordToggle={true}
                   placeholder="New password"
                   required
                   value={password}

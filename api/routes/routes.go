@@ -25,12 +25,9 @@ func SetupRoutes(app fiber.Router, cfg *config.Config) {
 
 // SetupAuthRoutes configures authentication routes
 func SetupAuthRoutes(router fiber.Router, cfg *config.Config) {
-	router.Post("/register", handlers.Register)
-	router.Post("/login", handlers.Login)
-	router.Post("/logout", handlers.Logout)
-	router.Post("/refresh", handlers.RefreshToken)
-	router.Post("/forgot-password", handlers.ForgotPassword)
-	router.Post("/reset-password", handlers.ResetPassword)
+	router.Post("/validate", handlers.ValidateToken)
+	router.Get("/me", handlers.Me)
+	router.Get("/health", handlers.HealthCheck)
 }
 
 // SetupProtectedRoutes configures protected routes
