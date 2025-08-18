@@ -34,6 +34,38 @@ interface AudioBook {
   updated_at: string;
 }
 
+// New AI processing types
+interface Transcript {
+  id: string;
+  audiobook_id: string;
+  content: string;
+  segments?: any;
+  language: string;
+  confidence_score: number;
+  processing_time_seconds: number;
+  created_at: string;
+}
+
+interface AIOutput {
+  id: string;
+  audiobook_id: string;
+  output_type: "summary" | "tags" | "embedding";
+  content: any;
+  model_used: string;
+  created_at: string;
+}
+
+interface ProcessingJob {
+  id: string;
+  audiobook_id: string;
+  job_type: "transcribe" | "summarize" | "tag" | "embed";
+  status: "pending" | "running" | "completed" | "failed";
+  error_message?: string;
+  created_at: string;
+  started_at?: string;
+  completed_at?: string;
+}
+
 interface ProfileUpdateData {
   username?: string;
   first_name?: string;
@@ -141,6 +173,67 @@ export const audiobooksAPI = {
     }),
 };
 
+// New AI Processing API functions
+export const aiProcessingAPI = {
+  // Transcripts
+  getTranscript: (audiobookId: string) =>
+    apiClient<ApiResponse<Transcript>>(`/transcripts/${audiobookId}`),
+
+  // AI Outputs
+  getAIOutput: (audiobookId: string, outputType: string) =>
+    apiClient<ApiResponse<AIOutput>>(
+      `/ai-outputs/${audiobookId}/${outputType}`
+    ),
+
+  getSummary: (audiobookId: string) =>
+    apiClient<ApiResponse<AIOutput>>(`/ai-outputs/${audiobookId}/summary`),
+
+  getTags: (audiobookId: string) =>
+    apiClient<ApiResponse<AIOutput>>(`/ai-outputs/${audiobookId}/tags`),
+
+  // Processing Jobs
+  getProcessingJobs: (audiobookId?: string) => {
+    const endpoint = audiobookId
+      ? `/processing-jobs?audiobook_id=${audiobookId}`
+      : "/processing-jobs";
+    return apiClient<ApiResponse<ProcessingJob[]>>(endpoint);
+  },
+
+  createProcessingJob: (data: { audiobook_id: string; job_type: string }) =>
+    apiClient<ApiResponse<ProcessingJob>>("/processing-jobs", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  getProcessingJob: (jobId: string) =>
+    apiClient<ApiResponse<ProcessingJob>>(`/processing-jobs/${jobId}`),
+
+  // Trigger AI processing
+  triggerTranscription: (audiobookId: string) =>
+    apiClient<ApiResponse>("/ai-processing/transcribe", {
+      method: "POST",
+      body: JSON.stringify({ audiobook_id: audiobookId }),
+    }),
+
+  triggerSummarization: (audiobookId: string) =>
+    apiClient<ApiResponse>("/ai-processing/summarize", {
+      method: "POST",
+      body: JSON.stringify({ audiobook_id: audiobookId }),
+    }),
+
+  triggerTagging: (audiobookId: string) =>
+    apiClient<ApiResponse>("/ai-processing/tag", {
+      method: "POST",
+      body: JSON.stringify({ audiobook_id: audiobookId }),
+    }),
+
+  triggerEmbedding: (audiobookId: string) =>
+    apiClient<ApiResponse>("/ai-processing/embed", {
+      method: "POST",
+      body: JSON.stringify({ audiobook_id: audiobookId }),
+    }),
+};
+
 // Public audio books API functions
 export const publicAPI = {
   getPublicAudioBooks: () =>
@@ -231,4 +324,17 @@ export const bookmarksAPI = {
     apiClient(`/bookmarks/${id}`, {
       method: "DELETE",
     }),
+};
+
+// Export types for use in components
+export type {
+  ApiResponse,
+  User,
+  AudioBook,
+  Transcript,
+  AIOutput,
+  ProcessingJob,
+  ProfileUpdateData,
+  AudioBookCreateData,
+  AudioBookUpdateData,
 };

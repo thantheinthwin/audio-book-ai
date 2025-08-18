@@ -23,15 +23,6 @@ type Config struct {
 	RedisURL   string
 	JobsPrefix string
 
-	// Ollama
-	OllamaURL      string
-	AISummaryModel string
-	AIEmbedModel   string
-
-	// Whisper
-	WhisperModel    string
-	WhisperLanguage string
-
 	// CORS
 	CORSOrigins []string
 }
@@ -54,15 +45,6 @@ func New() *Config {
 		// Redis
 		RedisURL:   getEnv("REDIS_URL", "redis://redis:6379/0"),
 		JobsPrefix: getEnv("JOBS_PREFIX", "audiobooks"),
-
-		// Ollama
-		OllamaURL:      getEnv("OLLAMA_URL", "http://ollama:11434"),
-		AISummaryModel: getEnv("AI_SUMMARY_MODEL", "llama3.1"),
-		AIEmbedModel:   getEnv("AI_EMBED_MODEL", "nomic-embed-text"),
-
-		// Whisper
-		WhisperModel:    getEnv("WHISPER_MODEL", "base"),
-		WhisperLanguage: getEnv("WHISPER_LANGUAGE", "auto"),
 
 		// CORS
 		CORSOrigins: parseCORSOrigins(getEnv("CORS_ORIGIN", "http://localhost:3000")),
