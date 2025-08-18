@@ -11,16 +11,6 @@ services:
     networks:
       - audiobook-network
 
-  # Ollama for LLM serving
-  ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama:/root/.ollama
-    networks:
-      - audiobook-network
-
   # Go API (REST)
   api:
     build:
@@ -28,56 +18,38 @@ services:
       dockerfile: api/Dockerfile
     ports:
       - "8080:8080"
-    # environment:
-    #   - REDIS_URL=${REDIS_URL}
-    #   - OLLAMA_URL=${OLLAMA_URL}
-    #   - JOBS_PREFIX=${JOBS_PREFIX}
     depends_on:
       - redis
-      - ollama
     networks:
       - audiobook-network
 
-  # Go worker (summarize jobs)
+  # Go worker (summarize jobs using Gemini)
   worker:
     build:
       context: ..
       dockerfile: worker/Dockerfile
-    # environment:
-    #   - REDIS_URL=${REDIS_URL}
-    #   - OLLAMA_URL=${OLLAMA_URL}
-    #   - JOBS_PREFIX=${JOBS_PREFIX}
     depends_on:
       - redis
-      - ollama
     networks:
       - audiobook-network
 
-  # Python Whisper worker
+  # Go transcriber service (using Rev.ai)
   transcriber:
     build:
       context: ..
       dockerfile: transcriber/Dockerfile
-    # environment:
-    #   - REDIS_URL=${REDIS_URL}
-    #   - JOBS_PREFIX=${JOBS_PREFIX}
     depends_on:
       - redis
     networks:
       - audiobook-network
 
-  # Go orchestrator worker
+  # Go AI orchestrator (tags and embeddings using Gemini)
   ai_orchestrator:
     build:
       context: ..
       dockerfile: ai_orchestrator/Dockerfile
-    # environment:
-    #   - REDIS_URL=${REDIS_URL}
-    #   - OLLAMA_URL=${OLLAMA_URL}
-    #   - JOBS_PREFIX=${JOBS_PREFIX}
     depends_on:
       - redis
-      - ollama
     networks:
       - audiobook-network
 
@@ -88,8 +60,6 @@ services:
   #     dockerfile: web/Dockerfile
   #   ports:
   #     - "3000:3000"
-  #   environment:
-  #     - NEXT_PUBLIC_API_URL=http://api:8080
   #   depends_on:
   #     - api
   #   networks:
@@ -97,7 +67,6 @@ services:
 
 volumes:
   redisdata:
-  ollama:
 
 networks:
   audiobook-network:

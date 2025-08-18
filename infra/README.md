@@ -8,11 +8,10 @@ The application uses a microservices architecture with the following components:
 
 - **Supabase**: Cloud-based Auth + PostgreSQL + Storage (not dockerized)
 - **Redis**: Job queue for background processing
-- **Ollama**: Local LLM serving for AI operations
 - **Go API**: REST API service
-- **Go Worker**: Background job processor for summarization
-- **Python Transcriber**: Whisper-based audio transcription worker
-- **Go AI Orchestrator**: AI workflow orchestration
+- **Go Worker**: Background job processor for summarization using Gemini API
+- **Go Transcriber**: Rev.ai-based audio transcription worker
+- **Go AI Orchestrator**: AI workflow orchestration using Gemini API
 - **Next.js Web App**: Frontend application
 
 ## Services Overview
@@ -20,11 +19,10 @@ The application uses a microservices architecture with the following components:
 The Docker Compose infrastructure includes:
 
 - **redis**: Job queue for background processing
-- **ollama**: LLM serving (llama3.1, nomic-embed-text)
 - **api**: Go REST API service
-- **worker**: Go worker for summarize jobs
-- **transcriber**: Python Whisper worker
-- **ai_orchestrator**: Go orchestrator worker
+- **worker**: Go worker for summarize jobs using Gemini
+- **transcriber**: Go transcriber using Rev.ai
+- **ai_orchestrator**: Go orchestrator worker using Gemini
 - **web**: Next.js web application
 
 ## Quick Start
@@ -32,9 +30,11 @@ The Docker Compose infrastructure includes:
 ### Prerequisites
 
 - Docker and Docker Compose installed
-- At least 8GB of available RAM (for Ollama models)
-- 20GB of available disk space
+- At least 4GB of available RAM
+- 10GB of available disk space
 - Supabase project set up
+- Gemini API key
+- Rev.ai API key
 
 ### Setup Instructions
 
@@ -53,7 +53,7 @@ The Docker Compose infrastructure includes:
 3. **Edit the environment file:**
 
    ```bash
-   # Edit infra/.env and add your Supabase credentials and configuration
+   # Edit infra/.env and add your Supabase credentials and API keys
    nano infra/.env
    ```
 
@@ -64,13 +64,7 @@ The Docker Compose infrastructure includes:
    docker-compose up -d
    ```
 
-5. **Pull Ollama models:**
-
-   ```bash
-   make pull-models
-   ```
-
-6. **Check service status:**
+5. **Check service status:**
    ```bash
    docker-compose ps
    ```
@@ -83,33 +77,29 @@ The Docker Compose infrastructure includes:
 - **Purpose**: Job queue for background processing
 - **Volume**: `redisdata`
 
-### Ollama (ollama)
-
-- **Port**: 11434
-- **Purpose**: Local LLM serving
-- **Models**: llama3.1, nomic-embed-text
-- **Volume**: `ollama`
-
 ### Go API (api)
 
 - **Port**: 8080
 - **Purpose**: REST API service
-- **Dependencies**: redis, ollama
+- **Dependencies**: redis
 
 ### Go Worker (worker)
 
 - **Purpose**: Background job processing for summarization
-- **Dependencies**: redis, ollama
-
-### Python Transcriber (transcriber)
-
-- **Purpose**: Audio transcription using Whisper
 - **Dependencies**: redis
+- **AI Provider**: Gemini API
+
+### Go Transcriber (transcriber)
+
+- **Purpose**: Audio transcription using Rev.ai
+- **Dependencies**: redis
+- **AI Provider**: Rev.ai API
 
 ### Go AI Orchestrator (ai_orchestrator)
 
-- **Purpose**: AI workflow orchestration
-- **Dependencies**: redis, ollama
+- **Purpose**: AI workflow orchestration for tags and embeddings
+- **Dependencies**: redis
+- **AI Provider**: Gemini API
 
 ### Next.js Web App (web)
 
@@ -133,16 +123,16 @@ Key environment variables needed:
 - `REDIS_URL`: Redis connection string
 - `JOBS_PREFIX`: Job queue prefix (default: "audiobooks")
 
-### Ollama Configuration
+### Gemini API Configuration
 
-- `OLLAMA_URL`: Ollama service URL
-- `AI_SUMMARY_MODEL`: Model for summarization (default: "llama3.1")
-- `AI_EMBED_MODEL`: Model for embeddings (default: "nomic-embed-text")
+- `GEMINI_API_KEY`: Your Gemini API key
+- `GEMINI_URL`: Gemini API base URL
+- `GEMINI_MODEL`: Gemini model to use (default: "gemini-2.0-flash-exp")
 
-### Whisper Configuration
+### Rev.ai Configuration
 
-- `WHISPER_MODEL`: Whisper model size (default: "base")
-- `WHISPER_LANGUAGE`: Language detection (default: "auto")
+- `REV_AI_API_KEY`: Your Rev.ai API key
+- `REV_AI_URL`: Rev.ai API base URL
 
 ## Development Workflow
 
@@ -165,12 +155,6 @@ docker-compose down
 docker-compose down
 docker-compose build --no-cache
 docker-compose up -d
-```
-
-### Pulling Ollama Models
-
-```bash
-make pull-models
 ```
 
 ### Viewing Logs
@@ -207,14 +191,13 @@ docker-compose logs [service-name]
 netstat -tulpn | grep :8080
 ```
 
-**Ollama model issues:**
+**API key issues:**
 
 ```bash
-# Check if models are downloaded
-docker-compose exec ollama ollama list
-
-# Pull missing models
-make pull-models
+# Check if API keys are set correctly
+docker-compose logs worker
+docker-compose logs transcriber
+docker-compose logs ai_orchestrator
 ```
 
 **Redis connection issues:**
@@ -260,7 +243,8 @@ infra/
 For issues related to the infrastructure setup, please check:
 
 1. Docker and Docker Compose versions
-2. Available system resources (especially RAM for Ollama)
+2. Available system resources
 3. Port conflicts
 4. Supabase configuration
 5. Environment variable configuration
+6. API key configuration for Gemini and Rev.ai

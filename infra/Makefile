@@ -1,4 +1,4 @@
-.PHONY: up down pull-models migrate logs status clean rebuild build-with-retry
+.PHONY: up down migrate logs status clean rebuild build-with-retry
 
 # Start all services
 up:
@@ -7,11 +7,6 @@ up:
 # Stop all services
 down:
 	docker-compose down
-
-# Pull Ollama models
-pull-models:
-	docker-compose exec ollama ollama pull llama3.1
-	docker-compose exec ollama ollama pull nomic-embed-text
 
 # Run database migrations (optional - can use Supabase dashboard)
 migrate:
@@ -40,9 +35,7 @@ rebuild:
 build-with-retry:
 	@echo "Building services with retry logic..."
 	docker-compose down
-	@echo "Building transcriber service first (most likely to fail)..."
-	docker-compose build --no-cache transcriber || (echo "Retrying transcriber build..." && docker-compose build --no-cache transcriber)
-	@echo "Building remaining services..."
+	@echo "Building all services..."
 	docker-compose build --no-cache
 	docker-compose up -d
 
@@ -56,11 +49,11 @@ logs-worker:
 logs-transcriber:
 	docker-compose logs -f transcriber
 
+logs-ai-orchestrator:
+	docker-compose logs -f ai_orchestrator
+
 logs-web:
 	docker-compose logs -f web
-
-logs-ollama:
-	docker-compose logs -f ollama
 
 logs-redis:
 	docker-compose logs -f redis
@@ -75,6 +68,9 @@ restart-worker:
 restart-transcriber:
 	docker-compose restart transcriber
 
+restart-ai-orchestrator:
+	docker-compose restart ai_orchestrator
+
 restart-web:
 	docker-compose restart web
 
@@ -86,21 +82,19 @@ shell-worker:
 	docker-compose exec worker /bin/sh
 
 shell-transcriber:
-	docker-compose exec transcriber /bin/bash
+	docker-compose exec transcriber /bin/sh
+
+shell-ai-orchestrator:
+	docker-compose exec ai_orchestrator /bin/sh
 
 shell-web:
 	docker-compose exec web /bin/sh
-
-# Check Ollama models
-models:
-	docker-compose exec ollama ollama list
 
 # Help
 help:
 	@echo "Available commands:"
 	@echo "  up              - Start all services"
 	@echo "  down            - Stop all services"
-	@echo "  pull-models     - Pull Ollama models"
 	@echo "  migrate         - Run database migrations (use Supabase dashboard)"
 	@echo "  logs            - Show logs for all services"
 	@echo "  status          - Show status of all services"
@@ -112,22 +106,23 @@ help:
 	@echo "  logs-api        - Show API logs"
 	@echo "  logs-worker     - Show worker logs"
 	@echo "  logs-transcriber - Show transcriber logs"
+	@echo "  logs-ai-orchestrator - Show AI orchestrator logs"
 	@echo "  logs-web        - Show web app logs"
-	@echo "  logs-ollama     - Show Ollama logs"
 	@echo "  logs-redis      - Show Redis logs"
 	@echo ""
 	@echo "Service restart:"
 	@echo "  restart-api     - Restart API service"
 	@echo "  restart-worker  - Restart worker service"
 	@echo "  restart-transcriber - Restart transcriber service"
+	@echo "  restart-ai-orchestrator - Restart AI orchestrator service"
 	@echo "  restart-web     - Restart web service"
 	@echo ""
 	@echo "Shell access:"
 	@echo "  shell-api       - Access API container shell"
 	@echo "  shell-worker    - Access worker container shell"
 	@echo "  shell-transcriber - Access transcriber container shell"
+	@echo "  shell-ai-orchestrator - Access AI orchestrator container shell"
 	@echo "  shell-web       - Access web container shell"
 	@echo ""
 	@echo "Other:"
-	@echo "  models          - List Ollama models"
 	@echo "  help            - Show this help"
