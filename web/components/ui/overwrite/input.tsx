@@ -3,27 +3,23 @@ import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input as BaseInput } from "@/components/ui/input";
 
-interface InputProps extends React.ComponentProps<typeof BaseInput> {
-  showPasswordToggle?: boolean;
-}
+interface InputProps extends React.ComponentProps<typeof BaseInput> {}
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, showPasswordToggle = false, ...props }, ref) => {
+  ({ className, type, ...props }, ref) => {
     const [showPassword, setShowPassword] = React.useState(false);
     const isPasswordType = type === "password";
-    const shouldShowToggle = showPasswordToggle && isPasswordType;
-
-    const inputType = shouldShowToggle && showPassword ? "text" : type;
+    const inputType = isPasswordType && showPassword ? "text" : type;
 
     return (
       <div className="relative">
         <BaseInput
           ref={ref}
           type={inputType}
-          className={cn(shouldShowToggle && "pr-10", className)}
+          className={cn(isPasswordType && "pr-10", className)}
           {...props}
         />
-        {shouldShowToggle && (
+        {isPasswordType && (
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}

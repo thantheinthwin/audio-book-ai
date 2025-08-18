@@ -10,7 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import {
   Form,
   FormControl,
@@ -25,12 +24,14 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { Input } from "./ui/overwrite/input";
 
 const adminSignUpSchema = z
   .object({
     email: z.string().email("Please enter a valid email address"),
     password: z.string().min(6, "Password must be at least 6 characters"),
     confirmPassword: z.string(),
+    invitationCode: z.string().min(1, "Invitation code is required"),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",
@@ -38,6 +39,9 @@ const adminSignUpSchema = z
   });
 
 type AdminSignUpFormValues = z.infer<typeof adminSignUpSchema>;
+
+// Simple invitation codes for testing
+const VALID_INVITATION_CODES = ["ADMIN2024", "SUPERADMIN", "TEST123"];
 
 export function AdminSignUpForm({
   className,
@@ -53,10 +57,19 @@ export function AdminSignUpForm({
       email: "",
       password: "",
       confirmPassword: "",
+      invitationCode: "",
     },
   });
 
   const onSubmit = async (data: AdminSignUpFormValues) => {
+    // Simple invitation code validation
+    if (!VALID_INVITATION_CODES.includes(data.invitationCode)) {
+      setError(
+        "Invalid invitation code. Please contact the administrator to get an invitation code."
+      );
+      return;
+    }
+
     const supabase = createClient();
     setIsLoading(true);
     setError(null);
@@ -70,6 +83,7 @@ export function AdminSignUpForm({
           emailRedirectTo: `${window.location.origin}/protected`,
           data: {
             role: "admin",
+            invitationCode: data.invitationCode, // Store for audit trail
           },
         },
       });
@@ -85,7 +99,10 @@ export function AdminSignUpForm({
 
         // For now, we'll store the role in user metadata
         const { error: updateError } = await supabase.auth.updateUser({
-          data: { role: "admin" },
+          data: {
+            role: "admin",
+            invitationCode: data.invitationCode,
+          },
         });
 
         if (updateError) {
@@ -107,12 +124,37 @@ export function AdminSignUpForm({
         <CardHeader>
           <CardTitle className="text-2xl">Admin Sign Up</CardTitle>
           <CardDescription>
-            Create a new account with role selection
+            Create a new admin account (Testing Mode)
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <p className="text-sm text-blue-800">
+              <strong>Testing Invitation Codes:</strong> Please contact the
+              administrator to get an invitation code.
+            </p>
+          </div>
+
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="invitationCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Invitation Code</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="text"
+                        placeholder="Enter invitation code"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="email"
@@ -122,7 +164,7 @@ export function AdminSignUpForm({
                     <FormControl>
                       <Input
                         type="email"
-                        placeholder="m@example.com"
+                        placeholder="admin@example.com"
                         {...field}
                       />
                     </FormControl>
@@ -170,7 +212,9 @@ export function AdminSignUpForm({
               {error && <p className="text-sm text-red-500">{error}</p>}
 
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Creating an account..." : "Sign up"}
+                {isLoading
+                  ? "Creating admin account..."
+                  : "Create Admin Account"}
               </Button>
             </form>
           </Form>
