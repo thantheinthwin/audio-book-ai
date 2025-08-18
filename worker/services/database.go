@@ -45,6 +45,7 @@ func NewDatabaseService(dbURL string) (*DatabaseService, error) {
 		return nil, fmt.Errorf("failed to ping connection pool: %v", err)
 	}
 
+	fmt.Println("Database service initialized successfully")
 	return &DatabaseService{pool: pool}, nil
 }
 
