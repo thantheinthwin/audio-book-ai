@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"audio-book-ai/api/config"
+	"audio-book-ai/api/database"
 	"audio-book-ai/api/handlers"
 	"audio-book-ai/api/routes"
 
@@ -68,9 +69,13 @@ func main() {
 	// Health check endpoint
 	app.Get("/health", handlers.HealthCheck)
 
+	// TODO: Initialize database repository
+	// For now, we'll use a mock repository until the database implementation is ready
+	var repo database.Repository = nil // This will be replaced with actual implementation
+
 	// API routes
 	api := app.Group("/api/v1")
-	routes.SetupRoutes(api, cfg)
+	routes.SetupRoutes(api, cfg, repo)
 
 	// Start server
 	port := os.Getenv("API_PORT")

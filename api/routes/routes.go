@@ -2,6 +2,7 @@ package routes
 
 import (
 	"audio-book-ai/api/config"
+	"audio-book-ai/api/database"
 	"audio-book-ai/api/handlers"
 	"audio-book-ai/api/middleware"
 
@@ -9,18 +10,21 @@ import (
 )
 
 // SetupRoutes configures all API routes
-func SetupRoutes(app fiber.Router, cfg *config.Config) {
+func SetupRoutes(app fiber.Router, cfg *config.Config, repo database.Repository) {
+	// Create handler instance
+	h := handlers.NewHandler(repo)
+
 	// Auth routes (no authentication required)
 	auth := app.Group("/auth")
 	SetupAuthRoutes(auth, cfg)
 
 	// Protected routes (authentication required)
 	protected := app.Group("/", middleware.AuthMiddleware(cfg))
-	SetupProtectedRoutes(protected, cfg)
+	SetupProtectedRoutes(protected, cfg, h)
 
 	// Admin routes (admin authentication required)
 	admin := app.Group("/admin", middleware.AuthMiddleware(cfg), middleware.RequireAdmin())
-	SetupAdminRoutes(admin, cfg)
+	SetupAdminRoutes(admin, cfg, h)
 
 	// Public routes (no authentication required)
 	public := app.Group("/")
@@ -35,7 +39,7 @@ func SetupAuthRoutes(router fiber.Router, cfg *config.Config) {
 }
 
 // SetupProtectedRoutes configures protected routes (requires user or admin role)
-func SetupProtectedRoutes(router fiber.Router, cfg *config.Config) {
+func SetupProtectedRoutes(router fiber.Router, cfg *config.Config, h *handlers.Handler) {
 	// Apply user role middleware
 	router.Use(middleware.RequireUser())
 
@@ -74,11 +78,19 @@ func SetupProtectedRoutes(router fiber.Router, cfg *config.Config) {
 }
 
 // SetupAdminRoutes configures admin-only routes
-func SetupAdminRoutes(router fiber.Router, cfg *config.Config) {
+func SetupAdminRoutes(router fiber.Router, cfg *config.Config, h *handlers.Handler) {
+	// Upload operations
+	router.Post("/uploads", h.CreateUpload)
+	router.Post("/uploads/:id/files", h.UploadFile)
+	router.Get("/uploads/:id/progress", h.GetUploadProgress)
+	router.Get("/uploads/:id", h.GetUploadDetails)
+	router.Delete("/uploads/:id", h.DeleteUpload)
+
 	// Audio books (admin operations)
-	router.Post("/audiobooks", handlers.CreateAudioBook)
+	router.Post("/audiobooks", h.CreateAudioBook)
 	router.Put("/audiobooks/:id", handlers.UpdateAudioBook)
 	router.Delete("/audiobooks/:id", handlers.DeleteAudioBook)
+	router.Get("/audiobooks/:id/jobs", h.GetJobStatus)
 
 	// User management
 	router.Get("/users", handlers.GetUsers)

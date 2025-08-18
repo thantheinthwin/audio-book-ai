@@ -22,10 +22,6 @@ func GetAudioBooks(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Get audio books - TODO"})
 }
 
-func CreateAudioBook(c *fiber.Ctx) error {
-	return c.JSON(fiber.Map{"message": "Create audio book - TODO"})
-}
-
 func GetAudioBook(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Get audio book - TODO"})
 }
@@ -36,6 +32,31 @@ func UpdateAudioBook(c *fiber.Ctx) error {
 
 func DeleteAudioBook(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Delete audio book - TODO"})
+}
+
+// Upload handlers
+func CreateUpload(c *fiber.Ctx) error {
+	return c.JSON(fiber.Map{"message": "Create upload - TODO"})
+}
+
+func UploadFile(c *fiber.Ctx) error {
+	return c.JSON(fiber.Map{"message": "Upload file - TODO"})
+}
+
+func GetUploadProgress(c *fiber.Ctx) error {
+	return c.JSON(fiber.Map{"message": "Get upload progress - TODO"})
+}
+
+func GetUploadDetails(c *fiber.Ctx) error {
+	return c.JSON(fiber.Map{"message": "Get upload details - TODO"})
+}
+
+func DeleteUpload(c *fiber.Ctx) error {
+	return c.JSON(fiber.Map{"message": "Delete upload - TODO"})
+}
+
+func GetJobStatus(c *fiber.Ctx) error {
+	return c.JSON(fiber.Map{"message": "Get job status - TODO"})
 }
 
 // Library handlers
@@ -114,4 +135,3 @@ func GetPublicAudioBooks(c *fiber.Ctx) error {
 func GetPublicAudioBook(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Get public audio book - TODO"})
 }
-
