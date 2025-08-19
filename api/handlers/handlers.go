@@ -90,7 +90,6 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 		ID:          uuid.New(),
 		Title:       req.Title,
 		Author:      req.Author,
-		Description: req.Description,
 		Language:    req.Language,
 		IsPublic:    req.IsPublic,
 		Status:      models.StatusPending,

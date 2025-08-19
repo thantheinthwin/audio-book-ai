@@ -120,11 +120,7 @@ export default async function AudioBooksPage() {
                   />
                 </div>
               )}
-              {book.description && (
-                <p className="text-sm text-muted-foreground line-clamp-3 mb-3">
-                  {book.description}
-                </p>
-              )}
+              
               <div className="flex justify-between items-center">
                 <div className="flex gap-2">
                   {book.duration && (

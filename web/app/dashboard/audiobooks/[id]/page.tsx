@@ -1,21 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { audiobooksAPI, aiProcessingAPI } from "@/lib/api";
+import { audiobooksAPI } from "@/lib/api";
 import { notFound } from "next/navigation";
-import {
-  Play,
-  Pause,
-  SkipBack,
-  SkipForward,
-  Volume2,
-  Edit,
-  Trash2,
-  FileText,
-  Brain,
-  Tags,
-  Download,
-  Share2,
-} from "lucide-react";
+import { Play, Edit, Trash2, Download, Share2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,9 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface PageProps {
   params: {
@@ -51,45 +36,10 @@ export default async function AudioBookDetailPage({ params }: PageProps) {
 
   // Fetch audio book details
   let audioBook = null;
-  let transcript = null;
-  let summary = null;
-  let tags = null;
-  let processingJobs = [];
 
   try {
-    const [
-      audioBookResponse,
-      transcriptResponse,
-      summaryResponse,
-      tagsResponse,
-      jobsResponse,
-    ] = await Promise.allSettled([
-      audiobooksAPI.getAudioBook(params.id),
-      aiProcessingAPI.getTranscript(params.id),
-      aiProcessingAPI.getSummary(params.id),
-      aiProcessingAPI.getTags(params.id),
-      aiProcessingAPI.getProcessingJobs(params.id),
-    ]);
-
-    if (audioBookResponse.status === "fulfilled") {
-      audioBook = audioBookResponse.value.data;
-    }
-
-    if (transcriptResponse.status === "fulfilled") {
-      transcript = transcriptResponse.value.data;
-    }
-
-    if (summaryResponse.status === "fulfilled") {
-      summary = summaryResponse.value.data;
-    }
-
-    if (tagsResponse.status === "fulfilled") {
-      tags = tagsResponse.value.data;
-    }
-
-    if (jobsResponse.status === "fulfilled") {
-      processingJobs = jobsResponse.value.data || [];
-    }
+    const audioBookResponse = await audiobooksAPI.getAudioBook(params.id);
+    audioBook = audioBookResponse.data;
   } catch (error) {
     console.error("Failed to fetch audio book details:", error);
   }
@@ -145,15 +95,6 @@ export default async function AudioBookDetailPage({ params }: PageProps) {
                 )}
                 <div className="flex-1">
                   <div className="space-y-4">
-                    <div>
-                      <h3 className="font-semibold text-lg mb-2">
-                        Description
-                      </h3>
-                      <p className="text-muted-foreground">
-                        {audioBook.description || "No description available."}
-                      </p>
-                    </div>
-
                     <div className="flex gap-4">
                       {audioBook.duration && (
                         <div>
@@ -195,151 +136,45 @@ export default async function AudioBookDetailPage({ params }: PageProps) {
             </CardContent>
           </Card>
 
-          {/* AI Processing Tabs */}
+          {/* Audio Book Information */}
           <Card>
             <CardHeader>
-              <CardTitle>AI Processing</CardTitle>
+              <CardTitle>Audio Book Information</CardTitle>
               <CardDescription>
-                View and manage AI-generated content
+                Basic information about this audio book
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="transcript" className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="transcript">Transcript</TabsTrigger>
-                  <TabsTrigger value="summary">Summary</TabsTrigger>
-                  <TabsTrigger value="tags">Tags</TabsTrigger>
-                  <TabsTrigger value="jobs">Processing Jobs</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="transcript" className="space-y-4">
-                  {transcript ? (
-                    <div>
-                      <div className="flex justify-between items-center mb-4">
-                        <div>
-                          <Badge variant="secondary">
-                            Confidence:{" "}
-                            {Math.round(transcript.confidence_score * 100)}%
-                          </Badge>
-                          <Badge variant="outline" className="ml-2">
-                            {transcript.language}
-                          </Badge>
-                        </div>
-                        <Button size="sm" variant="outline">
-                          <FileText className="h-4 w-4 mr-2" />
-                          Export
-                        </Button>
-                      </div>
-                      <div className="bg-muted p-4 rounded-md max-h-64 overflow-y-auto">
-                        <p className="text-sm whitespace-pre-wrap">
-                          {transcript.content}
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                      <p className="text-muted-foreground">
-                        No transcript available
-                      </p>
-                      <Button className="mt-2" size="sm">
-                        Generate Transcript
-                      </Button>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="summary" className="space-y-4">
-                  {summary ? (
-                    <div>
-                      <div className="flex justify-between items-center mb-4">
-                        <Badge variant="secondary">
-                          Model: {summary.model_used}
-                        </Badge>
-                      </div>
-                      <div className="bg-muted p-4 rounded-md">
-                        <p className="text-sm">{summary.content}</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                      <p className="text-muted-foreground">
-                        No summary available
-                      </p>
-                      <Button className="mt-2" size="sm">
-                        Generate Summary
-                      </Button>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="tags" className="space-y-4">
-                  {tags ? (
-                    <div>
-                      <div className="flex justify-between items-center mb-4">
-                        <Badge variant="secondary">
-                          Model: {tags.model_used}
-                        </Badge>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {tags.content.map((tag: string, index: number) => (
-                          <Badge key={index} variant="outline">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Tags className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                      <p className="text-muted-foreground">No tags available</p>
-                      <Button className="mt-2" size="sm">
-                        Generate Tags
-                      </Button>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="jobs" className="space-y-4">
-                  {processingJobs.length > 0 ? (
-                    <div className="space-y-2">
-                      {processingJobs.map((job) => (
-                        <div
-                          key={job.id}
-                          className="flex justify-between items-center p-3 border rounded-md"
-                        >
-                          <div>
-                            <p className="font-medium capitalize">
-                              {job.job_type}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {new Date(job.created_at).toLocaleString()}
-                            </p>
-                          </div>
-                          <Badge
-                            variant={
-                              job.status === "completed"
-                                ? "default"
-                                : job.status === "failed"
-                                ? "destructive"
-                                : "secondary"
-                            }
-                          >
-                            {job.status}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <p className="text-muted-foreground">
-                        No processing jobs
-                      </p>
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
+            <CardContent className="space-y-4">
+              <div>
+                <span className="text-sm text-muted-foreground">Title:</span>
+                <p className="font-medium">{audioBook.title}</p>
+              </div>
+              <div>
+                <span className="text-sm text-muted-foreground">Author:</span>
+                <p className="font-medium">{audioBook.author}</p>
+              </div>
+              {audioBook.summary && (
+                <div>
+                  <span className="text-sm text-muted-foreground">
+                    Summary:
+                  </span>
+                  <p className="text-sm mt-1">{audioBook.summary}</p>
+                </div>
+              )}
+              <div>
+                <span className="text-sm text-muted-foreground">Created:</span>
+                <p className="text-sm">
+                  {new Date(audioBook.created_at).toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <span className="text-sm text-muted-foreground">
+                  Last Updated:
+                </span>
+                <p className="text-sm">
+                  {new Date(audioBook.updated_at).toLocaleString()}
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -353,16 +188,16 @@ export default async function AudioBookDetailPage({ params }: PageProps) {
             </CardHeader>
             <CardContent className="space-y-2">
               <Button className="w-full" size="sm">
-                <Brain className="h-4 w-4 mr-2" />
-                Process with AI
+                <Play className="h-4 w-4 mr-2" />
+                Play Audio Book
               </Button>
               <Button className="w-full" variant="outline" size="sm">
-                <FileText className="h-4 w-4 mr-2" />
-                Generate Transcript
+                <Download className="h-4 w-4 mr-2" />
+                Download
               </Button>
               <Button className="w-full" variant="outline" size="sm">
-                <Tags className="h-4 w-4 mr-2" />
-                Generate Tags
+                <Share2 className="h-4 w-4 mr-2" />
+                Share
               </Button>
             </CardContent>
           </Card>

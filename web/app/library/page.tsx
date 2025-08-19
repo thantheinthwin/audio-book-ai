@@ -87,11 +87,7 @@ export default async function LibraryPage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {book.description && (
-          <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-            {book.description}
-          </p>
-        )}
+        
         <div className="flex justify-between items-center">
           <div className="flex gap-2">
             {book.duration && (

@@ -91,12 +91,6 @@ func SetupAdminRoutes(router fiber.Router, cfg *config.Config, h *handlers.Handl
 	router.Put("/audiobooks/:id", handlers.UpdateAudioBook)
 	router.Delete("/audiobooks/:id", handlers.DeleteAudioBook)
 	router.Get("/audiobooks/:id/jobs", h.GetJobStatus)
-
-	// User management
-	router.Get("/users", handlers.GetUsers)
-	router.Get("/users/:id", handlers.GetUser)
-	router.Put("/users/:id", handlers.UpdateUser)
-	router.Delete("/users/:id", handlers.DeleteUser)
 }
 
 // SetupPublicRoutes configures public routes (no authentication required)

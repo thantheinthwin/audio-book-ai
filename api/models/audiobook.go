@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"audio-book-ai/api/utils"
+
+	"github.com/google/uuid"
 )
 
 // AudioBookStatus represents the processing status of an audio book
@@ -60,101 +61,101 @@ const (
 
 // AudioBook represents an audio book in the system
 type AudioBook struct {
-	ID             uuid.UUID       `json:"id" db:"id"`
-	Title          string          `json:"title" db:"title" validate:"required,min=1,max=255"`
-	Author         string          `json:"author" db:"author" validate:"required,min=1,max=255"`
-	Description    *string         `json:"description,omitempty" db:"description"`
-	DurationSeconds *int           `json:"duration_seconds,omitempty" db:"duration_seconds"`
-	FileSizeBytes  *int64          `json:"file_size_bytes,omitempty" db:"file_size_bytes"`
-	FilePath       string          `json:"file_path" db:"file_path" validate:"required"`
-	FileURL        *string         `json:"file_url,omitempty" db:"file_url"`
-	CoverImageURL  *string         `json:"cover_image_url,omitempty" db:"cover_image_url"`
-	Language       string          `json:"language" db:"language" validate:"required,len=2"`
-	IsPublic       bool            `json:"is_public" db:"is_public"`
-	Status         AudioBookStatus `json:"status" db:"status" validate:"required"`
-	CreatedBy      uuid.UUID       `json:"created_by" db:"created_by" validate:"required"`
-	CreatedAt      time.Time       `json:"created_at" db:"created_at"`
-	UpdatedAt      time.Time       `json:"updated_at" db:"updated_at"`
+	ID              uuid.UUID       `json:"id" db:"id"`
+	Title           string          `json:"title" db:"title" validate:"required,min=1,max=255"`
+	Author          string          `json:"author" db:"author" validate:"required,min=1,max=255"`
+	Summary         *string         `json:"summary,omitempty" db:"summary"`
+	DurationSeconds *int            `json:"duration_seconds,omitempty" db:"duration_seconds"`
+	FileSizeBytes   *int64          `json:"file_size_bytes,omitempty" db:"file_size_bytes"`
+	FilePath        string          `json:"file_path" db:"file_path" validate:"required"`
+	FileURL         *string         `json:"file_url,omitempty" db:"file_url"`
+	CoverImageURL   *string         `json:"cover_image_url,omitempty" db:"cover_image_url"`
+	Language        string          `json:"language" db:"language" validate:"required,len=2"`
+	IsPublic        bool            `json:"is_public" db:"is_public"`
+	Status          AudioBookStatus `json:"status" db:"status" validate:"required"`
+	CreatedBy       uuid.UUID       `json:"created_by" db:"created_by" validate:"required"`
+	CreatedAt       time.Time       `json:"created_at" db:"created_at"`
+	UpdatedAt       time.Time       `json:"updated_at" db:"updated_at"`
 }
 
 // Chapter represents a chapter within an audio book
 type Chapter struct {
-	ID             uuid.UUID  `json:"id" db:"id"`
-	AudiobookID    uuid.UUID  `json:"audiobook_id" db:"audiobook_id" validate:"required"`
-	ChapterNumber  int        `json:"chapter_number" db:"chapter_number" validate:"required,min=1"`
-	Title          string     `json:"title" db:"title" validate:"required,min=1,max=255"`
-	StartTime      *int       `json:"start_time_seconds,omitempty" db:"start_time_seconds"`
-	EndTime        *int       `json:"end_time_seconds,omitempty" db:"end_time_seconds"`
+	ID              uuid.UUID `json:"id" db:"id"`
+	AudiobookID     uuid.UUID `json:"audiobook_id" db:"audiobook_id" validate:"required"`
+	ChapterNumber   int       `json:"chapter_number" db:"chapter_number" validate:"required,min=1"`
+	Title           string    `json:"title" db:"title" validate:"required,min=1,max=255"`
+	StartTime       *int      `json:"start_time_seconds,omitempty" db:"start_time_seconds"`
+	EndTime         *int      `json:"end_time_seconds,omitempty" db:"end_time_seconds"`
 	DurationSeconds *int      `json:"duration_seconds,omitempty" db:"duration_seconds"`
-	CreatedAt      time.Time  `json:"created_at" db:"created_at"`
+	CreatedAt       time.Time `json:"created_at" db:"created_at"`
 }
 
 // Transcript represents the transcription of an audio book
 type Transcript struct {
-	ID                    uuid.UUID  `json:"id" db:"id"`
-	AudiobookID           uuid.UUID  `json:"audiobook_id" db:"audiobook_id" validate:"required"`
-	Content               string     `json:"content" db:"content" validate:"required"`
+	ID                    uuid.UUID        `json:"id" db:"id"`
+	AudiobookID           uuid.UUID        `json:"audiobook_id" db:"audiobook_id" validate:"required"`
+	Content               string           `json:"content" db:"content" validate:"required"`
 	Segments              *json.RawMessage `json:"segments,omitempty" db:"segments"`
-	Language              *string    `json:"language,omitempty" db:"language"`
-	ConfidenceScore       *float64   `json:"confidence_score,omitempty" db:"confidence_score"`
-	ProcessingTimeSeconds *int       `json:"processing_time_seconds,omitempty" db:"processing_time_seconds"`
-	CreatedAt             time.Time  `json:"created_at" db:"created_at"`
+	Language              *string          `json:"language,omitempty" db:"language"`
+	ConfidenceScore       *float64         `json:"confidence_score,omitempty" db:"confidence_score"`
+	ProcessingTimeSeconds *int             `json:"processing_time_seconds,omitempty" db:"processing_time_seconds"`
+	CreatedAt             time.Time        `json:"created_at" db:"created_at"`
 }
 
 // ChapterTranscript represents the transcription of a specific chapter
 type ChapterTranscript struct {
-	ID                    uuid.UUID  `json:"id" db:"id"`
-	ChapterID             uuid.UUID  `json:"chapter_id" db:"chapter_id" validate:"required"`
-	AudiobookID           uuid.UUID  `json:"audiobook_id" db:"audiobook_id" validate:"required"`
-	Content               string     `json:"content" db:"content" validate:"required"`
+	ID                    uuid.UUID        `json:"id" db:"id"`
+	ChapterID             uuid.UUID        `json:"chapter_id" db:"chapter_id" validate:"required"`
+	AudiobookID           uuid.UUID        `json:"audiobook_id" db:"audiobook_id" validate:"required"`
+	Content               string           `json:"content" db:"content" validate:"required"`
 	Segments              *json.RawMessage `json:"segments,omitempty" db:"segments"`
-	Language              *string    `json:"language,omitempty" db:"language"`
-	ConfidenceScore       *float64   `json:"confidence_score,omitempty" db:"confidence_score"`
-	ProcessingTimeSeconds *int       `json:"processing_time_seconds,omitempty" db:"processing_time_seconds"`
-	CreatedAt             time.Time  `json:"created_at" db:"created_at"`
+	Language              *string          `json:"language,omitempty" db:"language"`
+	ConfidenceScore       *float64         `json:"confidence_score,omitempty" db:"confidence_score"`
+	ProcessingTimeSeconds *int             `json:"processing_time_seconds,omitempty" db:"processing_time_seconds"`
+	CreatedAt             time.Time        `json:"created_at" db:"created_at"`
 }
 
 // AIOutput represents AI-generated content for an audio book
 type AIOutput struct {
-	ID                    uuid.UUID   `json:"id" db:"id"`
-	AudiobookID           uuid.UUID   `json:"audiobook_id" db:"audiobook_id" validate:"required"`
-	OutputType            OutputType  `json:"output_type" db:"output_type" validate:"required"`
+	ID                    uuid.UUID       `json:"id" db:"id"`
+	AudiobookID           uuid.UUID       `json:"audiobook_id" db:"audiobook_id" validate:"required"`
+	OutputType            OutputType      `json:"output_type" db:"output_type" validate:"required"`
 	Content               json.RawMessage `json:"content" db:"content" validate:"required"`
-	ModelUsed             *string     `json:"model_used,omitempty" db:"model_used"`
-	ProcessingTimeSeconds *int        `json:"processing_time_seconds,omitempty" db:"processing_time_seconds"`
-	CreatedAt             time.Time   `json:"created_at" db:"created_at"`
+	ModelUsed             *string         `json:"model_used,omitempty" db:"model_used"`
+	ProcessingTimeSeconds *int            `json:"processing_time_seconds,omitempty" db:"processing_time_seconds"`
+	CreatedAt             time.Time       `json:"created_at" db:"created_at"`
 }
 
 // ChapterAIOutput represents AI-generated content for a specific chapter
 type ChapterAIOutput struct {
-	ID                    uuid.UUID   `json:"id" db:"id"`
-	ChapterID             uuid.UUID   `json:"chapter_id" db:"chapter_id" validate:"required"`
-	AudiobookID           uuid.UUID   `json:"audiobook_id" db:"audiobook_id" validate:"required"`
-	OutputType            OutputType  `json:"output_type" db:"output_type" validate:"required"`
+	ID                    uuid.UUID       `json:"id" db:"id"`
+	ChapterID             uuid.UUID       `json:"chapter_id" db:"chapter_id" validate:"required"`
+	AudiobookID           uuid.UUID       `json:"audiobook_id" db:"audiobook_id" validate:"required"`
+	OutputType            OutputType      `json:"output_type" db:"output_type" validate:"required"`
 	Content               json.RawMessage `json:"content" db:"content" validate:"required"`
-	ModelUsed             *string     `json:"model_used,omitempty" db:"model_used"`
-	ProcessingTimeSeconds *int        `json:"processing_time_seconds,omitempty" db:"processing_time_seconds"`
-	CreatedAt             time.Time   `json:"created_at" db:"created_at"`
+	ModelUsed             *string         `json:"model_used,omitempty" db:"model_used"`
+	ProcessingTimeSeconds *int            `json:"processing_time_seconds,omitempty" db:"processing_time_seconds"`
+	CreatedAt             time.Time       `json:"created_at" db:"created_at"`
 }
 
 // ProcessingJob represents a background processing job
 type ProcessingJob struct {
-	ID            uuid.UUID  `json:"id" db:"id"`
-	AudiobookID   uuid.UUID  `json:"audiobook_id" db:"audiobook_id" validate:"required"`
-	JobType       JobType    `json:"job_type" db:"job_type" validate:"required"`
-	Status        JobStatus  `json:"status" db:"status" validate:"required"`
-	RedisJobID    *string    `json:"redis_job_id,omitempty" db:"redis_job_id"`
-	ErrorMessage  *string    `json:"error_message,omitempty" db:"error_message"`
-	StartedAt     *time.Time `json:"started_at,omitempty" db:"started_at"`
-	CompletedAt   *time.Time `json:"completed_at,omitempty" db:"completed_at"`
-	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
+	ID           uuid.UUID  `json:"id" db:"id"`
+	AudiobookID  uuid.UUID  `json:"audiobook_id" db:"audiobook_id" validate:"required"`
+	JobType      JobType    `json:"job_type" db:"job_type" validate:"required"`
+	Status       JobStatus  `json:"status" db:"status" validate:"required"`
+	RedisJobID   *string    `json:"redis_job_id,omitempty" db:"redis_job_id"`
+	ErrorMessage *string    `json:"error_message,omitempty" db:"error_message"`
+	StartedAt    *time.Time `json:"started_at,omitempty" db:"started_at"`
+	CompletedAt  *time.Time `json:"completed_at,omitempty" db:"completed_at"`
+	CreatedAt    time.Time  `json:"created_at" db:"created_at"`
 }
 
 // Tag represents a tag that can be applied to audio books
 type Tag struct {
-	ID       uuid.UUID `json:"id" db:"id"`
-	Name     string    `json:"name" db:"name" validate:"required,min=1,max=100"`
-	Category *string   `json:"category,omitempty" db:"category"`
+	ID        uuid.UUID `json:"id" db:"id"`
+	Name      string    `json:"name" db:"name" validate:"required,min=1,max=100"`
+	Category  *string   `json:"category,omitempty" db:"category"`
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 }
 
@@ -169,11 +170,11 @@ type AudioBookTag struct {
 
 // AudioBookEmbedding represents vector embeddings for semantic search
 type AudioBookEmbedding struct {
-	ID             uuid.UUID      `json:"id" db:"id"`
-	AudiobookID    uuid.UUID      `json:"audiobook_id" db:"audiobook_id" validate:"required"`
-	Embedding      []float64      `json:"embedding" db:"embedding" validate:"required"`
-	EmbeddingType  EmbeddingType  `json:"embedding_type" db:"embedding_type" validate:"required"`
-	CreatedAt      time.Time      `json:"created_at" db:"created_at"`
+	ID            uuid.UUID     `json:"id" db:"id"`
+	AudiobookID   uuid.UUID     `json:"audiobook_id" db:"audiobook_id" validate:"required"`
+	Embedding     []float64     `json:"embedding" db:"embedding" validate:"required"`
+	EmbeddingType EmbeddingType `json:"embedding_type" db:"embedding_type" validate:"required"`
+	CreatedAt     time.Time     `json:"created_at" db:"created_at"`
 }
 
 // Request/Response models
@@ -182,7 +183,6 @@ type AudioBookEmbedding struct {
 type CreateAudioBookRequest struct {
 	Title         string  `json:"title" validate:"required,min=1,max=255"`
 	Author        string  `json:"author" validate:"required,min=1,max=255"`
-	Description   *string `json:"description,omitempty"`
 	Language      string  `json:"language" validate:"required,len=2"`
 	IsPublic      bool    `json:"is_public"`
 	CoverImageURL *string `json:"cover_image_url,omitempty"`
@@ -192,7 +192,6 @@ type CreateAudioBookRequest struct {
 type UpdateAudioBookRequest struct {
 	Title         *string `json:"title,omitempty" validate:"omitempty,min=1,max=255"`
 	Author        *string `json:"author,omitempty" validate:"omitempty,min=1,max=255"`
-	Description   *string `json:"description,omitempty"`
 	Language      *string `json:"language,omitempty" validate:"omitempty,len=2"`
 	IsPublic      *bool   `json:"is_public,omitempty"`
 	CoverImageURL *string `json:"cover_image_url,omitempty"`
@@ -201,20 +200,20 @@ type UpdateAudioBookRequest struct {
 // AudioBookWithDetails represents an audio book with all related data
 type AudioBookWithDetails struct {
 	AudioBook
-	Chapters        []Chapter        `json:"chapters,omitempty"`
-	Transcript      *Transcript      `json:"transcript,omitempty"`
-	AIOutputs       []AIOutput       `json:"ai_outputs,omitempty"`
-	Tags            []Tag            `json:"tags,omitempty"`
-	ProcessingJobs  []ProcessingJob  `json:"processing_jobs,omitempty"`
+	Chapters       []Chapter       `json:"chapters,omitempty"`
+	Transcript     *Transcript     `json:"transcript,omitempty"`
+	AIOutputs      []AIOutput      `json:"ai_outputs,omitempty"`
+	Tags           []Tag           `json:"tags,omitempty"`
+	ProcessingJobs []ProcessingJob `json:"processing_jobs,omitempty"`
 }
 
 // SearchRequest represents a search request
 type SearchRequest struct {
-	Query     string `json:"query" validate:"required,min=1"`
-	Limit     int    `json:"limit" validate:"min=1,max=100"`
-	Offset    int    `json:"offset" validate:"min=0"`
-	Language  *string `json:"language,omitempty"`
-	IsPublic  *bool   `json:"is_public,omitempty"`
+	Query    string  `json:"query" validate:"required,min=1"`
+	Limit    int     `json:"limit" validate:"min=1,max=100"`
+	Offset   int     `json:"offset" validate:"min=0"`
+	Language *string `json:"language,omitempty"`
+	IsPublic *bool   `json:"is_public,omitempty"`
 }
 
 // SearchResponse represents a search response
@@ -227,11 +226,11 @@ type SearchResponse struct {
 
 // JobStatusResponse represents the status of processing jobs
 type JobStatusResponse struct {
-	AudiobookID     uuid.UUID        `json:"audiobook_id"`
-	Jobs            []ProcessingJob  `json:"jobs"`
-	OverallStatus   AudioBookStatus  `json:"overall_status"`
-	Progress        float64          `json:"progress"` // 0.0 to 1.0
-	EstimatedTime   *int             `json:"estimated_time_seconds,omitempty"`
+	AudiobookID   uuid.UUID       `json:"audiobook_id"`
+	Jobs          []ProcessingJob `json:"jobs"`
+	OverallStatus AudioBookStatus `json:"overall_status"`
+	Progress      float64         `json:"progress"` // 0.0 to 1.0
+	EstimatedTime *int            `json:"estimated_time_seconds,omitempty"`
 }
 
 // Helper methods
@@ -261,12 +260,12 @@ func (ab *AudioBook) GetDurationFormatted() string {
 	if ab.DurationSeconds == nil {
 		return "Unknown"
 	}
-	
+
 	seconds := *ab.DurationSeconds
 	hours := seconds / 3600
 	minutes := (seconds % 3600) / 60
 	secs := seconds % 60
-	
+
 	if hours > 0 {
 		return fmt.Sprintf("%dh %dm %ds", hours, minutes, secs)
 	}
@@ -278,7 +277,7 @@ func (ab *AudioBook) GetFileSizeFormatted() string {
 	if ab.FileSizeBytes == nil {
 		return "Unknown"
 	}
-	
+
 	bytes := *ab.FileSizeBytes
 	const unit = 1024
 	if bytes < unit {
@@ -302,11 +301,11 @@ func (c *Chapter) GetDurationFormatted() string {
 	if c.DurationSeconds == nil {
 		return "Unknown"
 	}
-	
+
 	seconds := *c.DurationSeconds
 	minutes := seconds / 60
 	secs := seconds % 60
-	
+
 	return fmt.Sprintf("%dm %ds", minutes, secs)
 }
 

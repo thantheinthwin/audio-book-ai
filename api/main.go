@@ -66,7 +66,7 @@ func main() {
 	}))
 
 	// Health check endpoint
-	app.Get("/health", handlers.HealthCheck)
+	// app.Get("/health", handlers.HealthCheck)
 
 	// TODO: Initialize database repository
 	// For now, we'll use a mock repository until the database implementation is ready

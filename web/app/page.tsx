@@ -182,7 +182,7 @@ export default async function HomePage() {
                       className="w-full h-32 object-cover rounded-md mb-3"
                     />
                   )}
-                  <h3 className="font-semibold text-sm line-clamp-2 mb-1">
+                  <h3 className="font-semibold text-sm line-clamp-2 mb-2">
                     {book.title}
                   </h3>
                   <p className="text-xs text-muted-foreground mb-2">

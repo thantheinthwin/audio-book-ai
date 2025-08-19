@@ -204,14 +204,7 @@ export default function AudioBookListeningPage() {
                 )}
                 <div className="flex-1">
                   <div className="space-y-4">
-                    <div>
-                      <h3 className="font-semibold text-lg mb-2">
-                        Description
-                      </h3>
-                      <p className="text-muted-foreground">
-                        {audioBook.description || "No description available."}
-                      </p>
-                    </div>
+                    
 
                     <div className="flex gap-4">
                       {audioBook.duration && (

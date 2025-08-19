@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS audiobooks (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(255) NOT NULL,
     author VARCHAR(255) NOT NULL,
-    description TEXT,
+    summary TEXT,
     duration_seconds INTEGER,
     file_size_bytes BIGINT,
     file_path VARCHAR(500) NOT NULL,
