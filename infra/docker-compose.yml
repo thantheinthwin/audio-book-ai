@@ -20,6 +20,7 @@ services:
       - "8080:8080"
     depends_on:
       - redis
+    restart: unless-stopped
     networks:
       - audiobook-network
 
@@ -30,6 +31,7 @@ services:
       dockerfile: worker/Dockerfile
     depends_on:
       - redis
+    restart: unless-stopped
     networks:
       - audiobook-network
 
@@ -40,6 +42,7 @@ services:
       dockerfile: transcriber/Dockerfile
     depends_on:
       - redis
+    restart: unless-stopped
     networks:
       - audiobook-network
 
@@ -61,3 +64,4 @@ volumes:
 networks:
   audiobook-network:
     driver: bridge
+    enable_ipv6: true

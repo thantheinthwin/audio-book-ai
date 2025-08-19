@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"os"
 	"strings"
 
 	"audio-book-ai/api/config"
@@ -77,14 +76,8 @@ func main() {
 	api := app.Group("/api/v1")
 	routes.SetupRoutes(api, cfg, repo)
 
-	// Start server
-	port := os.Getenv("API_PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	log.Printf("🚀 Server starting on port %s", port)
-	if err := app.Listen(":" + port); err != nil {
+	log.Printf("🚀 Server starting on port %s", cfg.Port)
+	if err := app.Listen(":" + cfg.Port); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
 }
