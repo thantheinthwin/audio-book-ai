@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { uploadAPI, audiobooksAPI } from "@/lib/api";
+import { audiobooksAPI } from "@/lib/api";
 import { Upload, FileAudio, CheckCircle, AlertCircle } from "lucide-react";
 import CoverImageUpload from "@/components/cover-image-upload";
 import AudioFilesUpload from "@/components/audio-files-upload";
@@ -103,63 +103,23 @@ export default function CreateAudioBookPage() {
     setUploadState((prev) => ({ ...prev, status: "creating", error: null }));
 
     try {
-      // Step 1: Create upload session
-      const totalFiles = chaptersWithFiles.length;
-      const totalSize = chaptersWithFiles.reduce((sum, chapter) => {
-        return sum + (chapter.audio_file?.size || 0);
-      }, 0);
+      // Create FormData for the Next.js API route
+      const formData = new FormData();
+      formData.append("title", data.title);
+      formData.append("author", data.author);
+      formData.append("language", data.language);
+      formData.append("isPublic", data.isPublic.toString());
 
-      const uploadResponse = await uploadAPI.createUpload({
-        upload_type: totalFiles === 1 ? "single" : "chapters",
-        total_files: totalFiles,
-        total_size_bytes: totalSize,
-      });
-
-      const uploadId = uploadResponse.data?.upload_id;
-      if (!uploadId) {
-        throw new Error("Failed to create upload session");
+      if (coverImage) {
+        formData.append("coverImage", coverImage);
       }
 
-      setUploadState((prev) => ({
-        ...prev,
-        uploadId,
-        status: "uploading",
-        totalFiles,
-        progress: 0,
-      }));
+      formData.append("chapters", JSON.stringify(data.chapters));
 
-      // Step 2: Upload each file
-      for (let i = 0; i < chaptersWithFiles.length; i++) {
-        const chapter = chaptersWithFiles[i];
-        if (!chapter.audio_file) continue;
+      // Call the Next.js API route
+      const response = await audiobooksAPI.createAudioBookWithFiles(formData);
 
-        await uploadAPI.uploadFile(uploadId, chapter.audio_file, {
-          chapter_number: chapter.chapter_number,
-          chapter_title: chapter.title || `Chapter ${chapter.chapter_number}`,
-        });
-
-        setUploadState((prev) => ({
-          ...prev,
-          uploadedFiles: i + 1,
-          progress: ((i + 1) / totalFiles) * 100,
-        }));
-      }
-
-      setUploadState((prev) => ({ ...prev, status: "completed" }));
-
-      // Step 3: Create audio book from upload
-      const audioBookResponse = await audiobooksAPI.createAudioBook({
-        upload_id: uploadId,
-        title: data.title,
-        author: data.author,
-        language: data.language,
-        is_public: data.isPublic,
-        cover_image_url: coverImage
-          ? URL.createObjectURL(coverImage)
-          : undefined,
-      });
-
-      console.log("Audio book created:", audioBookResponse);
+      console.log("Audio book created:", response);
       router.push("/dashboard/audiobooks");
     } catch (error) {
       console.error("Failed to create audio book:", error);

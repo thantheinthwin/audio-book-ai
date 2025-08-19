@@ -109,6 +109,20 @@ async function getAuthToken(): Promise<string | null> {
       role: session.user?.user_metadata?.role || "user",
     });
 
+    // Try to decode the JWT to see its structure
+    try {
+      const tokenParts = session.access_token.split(".");
+      if (tokenParts.length === 3) {
+        const payload = JSON.parse(atob(tokenParts[1]));
+        console.log("JWT Token payload:", payload);
+        console.log("JWT Token issuer:", payload.iss);
+        console.log("JWT Token audience:", payload.aud);
+        console.log("JWT Token subject:", payload.sub);
+      }
+    } catch (e) {
+      console.log("Could not decode JWT token:", e);
+    }
+
     return session.access_token;
   }
 
@@ -363,6 +377,25 @@ export const audiobooksAPI = {
       data,
     }),
 
+  // New function to create audio book using Next.js API route
+  createAudioBookWithFiles: async (formData: FormData) => {
+    try {
+      const response = await fetch("/api/audiobooks/create", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create audio book");
+      }
+
+      return await response.json();
+    } catch (error) {
+      throw error;
+    }
+  },
+
   updateAudioBook: (id: string, data: AudioBookUpdateData) =>
     apiClient<ApiResponse<AudioBook>>(`/admin/audiobooks/${id}`, {
       method: "PUT",
@@ -509,6 +542,19 @@ export const testApiWithoutAuth = async () => {
   }
 };
 
+// Test admin authentication
+export const testAdminAuth = async () => {
+  try {
+    console.log("Testing admin authentication...");
+    const response = await apiClient<ApiResponse>("/admin/audiobooks");
+    console.log("Admin auth test successful:", response);
+    return true;
+  } catch (error) {
+    console.error("Admin auth test failed:", error);
+    return false;
+  }
+};
+
 // Test authentication function
 export const testAuth = async () => {
   try {
@@ -536,8 +582,8 @@ export const testAuth = async () => {
         console.log("Could not decode JWT token:", e);
       }
 
-      // Test the token with a simple API call
-      const response = await apiClient<ApiResponse>("/auth/health");
+      // Test the token with an authenticated endpoint
+      const response = await apiClient<ApiResponse>("/auth/me");
       console.log("Auth test successful:", response);
       return true;
     } else {

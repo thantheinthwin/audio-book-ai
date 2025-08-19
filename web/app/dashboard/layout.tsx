@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { UserProfile } from "@/components/user-profile";
-import { testAuth, testApiWithoutAuth } from "@/lib/api";
+import { testAuth, testApiWithoutAuth, testAdminAuth } from "@/lib/api";
 
 import {
   ChevronDown,
@@ -201,6 +201,17 @@ export default function DashboardLayout({
                   className="w-full"
                 >
                   Test Auth
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    console.log("Testing admin authentication...");
+                    await testAdminAuth();
+                  }}
+                  className="w-full"
+                >
+                  Test Admin Auth
                 </Button>
               </div>
             )}
