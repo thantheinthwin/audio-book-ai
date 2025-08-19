@@ -76,3 +76,8 @@ func (c *Config) IsDevelopment() bool {
 func (c *Config) IsProduction() bool {
 	return c.Environment == "production"
 }
+
+// GetJWTIssuer returns the JWT issuer (same as Supabase URL)
+func (c *Config) GetJWTIssuer() string {
+	return c.SupabaseURL
+}

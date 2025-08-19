@@ -4,12 +4,15 @@ This is the Golang backend API for the Audio Book AI application. The API is des
 
 ## Authentication Flow
 
-The API uses Supabase JWT tokens for authentication. Here's how it works:
+The API uses Supabase JWT tokens for authentication with proper JWKS (JSON Web Key Set) validation. Here's how it works:
 
 1. **Frontend Authentication**: The Next.js frontend handles all authentication (login, signup, password reset) through Supabase
-2. **Token Validation**: The backend validates Supabase JWT tokens and extracts user information
+2. **Token Validation**: The backend validates Supabase JWT tokens using RSA public keys from JWKS
 3. **Protected Routes**: API endpoints that require authentication use the `AuthMiddleware`
 4. **Optional Authentication**: Some routes can work with or without authentication using `OptionalAuthMiddleware`
+5. **Role-based Access Control**: User roles are extracted from JWT claims for authorization
+
+For detailed authentication documentation, see [SUPABASE_AUTH.md](./SUPABASE_AUTH.md).
 
 ## API Endpoints
 
@@ -47,9 +50,15 @@ Required environment variables:
 
 ```env
 # Supabase Configuration
-SUPABASE_URL=your_supabase_url
-SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_key
-SUPABASE_SECRET_KEY=your_supabase_secret_key
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+SUPABASE_SECRET_KEY=your-secret-key
+SUPABASE_JWKS_URL=https://your-project.supabase.co/auth/v1/keys
+SUPABASE_STORAGE_BUCKET=audio
+
+# JWT Configuration
+JWT_AUDIENCE=authenticated
+JWT_ISSUER=https://your-project.supabase.co
 
 # Server Configuration
 API_PORT=8080
@@ -95,12 +104,16 @@ const response = await fetch("/api/profile", {
 
 ## Token Validation
 
-The API validates Supabase JWT tokens by:
+The API validates Supabase JWT tokens using JWKS (JSON Web Key Set):
 
-1. Checking the Authorization header format
-2. Parsing the JWT token
-3. Validating the signature using the Supabase publishable key
-4. Extracting user information from the token claims
+1. Extract token from Authorization header
+2. Parse token header to get the key ID (`kid`)
+3. Fetch the corresponding RSA public key from Supabase's JWKS
+4. Validate the token signature using the public key
+5. Verify token claims (audience, issuer, expiration)
+6. Extract user information and role from claims
+
+This approach provides better security through key rotation and proper RSA signature verification.
 
 ## Error Responses
 

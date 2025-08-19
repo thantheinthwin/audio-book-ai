@@ -3,11 +3,9 @@ package handlers
 import (
 	"audio-book-ai/api/config"
 	"audio-book-ai/api/models"
-	"fmt"
-	"strings"
+	"audio-book-ai/api/services"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/golang-jwt/jwt/v5"
 )
 
 // AuthResponse represents the standard auth response format
@@ -20,69 +18,39 @@ type AuthResponse struct {
 // ValidateToken validates a Supabase JWT token and returns user info
 func ValidateToken(c *fiber.Ctx) error {
 	cfg := config.New()
+	authService := services.NewSupabaseAuthService(cfg)
 
 	// Get token from header
 	authHeader := c.Get("Authorization")
-	if authHeader == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(AuthResponse{
-			Error: "Authorization header required",
-		})
-	}
 
-	// Check if it's a Bearer token
-	if !strings.HasPrefix(authHeader, "Bearer ") {
-		return c.Status(fiber.StatusUnauthorized).JSON(AuthResponse{
-			Error: "Bearer token required",
-		})
-	}
-
-	// Extract token
-	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-
-	// Parse and validate JWT token
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// Validate signing method
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return []byte(cfg.SupabasePublishableKey), nil
-	})
-
+	// Extract token from header
+	tokenString, err := authService.ExtractTokenFromHeader(authHeader)
 	if err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(AuthResponse{
-			Error: "Invalid token format",
+			Error: err.Error(),
 		})
 	}
 
-	// Extract claims
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		// Extract user information from claims
-		userID, _ := claims["sub"].(string)
-		email, _ := claims["email"].(string)
-		role, _ := claims["role"].(string)
-
-		// Default to user role if not specified
-		if role == "" {
-			role = models.RoleUser
-		}
-
-		// Create user object
-		user := &models.User{
-			ID:         userID,
-			Email:      email,
-			Role:       role,
-			IsActive:   true,
-			IsVerified: true, // Supabase handles email verification
-		}
-
-		return c.JSON(AuthResponse{
-			User:    user,
-			Message: "Token is valid",
+	// Validate token using Supabase auth service
+	userContext, err := authService.ValidateToken(tokenString)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(AuthResponse{
+			Error: "Invalid token",
 		})
 	}
 
-	return c.Status(fiber.StatusUnauthorized).JSON(AuthResponse{
-		Error: "Invalid token claims",
+	// Create user object from context
+	user := &models.User{
+		ID:         userContext.ID,
+		Email:      userContext.Email,
+		Role:       userContext.Role,
+		IsActive:   true,
+		IsVerified: true, // Supabase handles email verification
+	}
+
+	return c.JSON(AuthResponse{
+		User:    user,
+		Message: "Token is valid",
 	})
 }
 
