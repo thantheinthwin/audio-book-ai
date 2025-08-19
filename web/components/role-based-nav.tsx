@@ -105,13 +105,13 @@ export function RoleBasedNav() {
                 <Link href="/">Dashboard</Link>
               </Button>
               <Button variant="outline" size="sm" asChild>
-                <Link href="/">My Library</Link>
+                <Link href="/library">My Library</Link>
               </Button>
               <Button variant="outline" size="sm" asChild>
-                <Link href="/">Playlists</Link>
+                <Link href="/playlists">Playlists</Link>
               </Button>
               <Button variant="outline" size="sm" asChild>
-                <Link href="/">Progress</Link>
+                <Link href="/progress">Progress</Link>
               </Button>
             </div>
           </div>
@@ -124,13 +124,13 @@ export function RoleBasedNav() {
                   <Link href="/dashboard">Admin Dashboard</Link>
                 </Button>
                 <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard">Manage Users</Link>
+                  <Link href="/dashboard/users">Manage Users</Link>
                 </Button>
                 <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard">Manage Audio Books</Link>
+                  <Link href="/dashboard/audiobooks">Manage Audio Books</Link>
                 </Button>
                 <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard">Analytics</Link>
+                  <Link href="/dashboard/analytics">Analytics</Link>
                 </Button>
               </div>
             </div>

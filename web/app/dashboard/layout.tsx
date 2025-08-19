@@ -15,8 +15,6 @@ import {
   Menu,
   X,
   Clock,
-  Headphones,
-  Send,
 } from "lucide-react";
 
 interface SidebarItem {
