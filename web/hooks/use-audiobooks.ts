@@ -1,14 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { audiobooksAPI } from "@/lib/api";
-
-// Query keys
-export const audiobookKeys = {
-  all: ["audiobooks"] as const,
-  lists: () => [...audiobookKeys.all, "list"] as const,
-  list: (filters: string) => [...audiobookKeys.lists(), { filters }] as const,
-  details: () => [...audiobookKeys.all, "detail"] as const,
-  detail: (id: string) => [...audiobookKeys.details(), id] as const,
-};
+import { audiobookKeys } from "@/queryKeys";
 
 // Hook to get all audiobooks
 export function useAudioBooks() {
@@ -74,11 +66,12 @@ export function useDeleteAudioBook() {
 }
 
 // Hook to get audiobook chapters
-export function useAudioBookChapters(audiobookId: string) {
-  return useQuery({
-    queryKey: [...audiobookKeys.detail(audiobookId), "chapters"],
-    queryFn: () => audiobooksAPI.getAudioBookChapters(audiobookId),
-    enabled: !!audiobookId,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
-}
+// Note: This function is not implemented in the current backend
+// export function useAudioBookChapters(audiobookId: string) {
+//   return useQuery({
+//     queryKey: [...audiobookKeys.detail(audiobookId), "chapters"],
+//     queryFn: () => audiobooksAPI.getAudioBookChapters(audiobookId),
+//     enabled: !!audiobookId,
+//     staleTime: 1000 * 60 * 5, // 5 minutes
+//   });
+// }

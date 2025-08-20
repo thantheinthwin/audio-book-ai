@@ -1,14 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { testAuth, testAdminAuth } from "@/lib/api";
-
-// Query keys
-export const authKeys = {
-  all: ["auth"] as const,
-  session: () => [...authKeys.all, "session"] as const,
-  user: () => [...authKeys.all, "user"] as const,
-  admin: () => [...authKeys.all, "admin"] as const,
-};
+import { authKeys } from "@/queryKeys";
 
 // Hook to get current session
 export function useSession() {
