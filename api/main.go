@@ -70,23 +70,15 @@ func main() {
 	// app.Get("/health", handlers.HealthCheck)
 
 	// Initialize database repository
-	var repo database.Repository
-	if cfg.DatabaseURL != "" {
-		// Use PostgreSQL repository if DATABASE_URL is provided
-		postgresRepo, err := database.NewPostgresRepository(cfg.DatabaseURL)
-		if err != nil {
-			log.Printf("Warning: Failed to initialize PostgreSQL repository: %v", err)
-			log.Printf("Falling back to mock repository")
-			repo = database.NewMockRepository()
-		} else {
-			log.Println("PostgreSQL repository initialized")
-			repo = postgresRepo
-		}
-	} else {
-		// Use mock repository if no DATABASE_URL is provided
-		log.Println("No DATABASE_URL provided, using mock repository")
-		repo = database.NewMockRepository()
+	if cfg.DatabaseURL == "" {
+		log.Fatal("DATABASE_URL is required. Please set the DATABASE_URL environment variable.")
 	}
+
+	repo, err := database.NewPostgresRepository(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatal("Failed to initialize PostgreSQL repository:", err)
+	}
+	log.Println("PostgreSQL repository initialized")
 
 	// Initialize Supabase storage service
 	storageService := services.NewSupabaseStorageService(cfg)

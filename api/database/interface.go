@@ -19,6 +19,7 @@ type Repository interface {
 	ListAudioBooks(ctx context.Context, limit, offset int, isPublic *bool) ([]models.AudioBook, int, error)
 	GetAudioBooksByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.AudioBook, int, error)
 	UpdateAudioBookStatus(ctx context.Context, id uuid.UUID, status models.AudioBookStatus) error
+	CheckAndUpdateAudioBookStatus(ctx context.Context, audiobookID uuid.UUID) error
 
 	// Chapter operations
 	CreateChapter(ctx context.Context, chapter *models.Chapter) error

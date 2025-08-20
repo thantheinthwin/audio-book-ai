@@ -100,10 +100,20 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 		Author:    req.Author,
 		Language:  req.Language,
 		IsPublic:  req.IsPublic,
-		Status:    models.StatusPending,
+		Status:    models.StatusProcessing, // Start with processing status
 		CreatedBy: userID,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
+	}
+
+	// Set description if provided
+	if req.Description != nil && *req.Description != "" {
+		audiobook.Summary = req.Description
+	}
+
+	// Set cover image URL if provided
+	if req.CoverImageURL != nil && *req.CoverImageURL != "" {
+		audiobook.CoverImageURL = req.CoverImageURL
 	}
 
 	// Handle different upload types
@@ -659,13 +669,13 @@ func (h *Handler) DeleteUpload(c *fiber.Ctx) error {
 	})
 }
 
-// GetJobStatus returns the status of processing jobs for an audio book
-// GET /v1/admin/audiobooks/:id/jobs
+// GetJobStatus returns the status of processing jobs for an audiobook
+// GET /v1/admin/audiobooks/{id}/jobs
 func (h *Handler) GetJobStatus(c *fiber.Ctx) error {
 	audiobookID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid audio book ID",
+			"error": "Invalid audiobook ID",
 		})
 	}
 
@@ -678,7 +688,7 @@ func (h *Handler) GetJobStatus(c *fiber.Ctx) error {
 	}
 	userID := uuid.MustParse(userCtx.ID)
 
-	// Get audio book to check ownership
+	// Get audiobook to check ownership
 	audiobook, err := h.repo.GetAudioBookByID(context.Background(), audiobookID)
 	if err != nil {
 		return c.Status(http.StatusNotFound).JSON(fiber.Map{
@@ -686,10 +696,14 @@ func (h *Handler) GetJobStatus(c *fiber.Ctx) error {
 		})
 	}
 
+	// Check if user owns this audiobook or is admin
 	if audiobook.CreatedBy != userID {
-		return c.Status(http.StatusForbidden).JSON(fiber.Map{
-			"error": "Access denied",
-		})
+		// Check if user is admin
+		if userCtx.Role != "admin" {
+			return c.Status(http.StatusForbidden).JSON(fiber.Map{
+				"error": "Access denied",
+			})
+		}
 	}
 
 	// Get processing jobs
@@ -700,9 +714,11 @@ func (h *Handler) GetJobStatus(c *fiber.Ctx) error {
 		})
 	}
 
-	// Calculate overall status and progress
+	// Calculate overall progress
+	totalJobs := len(jobs)
 	completedJobs := 0
 	failedJobs := 0
+
 	for _, job := range jobs {
 		if job.Status == models.JobStatusCompleted {
 			completedJobs++
@@ -711,27 +727,89 @@ func (h *Handler) GetJobStatus(c *fiber.Ctx) error {
 		}
 	}
 
-	var overallStatus models.AudioBookStatus
 	var progress float64
-
-	if len(jobs) == 0 {
-		overallStatus = models.StatusPending
-		progress = 0.0
-	} else if failedJobs > 0 {
-		overallStatus = models.StatusFailed
-		progress = float64(completedJobs) / float64(len(jobs))
-	} else if completedJobs == len(jobs) {
-		overallStatus = models.StatusCompleted
-		progress = 1.0
-	} else {
-		overallStatus = models.StatusProcessing
-		progress = float64(completedJobs) / float64(len(jobs))
+	if totalJobs > 0 {
+		progress = float64(completedJobs) / float64(totalJobs)
 	}
 
-	return c.JSON(models.JobStatusResponse{
-		AudiobookID:   audiobookID,
-		Jobs:          jobs,
-		OverallStatus: overallStatus,
-		Progress:      progress,
+	// Determine overall status
+	var overallStatus models.AudioBookStatus
+	if failedJobs > 0 {
+		overallStatus = models.StatusFailed
+	} else if completedJobs == totalJobs {
+		overallStatus = models.StatusCompleted
+	} else {
+		overallStatus = models.StatusProcessing
+	}
+
+	// Update audiobook status if needed
+	if overallStatus != audiobook.Status {
+		h.repo.UpdateAudioBookStatus(context.Background(), audiobookID, overallStatus)
+	}
+
+	return c.JSON(fiber.Map{
+		"audiobook_id":   audiobookID,
+		"jobs":           jobs,
+		"overall_status": overallStatus,
+		"progress":       progress,
+		"total_jobs":     totalJobs,
+		"completed_jobs": completedJobs,
+		"failed_jobs":    failedJobs,
+	})
+}
+
+// UpdateJobStatus updates the status of a processing job (called by workers)
+// POST /v1/admin/jobs/{job_id}/status
+func (h *Handler) UpdateJobStatus(c *fiber.Ctx) error {
+	jobID, err := uuid.Parse(c.Params("job_id"))
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid job ID",
+		})
+	}
+
+	var req struct {
+		Status       models.JobStatus `json:"status" validate:"required"`
+		ErrorMessage *string          `json:"error_message,omitempty"`
+		StartedAt    *time.Time       `json:"started_at,omitempty"`
+		CompletedAt  *time.Time       `json:"completed_at,omitempty"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	// Get the job
+	job, err := h.repo.GetProcessingJobByID(context.Background(), jobID)
+	if err != nil {
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{
+			"error": "Job not found",
+		})
+	}
+
+	// Update job status
+	job.Status = req.Status
+	job.ErrorMessage = req.ErrorMessage
+	job.StartedAt = req.StartedAt
+	job.CompletedAt = req.CompletedAt
+
+	if err := h.repo.UpdateProcessingJob(context.Background(), job); err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to update job status",
+		})
+	}
+
+	// Check and update audiobook status
+	if err := h.repo.CheckAndUpdateAudioBookStatus(context.Background(), job.AudiobookID); err != nil {
+		// Log error but don't fail the request
+		fmt.Printf("Failed to update audiobook status: %v\n", err)
+	}
+
+	return c.JSON(fiber.Map{
+		"job_id":  jobID,
+		"status":  req.Status,
+		"message": "Job status updated successfully",
 	})
 }

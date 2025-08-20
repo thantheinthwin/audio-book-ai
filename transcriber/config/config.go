@@ -14,6 +14,9 @@ type Config struct {
 	RedisURL   string
 	JobsPrefix string
 
+	// API
+	APIBaseURL string
+
 	// Rev.ai
 	RevAIAPIKey string
 	RevAIURL    string
@@ -33,6 +36,9 @@ func New() *Config {
 		// Redis
 		RedisURL:   getEnv("REDIS_URL", "redis://redis:6379/0"),
 		JobsPrefix: getEnv("JOBS_PREFIX", "audiobooks"),
+
+		// API
+		APIBaseURL: getEnv("API_BASE_URL", "http://localhost:8080"),
 
 		// Rev.ai
 		RevAIAPIKey: getEnv("REV_AI_API_KEY", ""),
