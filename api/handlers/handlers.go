@@ -5,6 +5,7 @@ import (
 	"audio-book-ai/api/models"
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -87,15 +88,15 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 
 	// Create audio book
 	audiobook := &models.AudioBook{
-		ID:          uuid.New(),
-		Title:       req.Title,
-		Author:      req.Author,
-		Language:    req.Language,
-		IsPublic:    req.IsPublic,
-		Status:      models.StatusPending,
-		CreatedBy:   userID,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		ID:        uuid.New(),
+		Title:     req.Title,
+		Author:    req.Author,
+		Language:  req.Language,
+		IsPublic:  req.IsPublic,
+		Status:    models.StatusPending,
+		CreatedBy: userID,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 
 	// Handle different upload types
@@ -223,26 +224,39 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 // CreateUpload creates a new upload session
 // POST /v1/admin/uploads
 func (h *Handler) CreateUpload(c *fiber.Ctx) error {
+	log.Printf("CreateUpload: Request received from IP %s", c.IP())
+	log.Printf("CreateUpload: User agent: %s", c.Get("User-Agent"))
+
 	var req models.CreateUploadRequest
 	if err := c.BodyParser(&req); err != nil {
+		log.Printf("CreateUpload: Failed to parse request body: %v", err)
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
 	}
 
+	log.Printf("CreateUpload: Request parsed successfully - UploadType: %s, TotalFiles: %d, TotalSize: %d",
+		req.UploadType, req.TotalFiles, req.TotalSize)
+
 	if err := req.Validate(); err != nil {
+		log.Printf("CreateUpload: Validation failed: %v", err)
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
 			"error": fmt.Sprintf("Validation error: %v", err),
 		})
 	}
 
+	log.Printf("CreateUpload: Request validation passed")
+
 	// Get user ID from context (set by auth middleware)
 	userID, ok := c.Locals("user_id").(uuid.UUID)
 	if !ok {
+		log.Printf("CreateUpload: User not authenticated - user_id not found in context")
 		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
 			"error": "User not authenticated",
 		})
 	}
+
+	log.Printf("CreateUpload: User authenticated - UserID: %s", userID)
 
 	upload := &models.Upload{
 		ID:            uuid.New(),
@@ -256,11 +270,17 @@ func (h *Handler) CreateUpload(c *fiber.Ctx) error {
 		UpdatedAt:     time.Now(),
 	}
 
+	log.Printf("CreateUpload: Creating upload session - UploadID: %s", upload.ID)
+
 	if err := h.repo.CreateUpload(context.Background(), upload); err != nil {
+		log.Printf("CreateUpload: Failed to create upload in database: %v", err)
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to create upload session",
 		})
 	}
+
+	log.Printf("CreateUpload: Upload session created successfully - UploadID: %s, Status: %s",
+		upload.ID, upload.Status)
 
 	return c.Status(http.StatusCreated).JSON(fiber.Map{
 		"upload_id": upload.ID,
