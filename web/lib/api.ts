@@ -546,7 +546,8 @@ export const testApiWithoutAuth = async () => {
 export const testAdminAuth = async () => {
   try {
     console.log("Testing admin authentication...");
-    const response = await apiClient<ApiResponse>("/audiobooks");
+    // const response = await apiClient<ApiResponse>("/audiobooks");
+    const response = await audiobooksAPI.getAudioBooks();
     console.log("Admin auth test successful:", response);
     return true;
   } catch (error) {

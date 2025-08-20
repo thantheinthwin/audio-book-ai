@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { UserProfile } from "@/components/user-profile";
-import { testAuth, testAdminAuth } from "@/lib/api";
+import { useTestAuth, useTestAdminAuth } from "@/hooks/use-auth";
 
 import {
   ChevronDown,
@@ -52,6 +52,9 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const pathname = usePathname();
+
+  const testAuthMutation = useTestAuth();
+  const testAdminAuthMutation = useTestAdminAuth();
 
   const toggleExpanded = (label: string) => {
     setExpandedItems((prev) =>
@@ -183,24 +186,28 @@ export default function DashboardLayout({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={async () => {
+                  onClick={() => {
                     console.log("Testing authentication...");
-                    await testAuth();
+                    testAuthMutation.mutate();
                   }}
                   className="w-full"
+                  disabled={testAuthMutation.isPending}
                 >
-                  Test Auth
+                  {testAuthMutation.isPending ? "Testing..." : "Test Auth"}
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={async () => {
+                  onClick={() => {
                     console.log("Testing admin authentication...");
-                    await testAdminAuth();
+                    testAdminAuthMutation.mutate();
                   }}
                   className="w-full"
+                  disabled={testAdminAuthMutation.isPending}
                 >
-                  Test Admin Auth
+                  {testAdminAuthMutation.isPending
+                    ? "Testing..."
+                    : "Test Admin Auth"}
                 </Button>
               </div>
             )}

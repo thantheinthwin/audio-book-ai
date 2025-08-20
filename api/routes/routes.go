@@ -41,7 +41,7 @@ func SetupAuthRoutes(router fiber.Router, cfg *config.Config) {
 // SetupProtectedRoutes configures protected routes (requires user or admin role)
 func SetupProtectedRoutes(router fiber.Router, cfg *config.Config, h *handlers.Handler) {
 	// Apply user role middleware
-	router.Use(middleware.RequireUser())
+	router.Use(middleware.RequireUser(), middleware.RequireAdmin())
 
 	// User profile
 	router.Get("/profile", handlers.GetProfile)

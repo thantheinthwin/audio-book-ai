@@ -1,6 +1,8 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { InfoIcon, Users, BookOpen, BarChart3 } from "lucide-react";
+"use client";
+
+import { useUser, useSession } from "@/hooks/use-auth";
+import { useAudioBooks } from "@/hooks/use-audiobooks";
+import { InfoIcon, Users, BookOpen, BarChart3, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,20 +12,46 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { redirect } from "next/navigation";
+import { useEffect } from "react";
 
-export default async function DashboardPage() {
-  const supabase = await createClient();
+export default function DashboardPage() {
+  const { data: user, isLoading: userLoading, error: userError } = useUser();
+  const { data: session, isLoading: sessionLoading } = useSession();
+  const { data: audiobooks, isLoading: audiobooksLoading } = useAudioBooks();
 
-  const { data, error } = await supabase.auth.getClaims();
-  if (error || !data?.claims) {
-    redirect("/auth/login");
+  const isLoading = userLoading || sessionLoading;
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      redirect("/auth/login");
+    }
+
+    if (!isLoading && user) {
+      const userRole = user.user_metadata?.role || "user";
+      if (userRole !== "admin") {
+        redirect("/");
+      }
+    }
+  }, [user, isLoading]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading dashboard...</span>
+        </div>
+      </div>
+    );
   }
 
-  // Check if user is admin
-  const userRole = data.claims.user_metadata.role || "user";
-  if (userRole !== "admin") {
-    redirect("/");
+  if (!user) {
+    return null; // Will redirect in useEffect
   }
+
+  const userRole = user.user_metadata?.role || "user";
+  const totalAudiobooks = audiobooks?.data?.length || 0;
 
   return (
     <div className="space-y-6">
@@ -74,6 +102,11 @@ export default async function DashboardPage() {
               </CardTitle>
               <CardDescription>
                 Upload, edit, and manage audio book content
+                {!audiobooksLoading && (
+                  <span className="block text-sm font-medium">
+                    Total Books: {totalAudiobooks}
+                  </span>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -116,7 +149,7 @@ export default async function DashboardPage() {
         <div className="flex flex-col gap-2 items-start">
           <h2 className="font-bold text-2xl mb-4">Admin User Details</h2>
           <pre className="text-xs font-mono p-3 rounded border max-h-32 overflow-auto">
-            {JSON.stringify(data.claims, null, 2)}
+            {JSON.stringify(user, null, 2)}
           </pre>
         </div>
       </div>
