@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"log"
+
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -19,6 +21,10 @@ func DeleteProfile(c *fiber.Ctx) error {
 
 // Audio book handlers
 func GetAudioBooks(c *fiber.Ctx) error {
+	log.Printf("GetAudioBooks: Request received from IP %s", c.IP())
+	log.Printf("GetAudioBooks: User agent: %s", c.Get("User-Agent"))
+	log.Printf("GetAudioBooks: User context: %v", c.Locals("user"))
+
 	return c.JSON(fiber.Map{"message": "Get audio books - TODO"})
 }
 

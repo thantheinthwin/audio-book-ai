@@ -61,7 +61,7 @@ type UploadFile struct {
 type CreateUploadRequest struct {
 	UploadType UploadType `json:"upload_type" validate:"required"`
 	TotalFiles int        `json:"total_files" validate:"required,min=1,max=100"`
-	TotalSize  int64      `json:"total_size_bytes" validate:"required,min=1"`
+	TotalSize  int64      `json:"total_size_bytes" validate:"min=0"` // Made optional, min=0 to allow 0
 }
 
 // UploadFileRequest represents the request to upload a file

@@ -3,11 +3,11 @@ package handlers
 import (
 	"audio-book-ai/api/database"
 	"audio-book-ai/api/models"
+	"audio-book-ai/api/services"
 	"context"
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -18,12 +18,18 @@ import (
 
 // Handler struct holds all handlers with their dependencies
 type Handler struct {
-	repo database.Repository
+	repo       database.Repository
+	storage    *services.SupabaseStorageService
+	redisQueue *services.RedisQueueService
 }
 
 // NewHandler creates a new handler instance with dependencies
-func NewHandler(repo database.Repository) *Handler {
-	return &Handler{repo: repo}
+func NewHandler(repo database.Repository, storage *services.SupabaseStorageService, redisQueue *services.RedisQueueService) *Handler {
+	return &Handler{
+		repo:       repo,
+		storage:    storage,
+		redisQueue: redisQueue,
+	}
 }
 
 // CreateAudioBook creates an audio book from a completed upload session
@@ -43,12 +49,13 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 	}
 
 	// Get user ID from context
-	userID, ok := c.Locals("user_id").(uuid.UUID)
-	if !ok {
+	userCtx, ok := c.Locals("user").(*models.UserContext)
+	if !ok || userCtx == nil {
 		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
 			"error": "User not authenticated",
 		})
 	}
+	userID := uuid.MustParse(userCtx.ID)
 
 	// Get upload session
 	upload, err := h.repo.GetUploadByID(context.Background(), req.UploadID)
@@ -181,7 +188,7 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 		})
 	}
 
-	// Create processing jobs
+	// Create processing jobs and enqueue them to Redis
 	jobTypes := []models.JobType{
 		models.JobTypeTranscribe,
 		models.JobTypeSummarize,
@@ -189,6 +196,7 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 		models.JobTypeEmbed,
 	}
 
+	jobsCreated := 0
 	for _, jobType := range jobTypes {
 		job := &models.ProcessingJob{
 			ID:          uuid.New(),
@@ -198,10 +206,33 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 			CreatedAt:   time.Now(),
 		}
 
+		// Save job to database
 		if err := h.repo.CreateProcessingJob(context.Background(), job); err != nil {
 			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
 				"error": "Failed to create processing job",
 			})
+		}
+
+		// Enqueue job to Redis if Redis service is available
+		if h.redisQueue != nil {
+			var enqueueErr error
+			if jobType == models.JobTypeTranscribe {
+				// For transcription jobs, pass the file path
+				enqueueErr = h.redisQueue.EnqueueTranscriptionJob(context.Background(), job, audiobook.FilePath)
+			} else {
+				// For other AI jobs, don't pass file path
+				enqueueErr = h.redisQueue.EnqueueAIJob(context.Background(), job)
+			}
+
+			if enqueueErr != nil {
+				log.Printf("Failed to enqueue job %s to Redis: %v", jobType, enqueueErr)
+				// Continue with other jobs even if one fails to enqueue
+			} else {
+				jobsCreated++
+			}
+		} else {
+			log.Printf("Redis queue service not available, job %s created in database only", jobType)
+			jobsCreated++
 		}
 	}
 
@@ -217,7 +248,8 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 		"audiobook_id": audiobook.ID,
 		"status":       audiobook.Status,
 		"message":      "Audio book created successfully",
-		"jobs_created": len(jobTypes),
+		"jobs_created": jobsCreated,
+		"total_jobs":   len(jobTypes),
 	})
 }
 
@@ -226,6 +258,10 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 func (h *Handler) CreateUpload(c *fiber.Ctx) error {
 	log.Printf("CreateUpload: Request received from IP %s", c.IP())
 	log.Printf("CreateUpload: User agent: %s", c.Get("User-Agent"))
+
+	// Log raw request body for debugging
+	body := c.Body()
+	log.Printf("CreateUpload: Raw request body: %s", string(body))
 
 	var req models.CreateUploadRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -238,6 +274,10 @@ func (h *Handler) CreateUpload(c *fiber.Ctx) error {
 	log.Printf("CreateUpload: Request parsed successfully - UploadType: %s, TotalFiles: %d, TotalSize: %d",
 		req.UploadType, req.TotalFiles, req.TotalSize)
 
+	// Log individual field values for debugging validation
+	log.Printf("CreateUpload: Field values - UploadType: '%v', TotalFiles: %v, TotalSize: %v",
+		req.UploadType, req.TotalFiles, req.TotalSize)
+
 	if err := req.Validate(); err != nil {
 		log.Printf("CreateUpload: Validation failed: %v", err)
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
@@ -248,24 +288,32 @@ func (h *Handler) CreateUpload(c *fiber.Ctx) error {
 	log.Printf("CreateUpload: Request validation passed")
 
 	// Get user ID from context (set by auth middleware)
-	userID, ok := c.Locals("user_id").(uuid.UUID)
-	if !ok {
-		log.Printf("CreateUpload: User not authenticated - user_id not found in context")
+	userCtx, ok := c.Locals("user").(*models.UserContext)
+	log.Printf("CreateUpload: User context: %v", userCtx)
+	if !ok || userCtx == nil {
+		log.Printf("CreateUpload: User not authenticated - user context not found in context")
 		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
 			"error": "User not authenticated",
 		})
 	}
 
-	log.Printf("CreateUpload: User authenticated - UserID: %s", userID)
+	log.Printf("CreateUpload: User authenticated - UserID: %s", userCtx.ID)
+
+	// Handle case where TotalSize is 0 or not provided
+	totalSize := req.TotalSize
+	if totalSize <= 0 {
+		log.Printf("CreateUpload: TotalSize is 0 or not provided, will be calculated during file uploads")
+		totalSize = 0 // Will be updated as files are uploaded
+	}
 
 	upload := &models.Upload{
 		ID:            uuid.New(),
-		UserID:        userID,
+		UserID:        uuid.MustParse(userCtx.ID),
 		UploadType:    req.UploadType,
 		Status:        models.UploadStatusPending,
 		TotalFiles:    req.TotalFiles,
 		UploadedFiles: 0,
-		TotalSize:     req.TotalSize,
+		TotalSize:     totalSize,
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
 	}
@@ -300,12 +348,13 @@ func (h *Handler) UploadFile(c *fiber.Ctx) error {
 	}
 
 	// Get user ID from context
-	userID, ok := c.Locals("user_id").(uuid.UUID)
-	if !ok {
+	userCtx, ok := c.Locals("user").(*models.UserContext)
+	if !ok || userCtx == nil {
 		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
 			"error": "User not authenticated",
 		})
 	}
+	userID := uuid.MustParse(userCtx.ID)
 
 	// Get upload session
 	upload, err := h.repo.GetUploadByID(context.Background(), uploadID)
@@ -352,23 +401,23 @@ func (h *Handler) UploadFile(c *fiber.Ctx) error {
 		})
 	}
 
-	// Create upload directory
-	uploadDir := fmt.Sprintf("uploads/%s", uploadID)
-	if err := os.MkdirAll(uploadDir, 0755); err != nil {
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to create upload directory",
+	// Validate file type
+	if err := h.storage.ValidateFileType(file.Filename); err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
 		})
 	}
 
 	// Generate unique filename
 	fileExt := filepath.Ext(file.Filename)
 	fileName := fmt.Sprintf("%s%s", uuid.New().String(), fileExt)
-	filePath := filepath.Join(uploadDir, fileName)
 
-	// Save file
-	if err := c.SaveFile(file, filePath); err != nil {
+	// Upload file to Supabase Storage
+	fileURL, err := h.storage.UploadFile(file, uploadID.String(), fileName)
+	if err != nil {
+		log.Printf("UploadFile: Failed to upload file to Supabase Storage: %v", err)
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to save file",
+			"error": "Failed to upload file to storage",
 		})
 	}
 
@@ -379,7 +428,7 @@ func (h *Handler) UploadFile(c *fiber.Ctx) error {
 		FileName:      file.Filename,
 		FileSize:      file.Size,
 		MimeType:      file.Header.Get("Content-Type"),
-		FilePath:      filePath,
+		FilePath:      fileURL, // Store the Supabase Storage URL
 		ChapterNumber: chapterNumber,
 		ChapterTitle:  &chapterTitle,
 		Status:        models.UploadStatusCompleted,
@@ -387,8 +436,10 @@ func (h *Handler) UploadFile(c *fiber.Ctx) error {
 	}
 
 	if err := h.repo.CreateUploadFile(context.Background(), uploadFile); err != nil {
-		// Clean up file if database insert fails
-		os.Remove(filePath)
+		// Clean up file from Supabase Storage if database insert fails
+		if err := h.storage.DeleteFile(uploadID.String(), fileName); err != nil {
+			log.Printf("UploadFile: Failed to delete file from storage after database error: %v", err)
+		}
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to save file metadata",
 		})
@@ -396,9 +447,14 @@ func (h *Handler) UploadFile(c *fiber.Ctx) error {
 
 	// Update upload session
 	upload.UploadedFiles++
+	upload.TotalSize += file.Size // Add file size to total
 	upload.UpdatedAt = time.Now()
+	log.Printf("UploadFile: Updated upload session - UploadedFiles: %d/%d, TotalSize: %d bytes",
+		upload.UploadedFiles, upload.TotalFiles, upload.TotalSize)
+
 	if upload.UploadedFiles >= upload.TotalFiles {
 		upload.Status = models.UploadStatusCompleted
+		log.Printf("UploadFile: Upload session completed")
 	} else {
 		upload.Status = models.UploadStatusUploading
 	}
@@ -431,12 +487,13 @@ func (h *Handler) GetUploadProgress(c *fiber.Ctx) error {
 	}
 
 	// Get user ID from context
-	userID, ok := c.Locals("user_id").(uuid.UUID)
-	if !ok {
+	userCtx, ok := c.Locals("user").(*models.UserContext)
+	if !ok || userCtx == nil {
 		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
 			"error": "User not authenticated",
 		})
 	}
+	userID := uuid.MustParse(userCtx.ID)
 
 	// Get upload session
 	upload, err := h.repo.GetUploadByID(context.Background(), uploadID)
@@ -485,12 +542,13 @@ func (h *Handler) GetUploadDetails(c *fiber.Ctx) error {
 	}
 
 	// Get user ID from context
-	userID, ok := c.Locals("user_id").(uuid.UUID)
-	if !ok {
+	userCtx, ok := c.Locals("user").(*models.UserContext)
+	if !ok || userCtx == nil {
 		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
 			"error": "User not authenticated",
 		})
 	}
+	userID := uuid.MustParse(userCtx.ID)
 
 	// Get upload session
 	upload, err := h.repo.GetUploadByID(context.Background(), uploadID)
@@ -548,12 +606,13 @@ func (h *Handler) DeleteUpload(c *fiber.Ctx) error {
 	}
 
 	// Get user ID from context
-	userID, ok := c.Locals("user_id").(uuid.UUID)
-	if !ok {
+	userCtx, ok := c.Locals("user").(*models.UserContext)
+	if !ok || userCtx == nil {
 		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
 			"error": "User not authenticated",
 		})
 	}
+	userID := uuid.MustParse(userCtx.ID)
 
 	// Get upload session
 	upload, err := h.repo.GetUploadByID(context.Background(), uploadID)
@@ -578,18 +637,14 @@ func (h *Handler) DeleteUpload(c *fiber.Ctx) error {
 		})
 	}
 
-	// Delete files from disk
+	// Delete files from Supabase Storage
 	for _, file := range files {
-		if err := os.Remove(file.FilePath); err != nil && !os.IsNotExist(err) {
+		// Extract filename from the file path (which is now a URL)
+		fileName := filepath.Base(file.FilePath)
+		if err := h.storage.DeleteFile(uploadID.String(), fileName); err != nil {
 			// Log error but continue with deletion
-			fmt.Printf("Failed to delete file %s: %v\n", file.FilePath, err)
+			log.Printf("Failed to delete file %s from storage: %v", file.FilePath, err)
 		}
-	}
-
-	// Delete upload directory
-	uploadDir := fmt.Sprintf("uploads/%s", uploadID)
-	if err := os.RemoveAll(uploadDir); err != nil && !os.IsNotExist(err) {
-		fmt.Printf("Failed to delete upload directory %s: %v\n", uploadDir, err)
 	}
 
 	// Delete from database
@@ -615,12 +670,13 @@ func (h *Handler) GetJobStatus(c *fiber.Ctx) error {
 	}
 
 	// Get user ID from context
-	userID, ok := c.Locals("user_id").(uuid.UUID)
-	if !ok {
+	userCtx, ok := c.Locals("user").(*models.UserContext)
+	if !ok || userCtx == nil {
 		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
 			"error": "User not authenticated",
 		})
 	}
+	userID := uuid.MustParse(userCtx.ID)
 
 	// Get audio book to check ownership
 	audiobook, err := h.repo.GetAudioBookByID(context.Background(), audiobookID)

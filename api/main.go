@@ -8,6 +8,7 @@ import (
 	"audio-book-ai/api/database"
 	"audio-book-ai/api/handlers"
 	"audio-book-ai/api/routes"
+	"audio-book-ai/api/services"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -68,13 +69,26 @@ func main() {
 	// Health check endpoint
 	// app.Get("/health", handlers.HealthCheck)
 
-	// TODO: Initialize database repository
+	// Initialize database repository
 	// For now, we'll use a mock repository until the database implementation is ready
-	var repo database.Repository = nil // This will be replaced with actual implementation
+	repo := database.NewMockRepository()
+
+	// Initialize Supabase storage service
+	storageService := services.NewSupabaseStorageService(cfg)
+
+	// Initialize Redis queue service
+	redisQueue, err := services.NewRedisQueueService(cfg.RedisURL, cfg.JobsPrefix)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize Redis queue service: %v", err)
+		log.Printf("Continuing without Redis queue functionality")
+		redisQueue = nil
+	} else {
+		log.Println("Redis queue service initialized")
+	}
 
 	// API routes
 	api := app.Group("/api/v1")
-	routes.SetupRoutes(api, cfg, repo)
+	routes.SetupRoutes(api, cfg, repo, storageService, redisQueue)
 
 	log.Printf("🚀 Server starting on port %s", cfg.Port)
 	if err := app.Listen(":" + cfg.Port); err != nil {

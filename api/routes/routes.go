@@ -5,14 +5,15 @@ import (
 	"audio-book-ai/api/database"
 	"audio-book-ai/api/handlers"
 	"audio-book-ai/api/middleware"
+	"audio-book-ai/api/services"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 // SetupRoutes configures all API routes
-func SetupRoutes(app fiber.Router, cfg *config.Config, repo database.Repository) {
+func SetupRoutes(app fiber.Router, cfg *config.Config, repo database.Repository, storage *services.SupabaseStorageService, redisQueue *services.RedisQueueService) {
 	// Create handler instance
-	h := handlers.NewHandler(repo)
+	h := handlers.NewHandler(repo, storage, redisQueue)
 	// Auth routes
 	auth := app.Group("/auth", middleware.AuthMiddleware(cfg))
 	SetupAuthRoutes(auth, cfg)

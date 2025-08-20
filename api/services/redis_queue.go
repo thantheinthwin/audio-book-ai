@@ -20,14 +20,14 @@ type RedisQueueService struct {
 
 // JobMessage represents a job message in the queue
 type JobMessage struct {
-	ID          uuid.UUID           `json:"id"`
-	AudiobookID uuid.UUID           `json:"audiobook_id"`
-	JobType     models.JobType      `json:"job_type"`
-	FilePath    *string             `json:"file_path,omitempty"`
-	CreatedAt   time.Time           `json:"created_at"`
-	Priority    int                 `json:"priority"` // Higher number = higher priority
-	RetryCount  int                 `json:"retry_count"`
-	MaxRetries  int                 `json:"max_retries"`
+	ID          uuid.UUID              `json:"id"`
+	AudiobookID uuid.UUID              `json:"audiobook_id"`
+	JobType     models.JobType         `json:"job_type"`
+	FilePath    *string                `json:"file_path,omitempty"`
+	CreatedAt   time.Time              `json:"created_at"`
+	Priority    int                    `json:"priority"` // Higher number = higher priority
+	RetryCount  int                    `json:"retry_count"`
+	MaxRetries  int                    `json:"max_retries"`
 	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 }
 
@@ -155,9 +155,9 @@ func (r *RedisQueueService) GetQueueStats(ctx context.Context) (map[string]inter
 		}
 
 		stats[string(jobType)] = map[string]interface{}{
-			"pending":   pending,
+			"pending":    pending,
 			"processing": processing,
-			"failed":    failed,
+			"failed":     failed,
 		}
 	}
 
