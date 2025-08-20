@@ -9,40 +9,94 @@ import (
 	"strings"
 	"time"
 
-	storage_go "github.com/supabase-community/storage-go"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 )
 
-// SupabaseStorageService handles file operations with Supabase Storage using storage-go client
+// SupabaseStorageService handles file operations with Supabase Storage using AWS S3 SDK
 type SupabaseStorageService struct {
 	cfg    *config.Config
-	client *storage_go.Client
+	client *s3.S3
+}
+
+// NewSupabaseStorageService ...
+func NewSupabaseStorageService(cfg *config.Config) *SupabaseStorageService {
+	s3Region := cfg.SupabaseS3Region
+
+	// Create AWS session with custom endpoint
+	sess, err := session.NewSession(&aws.Config{
+		Region:           aws.String(s3Region),
+		Endpoint:         aws.String(cfg.SupabaseS3Endpoint),
+		S3ForcePathStyle: aws.Bool(true),
+		Credentials:      credentials.NewStaticCredentials(cfg.SupabaseS3AccessKeyID, cfg.SupabaseS3SecretKey, ""),
+	})
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create AWS session: %v", err))
+	}
+
+	// Create S3 client
+	s3Client := s3.New(sess)
+
+	return &SupabaseStorageService{cfg: cfg, client: s3Client}
 }
 
 // NewSupabaseStorageService creates a new Supabase storage service
-func NewSupabaseStorageService(cfg *config.Config) *SupabaseStorageService {
-	storageClient := storage_go.NewClient(
-		cfg.SupabaseS3Endpoint,
-		cfg.SupabaseSecretKey,
-		nil,
-	)
+// func NewSupabaseStorageService(cfg *config.Config) *SupabaseStorageService {
 
-	service := &SupabaseStorageService{
-		cfg:    cfg,
-		client: storageClient,
-	}
+// 	s3Endpoint, s3Region, s3AccessKeyID, s3SecretKey := cfg.SupabaseS3Endpoint, cfg.SupabaseS3Region, cfg.SupabaseS3AccessKeyID, cfg.SupabaseS3SecretKey
 
-	return service
-}
+// 	// Create custom AWS configuration for Supabase S3
+// 	awsCfg, err := awsconfig.LoadDefaultConfig(context.TODO(),
+// 		awsconfig.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
+// 			func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+// 				return aws.Endpoint{
+// 					URL:               s3Endpoint,
+// 					SigningRegion:     s3Region,
+// 					HostnameImmutable: true,
+// 				}, nil
+// 			},
+// 		)),
+// 		awsconfig.WithCredentialsProvider(credentials.StaticCredentialsProvider{
+// 			Value: aws.Credentials{
+// 				AccessKeyID:     s3AccessKeyID,
+// 				SecretAccessKey: s3SecretKey,
+// 			},
+// 		}),
+// 		awsconfig.WithRegion(s3Region),
+// 	)
+// 	if err != nil {
+// 		panic(fmt.Sprintf("Failed to load AWS config: %v", err))
+// 	}
+
+// 	// Create S3 client with path-style addressing
+// 	s3Client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+// 		o.UsePathStyle = true // Required for Supabase S3
+// 	})
+
+// 	service := &SupabaseStorageService{
+// 		cfg:    cfg,
+// 		client: s3Client,
+// 	}
+
+// 	return service
+// }
 
 // CheckBucketExists checks if the storage bucket exists and is accessible
 func (s *SupabaseStorageService) CheckBucketExists() error {
-	_, err := s.client.GetBucket(s.cfg.SupabaseStorageBucket)
-	if err != nil {
-		return fmt.Errorf("bucket '%s' does not exist or is not accessible: %w", s.cfg.SupabaseStorageBucket, err)
-	}
+	fmt.Printf("Checking bucket '%s' with endpoint '%s'\n", s.cfg.SupabaseStorageBucket, s.cfg.SupabaseS3Endpoint)
 
-	fmt.Printf("Bucket '%s' exists and is accessible\n", s.cfg.SupabaseStorageBucket)
-	return nil
+	if _, err := s.client.ListObjectsV2(&s3.ListObjectsV2Input{
+		Bucket:  aws.String(s.cfg.SupabaseStorageBucket),
+		MaxKeys: aws.Int64(1),
+	}); err == nil {
+		fmt.Printf("Bucket '%s' is readable\n", s.cfg.SupabaseStorageBucket)
+		return nil
+	} else {
+		fmt.Printf("ListObjectsV2 failed: %v\n", err)
+		return err
+	}
 }
 
 // UploadFile uploads a file to Supabase Storage
@@ -57,8 +111,13 @@ func (s *SupabaseStorageService) UploadFile(file *multipart.FileHeader, uploadID
 	// Create the file path in Supabase Storage
 	storagePath := fmt.Sprintf("uploads/%s/%s", uploadID, fileName)
 
-	// Upload to Supabase Storage using storage-go
-	_, err = s.client.UploadFile(s.cfg.SupabaseStorageBucket, storagePath, src)
+	// Upload to Supabase Storage
+	_, err = s.client.PutObject(&s3.PutObjectInput{
+		Bucket:      aws.String(s.cfg.SupabaseStorageBucket),
+		Key:         aws.String(storagePath),
+		Body:        src,
+		ContentType: aws.String(file.Header.Get("Content-Type")),
+	})
 	if err != nil {
 		return "", fmt.Errorf("failed to upload file to Supabase Storage: %w", err)
 	}
@@ -78,8 +137,38 @@ func (s *SupabaseStorageService) UploadFileFromPath(bucket, path, localPath stri
 	}
 	defer file.Close()
 
-	// Upload to Supabase Storage using storage-go
-	_, err = s.client.UploadFile(bucket, path, file)
+	// Determine content type based on file extension
+	contentType := "application/octet-stream"
+	if ext := filepath.Ext(localPath); ext != "" {
+		switch strings.ToLower(ext) {
+		case ".png":
+			contentType = "image/png"
+		case ".jpg", ".jpeg":
+			contentType = "image/jpeg"
+		case ".gif":
+			contentType = "image/gif"
+		case ".mp3":
+			contentType = "audio/mpeg"
+		case ".wav":
+			contentType = "audio/wav"
+		case ".m4a":
+			contentType = "audio/mp4"
+		case ".aac":
+			contentType = "audio/aac"
+		case ".ogg":
+			contentType = "audio/ogg"
+		case ".flac":
+			contentType = "audio/flac"
+		}
+	}
+
+	// Upload to Supabase Storage
+	_, err = s.client.PutObject(&s3.PutObjectInput{
+		Bucket:      aws.String(bucket),
+		Key:         aws.String(path),
+		Body:        file,
+		ContentType: aws.String(contentType),
+	})
 	if err != nil {
 		return fmt.Errorf("failed to upload file to Supabase Storage: %w", err)
 	}
@@ -92,8 +181,10 @@ func (s *SupabaseStorageService) UploadFileFromPath(bucket, path, localPath stri
 func (s *SupabaseStorageService) DeleteFile(uploadID string, fileName string) error {
 	storagePath := fmt.Sprintf("uploads/%s/%s", uploadID, fileName)
 
-	// Delete file using storage-go
-	_, err := s.client.RemoveFile(s.cfg.SupabaseStorageBucket, []string{storagePath})
+	_, err := s.client.DeleteObject(&s3.DeleteObjectInput{
+		Bucket: aws.String(s.cfg.SupabaseStorageBucket),
+		Key:    aws.String(storagePath),
+	})
 	if err != nil {
 		return fmt.Errorf("failed to delete file from Supabase Storage: %w", err)
 	}
@@ -104,23 +195,23 @@ func (s *SupabaseStorageService) DeleteFile(uploadID string, fileName string) er
 
 // GetPublicURL returns the public URL for a file
 func (s *SupabaseStorageService) GetPublicURL(path string) string {
-	// Construct the public URL manually since storage-go GetPublicUrl might not work as expected
 	// Supabase public URL format: https://<project-ref>.supabase.co/storage/v1/object/public/<bucket>/<path>
 	return fmt.Sprintf("%s/storage/v1/object/public/%s/%s", s.cfg.SupabaseURL, s.cfg.SupabaseStorageBucket, path)
 }
 
 // CreateSignedURL generates a signed URL for a file
 func (s *SupabaseStorageService) CreateSignedURL(path string, expiresIn time.Duration) (string, error) {
-	// Convert duration to seconds for storage-go
-	expireInSeconds := int(expiresIn.Seconds())
+	req, _ := s.client.GetObjectRequest(&s3.GetObjectInput{
+		Bucket: aws.String(s.cfg.SupabaseStorageBucket),
+		Key:    aws.String(path),
+	})
 
-	// Create signed URL using storage-go
-	result, err := s.client.CreateSignedUrl(s.cfg.SupabaseStorageBucket, path, expireInSeconds)
+	url, err := req.Presign(expiresIn)
 	if err != nil {
 		return "", fmt.Errorf("failed to create signed URL: %w", err)
 	}
 
-	return result.SignedURL, nil
+	return url, nil
 }
 
 // ValidateFileType checks if the file type is allowed
@@ -145,47 +236,4 @@ func (s *SupabaseStorageService) GetFileSize(file *multipart.FileHeader) int64 {
 // GetMimeType returns the MIME type of the file
 func (s *SupabaseStorageService) GetMimeType(file *multipart.FileHeader) string {
 	return file.Header.Get("Content-Type")
-}
-
-// DownloadFile downloads a file from Supabase Storage
-func (s *SupabaseStorageService) DownloadFile(path string) ([]byte, error) {
-	result, err := s.client.DownloadFile(s.cfg.SupabaseStorageBucket, path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to download file from Supabase Storage: %w", err)
-	}
-	return result, nil
-}
-
-// ListFiles lists all files in a bucket with optional search parameters
-func (s *SupabaseStorageService) ListFiles(bucket string, path string, limit int, offset int) ([]storage_go.FileObject, error) {
-	result, err := s.client.ListFiles(bucket, path, storage_go.FileSearchOptions{
-		Limit:  limit,
-		Offset: offset,
-		SortByOptions: storage_go.SortBy{
-			Column: "name",
-			Order:  "asc",
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list files from Supabase Storage: %w", err)
-	}
-	return result, nil
-}
-
-// MoveFile moves a file from one location to another within the same bucket
-func (s *SupabaseStorageService) MoveFile(bucket, fromPath, toPath string) error {
-	_, err := s.client.MoveFile(bucket, fromPath, toPath)
-	if err != nil {
-		return fmt.Errorf("failed to move file in Supabase Storage: %w", err)
-	}
-	return nil
-}
-
-// UpdateFile replaces an existing file at the specified path
-func (s *SupabaseStorageService) UpdateFile(bucket, path string, file multipart.File) error {
-	_, err := s.client.UpdateFile(bucket, path, file)
-	if err != nil {
-		return fmt.Errorf("failed to update file in Supabase Storage: %w", err)
-	}
-	return nil
 }
