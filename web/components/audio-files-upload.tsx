@@ -119,7 +119,7 @@ const getAudioDuration = (file: File): Promise<string> => {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
     const audio = new Audio();
-    audio.preload = "metadata";         // ensure metadata load
+    audio.preload = "metadata"; // ensure metadata load
     let settled = false;
 
     const cleanup = () => {
@@ -135,9 +135,11 @@ const getAudioDuration = (file: File): Promise<string> => {
       if (settled) return;
       settled = true;
       cleanup();
-      resolve(seconds == null || !isFinite(seconds) || isNaN(seconds)
-        ? "--:--"
-        : formatDuration(seconds));
+      resolve(
+        seconds == null || !isFinite(seconds) || isNaN(seconds)
+          ? "--:--"
+          : formatDuration(seconds)
+      );
     };
 
     const onMeta = () => {
@@ -170,7 +172,6 @@ const getAudioDuration = (file: File): Promise<string> => {
   });
 };
 
-
 export default function AudioFilesUpload({
   maxSizeMB = 100,
   maxFiles = 20,
@@ -181,7 +182,7 @@ export default function AudioFilesUpload({
 }: AudioFilesUploadProps) {
   const maxSize = maxSizeMB * 1024 * 1024; // Convert MB to bytes
 
-  const { fields, append, remove } = useFieldArray<FormData>({
+  const { fields, append, remove, replace } = useFieldArray<FormData>({
     control,
     name,
   });
@@ -202,15 +203,12 @@ export default function AudioFilesUpload({
     maxFiles,
     maxSize,
     accept: "audio/*",
-    onFilesChange: async (uploadedFiles) => {
-      // Clear existing fields and add new ones
-      while (fields.length > 0) {
-        remove(0);
-      }
+    onFilesAdded: async (newFiles) => {
+      // Only handle new files being added, don't clear existing fields
+      const startIndex = fields.length;
 
-      // Add new fields for each uploaded file
-      for (let index = 0; index < uploadedFiles.length; index++) {
-        const file = uploadedFiles[index];
+      for (let i = 0; i < newFiles.length; i++) {
+        const file = newFiles[i];
         const audioFile =
           file.file instanceof File ? file.file : new File([], file.file.name);
 
@@ -227,7 +225,7 @@ export default function AudioFilesUpload({
 
         append({
           id: file.id,
-          chapter_number: index + 1,
+          chapter_number: startIndex + i + 1,
           title: "",
           audio_file: audioFile,
           playtime,
@@ -356,7 +354,12 @@ export default function AudioFilesUpload({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={clearFiles}
+                  onClick={() => {
+                    // Clear all fields at once using replace with empty array
+                    replace([]);
+                    // Clear the file upload state
+                    clearFiles();
+                  }}
                   type="button"
                 >
                   <Trash2Icon
