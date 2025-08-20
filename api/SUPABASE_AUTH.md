@@ -153,5 +153,3 @@ To test the authentication:
 ### Debug Mode
 
 Enable debug logging by setting `NODE_ENV=development` to see detailed authentication logs.
-
-

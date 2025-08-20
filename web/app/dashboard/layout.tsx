@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { UserProfile } from "@/components/user-profile";
-import { testAuth, testApiWithoutAuth, testAdminAuth } from "@/lib/api";
+import { testAuth, testAdminAuth } from "@/lib/api";
 
 import {
   ChevronDown,
@@ -180,17 +180,6 @@ export default function DashboardLayout({
             {/* Test Buttons */}
             {process.env.NODE_ENV === "development" && (
               <div className="space-y-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    console.log("Testing API without auth...");
-                    await testApiWithoutAuth();
-                  }}
-                  className="w-full"
-                >
-                  Test API (No Auth)
-                </Button>
                 <Button
                   variant="outline"
                   size="sm"

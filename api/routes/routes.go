@@ -13,9 +13,8 @@ import (
 func SetupRoutes(app fiber.Router, cfg *config.Config, repo database.Repository) {
 	// Create handler instance
 	h := handlers.NewHandler(repo)
-
-	// Auth routes (no authentication required)
-	auth := app.Group("/auth")
+	// Auth routes
+	auth := app.Group("/auth", middleware.AuthMiddleware(cfg))
 	SetupAuthRoutes(auth, cfg)
 
 	// Protected routes (authentication required)

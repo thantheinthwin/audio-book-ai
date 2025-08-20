@@ -7,15 +7,6 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- Enable vector extension for embeddings (if using pgvector)
 CREATE EXTENSION IF NOT EXISTS vector;
 
--- Users table (references Supabase auth.users)
-CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-    email VARCHAR(255) NOT NULL UNIQUE,
-    role VARCHAR(50) NOT NULL DEFAULT 'user',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
 -- Audio Books table
 CREATE TABLE IF NOT EXISTS audiobooks (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -30,7 +21,7 @@ CREATE TABLE IF NOT EXISTS audiobooks (
     language VARCHAR(2) NOT NULL,
     is_public BOOLEAN DEFAULT false,
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    created_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_by UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -141,7 +132,7 @@ CREATE TABLE IF NOT EXISTS audiobook_embeddings (
 -- Uploads table
 CREATE TABLE IF NOT EXISTS uploads (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     upload_type VARCHAR(20) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     total_files INTEGER NOT NULL,
@@ -239,7 +230,6 @@ CREATE TRIGGER update_uploads_updated_at BEFORE UPDATE ON uploads
 
 -- Row Level Security (RLS) policies
 -- Enable RLS on all tables
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audiobooks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chapters ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transcripts ENABLE ROW LEVEL SECURITY;
@@ -252,13 +242,6 @@ ALTER TABLE audiobook_tags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audiobook_embeddings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE uploads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE upload_files ENABLE ROW LEVEL SECURITY;
-
--- Users can only see their own data
-CREATE POLICY "Users can view own data" ON users
-    FOR SELECT USING (auth.uid() = id);
-
-CREATE POLICY "Users can update own data" ON users
-    FOR UPDATE USING (auth.uid() = id);
 
 -- Audio Books policies
 CREATE POLICY "Users can view public audiobooks" ON audiobooks
@@ -276,13 +259,63 @@ CREATE POLICY "Users can update own audiobooks" ON audiobooks
 CREATE POLICY "Users can delete own audiobooks" ON audiobooks
     FOR DELETE USING (auth.uid() = created_by);
 
--- Admins can do everything
+-- Admins can do everything (checking auth.users directly)
 CREATE POLICY "Admins can do everything on audiobooks" ON audiobooks
     FOR ALL USING (
         EXISTS (
-            SELECT 1 FROM users 
-            WHERE users.id = auth.uid() 
-            AND users.role = 'admin'
+            SELECT 1 FROM auth.users 
+            WHERE auth.users.id = auth.uid() 
+            AND auth.users.raw_user_meta_data->>'role' = 'admin'
+        )
+    );
+
+-- Uploads policies
+CREATE POLICY "Users can view own uploads" ON uploads
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create own uploads" ON uploads
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own uploads" ON uploads
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own uploads" ON uploads
+    FOR DELETE USING (auth.uid() = user_id);
+
+-- Upload Files policies
+CREATE POLICY "Users can view own upload files" ON upload_files
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM uploads 
+            WHERE uploads.id = upload_files.upload_id 
+            AND uploads.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can create own upload files" ON upload_files
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM uploads 
+            WHERE uploads.id = upload_files.upload_id 
+            AND uploads.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can update own upload files" ON upload_files
+    FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM uploads 
+            WHERE uploads.id = upload_files.upload_id 
+            AND uploads.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can delete own upload files" ON upload_files
+    FOR DELETE USING (
+        EXISTS (
+            SELECT 1 FROM uploads 
+            WHERE uploads.id = upload_files.upload_id 
+            AND uploads.user_id = auth.uid()
         )
     );
 
