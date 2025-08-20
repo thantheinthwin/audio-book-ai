@@ -30,6 +30,30 @@ export async function POST(request: NextRequest) {
     const coverImage = formData.get("coverImage") as File | null;
     const chapters = JSON.parse(formData.get("chapters") as string);
 
+    // Extract files from FormData
+    const files: Array<{
+      file: File;
+      chapter_number: number;
+      title: string;
+    }> = [];
+
+    // Find all files in the FormData
+    for (const [key, value] of formData.entries()) {
+      if (key.startsWith("file_") && value instanceof File) {
+        const index = key.replace("file_", "");
+        const chapterNumber = parseInt(
+          formData.get(`file_${index}_chapter_number`) as string
+        );
+        const chapterTitle = formData.get(`file_${index}_title`) as string;
+
+        files.push({
+          file: value,
+          chapter_number: chapterNumber,
+          title: chapterTitle,
+        });
+      }
+    }
+
     // Validate required fields
     if (!title || !author || !language) {
       return NextResponse.json(
@@ -45,10 +69,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const chaptersWithFiles = chapters.filter(
-      (chapter: any) => chapter.audio_file
-    );
-    if (chaptersWithFiles.length === 0) {
+    if (files.length === 0) {
       return NextResponse.json(
         { error: "At least one audio file is required" },
         { status: 400 }
@@ -56,9 +77,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 1: Create upload session
-    const totalFiles = chaptersWithFiles.length;
-    const totalSize = chaptersWithFiles.reduce((sum: number, chapter: any) => {
-      return sum + (chapter.audio_file?.size || 0);
+    const totalFiles = files.length;
+    const totalSize = files.reduce((sum: number, file: any) => {
+      return sum + (file.file?.size || 0);
     }, 0);
 
     let uploadData;
@@ -92,7 +113,9 @@ export async function POST(request: NextRequest) {
         { status: error.response?.status || 500 }
       );
     }
-    const uploadId = uploadData.data?.upload_id;
+    const uploadId = uploadData?.upload_id;
+
+    console.log("uploadData", uploadData);
 
     if (!uploadId) {
       return NextResponse.json(
@@ -103,16 +126,16 @@ export async function POST(request: NextRequest) {
 
     // Step 2: Upload each file
     const uploadedFiles = [];
-    for (let i = 0; i < chaptersWithFiles.length; i++) {
-      const chapter = chaptersWithFiles[i];
-      if (!chapter.audio_file) continue;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!file.file) continue;
 
       const fileFormData = new FormData();
-      fileFormData.append("file", chapter.audio_file);
-      fileFormData.append("chapter_number", chapter.chapter_number.toString());
+      fileFormData.append("file", file.file);
+      fileFormData.append("chapter_number", file.chapter_number.toString());
       fileFormData.append(
         "chapter_title",
-        chapter.title || `Chapter ${chapter.chapter_number}`
+        file.title || `Chapter ${file.chapter_number}`
       );
 
       try {
@@ -131,12 +154,12 @@ export async function POST(request: NextRequest) {
         uploadedFiles.push(fileData);
       } catch (error: any) {
         console.error(
-          `File upload failed for chapter ${i + 1}:`,
+          `File upload failed for chapter ${file.chapter_number}:`,
           error.response?.data || error.message
         );
         return NextResponse.json(
           {
-            error: `Failed to upload file for chapter ${i + 1}`,
+            error: `Failed to upload file for chapter ${file.chapter_number}`,
             details: error.response?.data || error.message,
           },
           { status: error.response?.status || 500 }

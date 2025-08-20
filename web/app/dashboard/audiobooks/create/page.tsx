@@ -114,7 +114,29 @@ export default function CreateAudioBookPage() {
         formData.append("coverImage", coverImage);
       }
 
-      formData.append("chapters", JSON.stringify(data.chapters));
+      // Add chapters metadata (without files) as JSON
+      const chaptersMetadata = data.chapters.map((chapter) => ({
+        id: chapter.id,
+        chapter_number: chapter.chapter_number,
+        title: chapter.title,
+        // Don't include audio_file here as it will be added separately
+      }));
+      formData.append("chapters", JSON.stringify(chaptersMetadata));
+
+      // Add each file separately with its chapter index
+      data.chapters.forEach((chapter, index) => {
+        if (chapter.audio_file) {
+          formData.append(`file_${index}`, chapter.audio_file);
+          formData.append(
+            `file_${index}_chapter_number`,
+            chapter.chapter_number.toString()
+          );
+          formData.append(
+            `file_${index}_title`,
+            chapter.title || `Chapter ${chapter.chapter_number}`
+          );
+        }
+      });
 
       // Call the Next.js API route
       const response = await audiobooksAPI.createAudioBookWithFiles(formData);
