@@ -85,13 +85,13 @@ func NewSupabaseStorageService(cfg *config.Config) *SupabaseStorageService {
 
 // CheckBucketExists checks if the storage bucket exists and is accessible
 func (s *SupabaseStorageService) CheckBucketExists() error {
-	fmt.Printf("Checking bucket '%s' with endpoint '%s'\n", s.cfg.SupabaseStorageBucket, s.cfg.SupabaseS3Endpoint)
+	// fmt.Printf("Checking bucket '%s' with endpoint '%s'\n", s.cfg.SupabaseStorageBucket, s.cfg.SupabaseS3Endpoint)
 
 	if _, err := s.client.ListObjectsV2(&s3.ListObjectsV2Input{
 		Bucket:  aws.String(s.cfg.SupabaseStorageBucket),
 		MaxKeys: aws.Int64(1),
 	}); err == nil {
-		fmt.Printf("Bucket '%s' is readable\n", s.cfg.SupabaseStorageBucket)
+		// fmt.Printf("Bucket '%s' is readable\n", s.cfg.SupabaseStorageBucket)
 		return nil
 	} else {
 		fmt.Printf("ListObjectsV2 failed: %v\n", err)
