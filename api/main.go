@@ -70,11 +70,34 @@ func main() {
 	// app.Get("/health", handlers.HealthCheck)
 
 	// Initialize database repository
-	// For now, we'll use a mock repository until the database implementation is ready
-	repo := database.NewMockRepository()
+	var repo database.Repository
+	if cfg.DatabaseURL != "" {
+		// Use PostgreSQL repository if DATABASE_URL is provided
+		postgresRepo, err := database.NewPostgresRepository(cfg.DatabaseURL)
+		if err != nil {
+			log.Printf("Warning: Failed to initialize PostgreSQL repository: %v", err)
+			log.Printf("Falling back to mock repository")
+			repo = database.NewMockRepository()
+		} else {
+			log.Println("PostgreSQL repository initialized")
+			repo = postgresRepo
+		}
+	} else {
+		// Use mock repository if no DATABASE_URL is provided
+		log.Println("No DATABASE_URL provided, using mock repository")
+		repo = database.NewMockRepository()
+	}
 
 	// Initialize Supabase storage service
 	storageService := services.NewSupabaseStorageService(cfg)
+
+	// Check if the storage bucket exists
+	if err := storageService.CheckBucketExists(); err != nil {
+		log.Printf("Warning: Supabase storage bucket check failed: %v", err)
+		log.Printf("File uploads may fail. Please ensure the bucket '%s' exists in your Supabase project.", cfg.SupabaseStorageBucket)
+	} else {
+		log.Println("Supabase storage bucket is accessible")
+	}
 
 	// Initialize Redis queue service
 	redisQueue, err := services.NewRedisQueueService(cfg.RedisURL, cfg.JobsPrefix)
@@ -89,6 +112,9 @@ func main() {
 	// API routes
 	api := app.Group("/api/v1")
 	routes.SetupRoutes(api, cfg, repo, storageService, redisQueue)
+
+	// Uncomment the next line to run the storage example
+	// ExampleStorage()
 
 	log.Printf("🚀 Server starting on port %s", cfg.Port)
 	if err := app.Listen(":" + cfg.Port); err != nil {

@@ -11,12 +11,19 @@ type Config struct {
 	Port        string
 	Environment string
 
+	// Database
+	DatabaseURL string
+
 	// Supabase
 	SupabaseURL            string
 	SupabasePublishableKey string
 	SupabaseSecretKey      string
 	SupabaseJWKSURL        string
+	SupabaseS3Endpoint     string
 	SupabaseStorageBucket  string
+	SupabaseS3Region       string
+	SupabaseS3AccessKeyID  string
+	SupabaseS3SecretKey    string
 	JWTAudience            string
 
 	// Redis
@@ -34,12 +41,19 @@ func New() *Config {
 		Port:        getEnv("API_PORT", "8080"),
 		Environment: getEnv("NODE_ENV", "development"),
 
+		// Database
+		DatabaseURL: getEnv("DATABASE_URL", ""),
+
 		// Supabase
 		SupabaseURL:            getEnv("SUPABASE_URL", ""),
 		SupabasePublishableKey: getEnv("SUPABASE_PUBLISHABLE_KEY", ""),
 		SupabaseSecretKey:      getEnv("SUPABASE_SECRET_KEY", ""),
 		SupabaseJWKSURL:        getEnv("SUPABASE_JWKS_URL", ""),
 		SupabaseStorageBucket:  getEnv("SUPABASE_STORAGE_BUCKET", "audio"),
+		SupabaseS3Endpoint:     getEnv("SUPABASE_S3_ENDPOINT", ""),
+		SupabaseS3Region:       getEnv("SUPABASE_S3_REGION", ""),
+		SupabaseS3AccessKeyID:  getEnv("SUPABASE_S3_ACCESS_KEY_ID", ""),
+		SupabaseS3SecretKey:    getEnv("SUPABASE_S3_SECRET_KEY", ""),
 		JWTAudience:            getEnv("JWT_AUDIENCE", "authenticated"),
 
 		// Redis
