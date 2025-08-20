@@ -10,7 +10,6 @@ import {
   HeadphonesIcon,
   ImageIcon,
   Trash2Icon,
-  UploadCloudIcon,
   UploadIcon,
   VideoIcon,
   Plus,
@@ -27,7 +26,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useFieldArray, Control, UseFormRegister } from "react-hook-form";
 
 interface ChapterField {
@@ -35,6 +33,7 @@ interface ChapterField {
   chapter_number: number;
   title: string;
   audio_file?: File;
+  playtime?: string;
 }
 
 interface AudioFilesUploadProps {
@@ -44,6 +43,11 @@ interface AudioFilesUploadProps {
   register: UseFormRegister<any>;
   name: string; // Field array name
   className?: string;
+}
+
+// Type for the form data
+interface FormData {
+  [key: string]: ChapterField[];
 }
 
 const getFileIcon = (file: { file: File | { type: string; name: string } }) => {
@@ -81,6 +85,92 @@ const getFileIcon = (file: { file: File | { type: string; name: string } }) => {
   return <FileIcon className="size-4" />;
 };
 
+// Function to format duration in seconds to MM:SS format
+const formatDuration = (seconds: number): string => {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  return `${minutes.toString().padStart(2, "0")}:${remainingSeconds
+    .toString()
+    .padStart(2, "0")}`;
+};
+
+// // Function to get audio duration
+// const getAudioDuration = (file: File): Promise<string> => {
+//   return new Promise((resolve) => {
+//     const audio = new Audio();
+//     const url = URL.createObjectURL(file);
+
+//     audio.addEventListener("loadedmetadata", () => {
+//       const duration = formatDuration(audio.duration);
+//       URL.revokeObjectURL(url);
+//       resolve(duration);
+//     });
+
+//     audio.addEventListener("error", () => {
+//       URL.revokeObjectURL(url);
+//       resolve("--:--");
+//     });
+
+//     audio.src = url;
+//   });
+// };
+
+const getAudioDuration = (file: File): Promise<string> => {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const audio = new Audio();
+    audio.preload = "metadata";         // ensure metadata load
+    let settled = false;
+
+    const cleanup = () => {
+      audio.removeEventListener("loadedmetadata", onMeta);
+      audio.removeEventListener("timeupdate", onTimeUpdate);
+      audio.removeEventListener("error", onErr);
+      URL.revokeObjectURL(url);
+      // release element resources
+      audio.src = "";
+    };
+
+    const done = (seconds: number | null) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(seconds == null || !isFinite(seconds) || isNaN(seconds)
+        ? "--:--"
+        : formatDuration(seconds));
+    };
+
+    const onMeta = () => {
+      // Some browsers report Infinity until we seek
+      if (audio.duration === Infinity || isNaN(audio.duration)) {
+        // force a seek to get real duration
+        audio.currentTime = Number.MAX_SAFE_INTEGER;
+      } else {
+        done(audio.duration);
+      }
+    };
+
+    const onTimeUpdate = () => {
+      // after the forced seek above, duration becomes finite
+      if (audio.duration !== Infinity && !isNaN(audio.duration)) {
+        done(audio.duration);
+      }
+    };
+
+    const onErr = () => done(null);
+
+    audio.addEventListener("loadedmetadata", onMeta);
+    audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("error", onErr);
+
+    audio.src = url;
+
+    // Absolute last-resort timeout so the promise can't hang forever
+    setTimeout(() => done(null), 8000);
+  });
+};
+
+
 export default function AudioFilesUpload({
   maxSizeMB = 100,
   maxFiles = 20,
@@ -91,20 +181,19 @@ export default function AudioFilesUpload({
 }: AudioFilesUploadProps) {
   const maxSize = maxSizeMB * 1024 * 1024; // Convert MB to bytes
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove } = useFieldArray<FormData>({
     control,
     name,
   });
 
   const [
-    { files, isDragging, errors },
+    { isDragging, errors },
     {
       handleDragEnter,
       handleDragLeave,
       handleDragOver,
       handleDrop,
       openFileDialog,
-      removeFile: removeUploadedFile,
       clearFiles,
       getInputProps,
     },
@@ -113,38 +202,63 @@ export default function AudioFilesUpload({
     maxFiles,
     maxSize,
     accept: "audio/*",
-    onFilesChange: (uploadedFiles) => {
+    onFilesChange: async (uploadedFiles) => {
       // Clear existing fields and add new ones
       while (fields.length > 0) {
         remove(0);
       }
 
       // Add new fields for each uploaded file
-      uploadedFiles.forEach((file, index) => {
+      for (let index = 0; index < uploadedFiles.length; index++) {
+        const file = uploadedFiles[index];
+        const audioFile =
+          file.file instanceof File ? file.file : new File([], file.file.name);
+
+        // Get playtime for audio files
+        let playtime = undefined;
+        if (audioFile instanceof File && audioFile.type.startsWith("audio/")) {
+          try {
+            playtime = await getAudioDuration(audioFile);
+          } catch (error) {
+            console.error("Error getting audio duration:", error);
+            playtime = "--:--";
+          }
+        }
+
         append({
           id: file.id,
           chapter_number: index + 1,
           title: "",
-          audio_file:
-            file.file instanceof File
-              ? file.file
-              : new File([], file.file.name),
+          audio_file: audioFile,
+          playtime,
         });
-      });
+      }
     },
   });
 
-  const handleAudioFileUpload = (
+  const handleAudioFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
     index: number
   ) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Get playtime for audio files
+      let playtime = undefined;
+      if (file.type.startsWith("audio/")) {
+        try {
+          playtime = await getAudioDuration(file);
+        } catch (error) {
+          console.error("Error getting audio duration:", error);
+          playtime = "--:--";
+        }
+      }
+
       // Update the field with the new file
       const updatedFields = [...fields];
       updatedFields[index] = {
         ...updatedFields[index],
         audio_file: file,
+        playtime,
       };
 
       // Replace the field
@@ -263,6 +377,7 @@ export default function AudioFilesUpload({
                     <TableHead>Audio File</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Size</TableHead>
+                    <TableHead>Playtime</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -280,14 +395,16 @@ export default function AudioFilesUpload({
                         />
                       </TableCell>
                       <TableCell>
-                        <Input
-                          type="file"
-                          accept="audio/*"
-                          onChange={(e) => handleAudioFileUpload(e, index)}
-                          className="w-full"
-                        />
+                        {!field.audio_file && (
+                          <Input
+                            type="file"
+                            accept="audio/*"
+                            onChange={(e) => handleAudioFileUpload(e, index)}
+                            className="w-full"
+                          />
+                        )}
                         {field.audio_file && (
-                          <div className="flex items-center gap-2 mt-1">
+                          <div className="flex items-center gap-2">
                             {getFileIcon({ file: field.audio_file })}
                             <span className="text-sm text-green-600">
                               {field.audio_file.name}
@@ -305,6 +422,11 @@ export default function AudioFilesUpload({
                       <TableCell>
                         {field.audio_file
                           ? formatBytes(field.audio_file.size)
+                          : "-"}
+                      </TableCell>
+                      <TableCell>
+                        {field.audio_file
+                          ? field.playtime || "Calculating..."
                           : "-"}
                       </TableCell>
                       <TableCell>
