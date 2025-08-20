@@ -118,6 +118,8 @@ Key environment variables needed:
 - `SUPABASE_SECRET_KEY`: Supabase secret key (formerly service role key)
 - `SUPABASE_STORAGE_BUCKET`: Storage bucket name (default: "audio")
 
+**📁 Storage Setup**: See [STORAGE_SETUP.md](./STORAGE_SETUP.md) for detailed instructions on configuring Supabase storage with S3-compatible endpoints.
+
 ### Redis Configuration
 
 - `REDIS_URL`: Redis connection string
@@ -199,6 +201,18 @@ docker-compose logs worker
 docker-compose logs transcriber
 docker-compose logs ai_orchestrator
 ```
+
+**Storage issues:**
+
+```bash
+# Check storage configuration
+docker-compose logs api
+
+# Test storage setup
+cd api && go run test_storage.go
+```
+
+See [STORAGE_SETUP.md](./STORAGE_SETUP.md) for detailed storage troubleshooting.
 
 **Redis connection issues:**
 
