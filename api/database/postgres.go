@@ -580,7 +580,58 @@ func (p *PostgresRepository) GetAudioBookByID(ctx context.Context, id uuid.UUID)
 }
 
 func (p *PostgresRepository) GetAudioBookWithDetails(ctx context.Context, id uuid.UUID) (*models.AudioBookWithDetails, error) {
-	return nil, ErrNotFound
+	// Get the main audiobook
+	audiobook, err := p.GetAudioBookByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get chapters
+	chapters, err := p.GetChaptersByAudioBookID(ctx, id)
+	if err != nil && err != ErrNotFound {
+		return nil, fmt.Errorf("failed to get chapters: %w", err)
+	}
+
+	// Get transcript
+	transcript, err := p.GetTranscriptByAudioBookID(ctx, id)
+	if err == ErrNotFound {
+		transcript = nil
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to get transcript: %w", err)
+	}
+
+	// Get AI outputs
+	aiOutputs, err := p.GetAIOutputsByAudioBookID(ctx, id)
+	if err == ErrNotFound {
+		aiOutputs = nil
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to get AI outputs: %w", err)
+	}
+
+	// Get tags
+	tags, err := p.GetTagsByAudioBookID(ctx, id)
+	if err == ErrNotFound {
+		tags = nil
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to get tags: %w", err)
+	}
+
+	// Get processing jobs
+	jobs, err := p.GetProcessingJobsByAudioBookID(ctx, id)
+	if err == ErrNotFound {
+		jobs = nil
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to get processing jobs: %w", err)
+	}
+
+	return &models.AudioBookWithDetails{
+		AudioBook:      *audiobook,
+		Chapters:       chapters,
+		Transcript:     transcript,
+		AIOutputs:      aiOutputs,
+		Tags:           tags,
+		ProcessingJobs: jobs,
+	}, nil
 }
 
 func (p *PostgresRepository) UpdateAudioBook(ctx context.Context, audiobook *models.AudioBook) error {
