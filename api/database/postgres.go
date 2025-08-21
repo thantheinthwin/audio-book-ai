@@ -548,7 +548,7 @@ func (p *PostgresRepository) CreateAudioBook(ctx context.Context, audiobook *mod
 
 func (p *PostgresRepository) GetAudioBookByID(ctx context.Context, id uuid.UUID) (*models.AudioBook, error) {
 	query := `
-		SELECT id, title, author, summary, duration_seconds, cover_image_url, language, is_public, status, created_by, created_at, updated_at
+		SELECT id, title, author, summary, tags, duration_seconds, cover_image_url, language, is_public, status, created_by, created_at, updated_at
 		FROM audiobooks
 		WHERE id = $1
 	`
@@ -559,6 +559,7 @@ func (p *PostgresRepository) GetAudioBookByID(ctx context.Context, id uuid.UUID)
 		&audiobook.Title,
 		&audiobook.Author,
 		&audiobook.Summary,
+		&audiobook.Tags,
 		&audiobook.DurationSeconds,
 		&audiobook.CoverImageURL,
 		&audiobook.Language,
@@ -747,15 +748,15 @@ func (p *PostgresRepository) UpdateAudioBookStatus(ctx context.Context, id uuid.
 }
 
 // UpdateAudioBookSummary updates the audiobook summary from AI output
-func (p *PostgresRepository) UpdateAudioBookSummary(ctx context.Context, audiobookID uuid.UUID, summary string) error {
+func (p *PostgresRepository) UpdateAudioBookSummaryAndTags(ctx context.Context, audiobookID uuid.UUID, summary string, tags []string) error {
 	query := `
 		UPDATE audiobooks 
-		SET summary = $2, updated_at = $3
+		SET summary = $2, tags = $3, updated_at = $4
 		WHERE id = $1
 	`
 
 	now := time.Now()
-	result, err := p.pool.Exec(ctx, query, audiobookID, summary, now)
+	result, err := p.pool.Exec(ctx, query, audiobookID, summary, tags, now)
 
 	if err != nil {
 		return fmt.Errorf("failed to update audiobook summary: %w", err)
@@ -807,13 +808,17 @@ func (p *PostgresRepository) CheckAndUpdateAudioBookStatus(ctx context.Context, 
 
 		// If summary job completed, update the audiobook summary
 		if hasSummary {
-			summaryOutput, err := p.GetAIOutputByType(ctx, audiobookID, models.OutputTypeSummary)
-			if err == nil && summaryOutput != nil {
+			aiOutput, err := p.GetAIOutputByType(ctx, audiobookID, models.OutputTypeSummary)
+			if err == nil && aiOutput != nil {
 				// Extract summary from JSON content
 				var summaryData map[string]interface{}
-				if err := json.Unmarshal(summaryOutput.Content, &summaryData); err == nil {
+				if err := json.Unmarshal(aiOutput.Content, &summaryData); err == nil {
 					if summaryText, ok := summaryData["summary"].(string); ok {
-						p.UpdateAudioBookSummary(ctx, audiobookID, summaryText)
+						tags, ok := summaryData["tags"].([]string)
+						if !ok {
+							tags = []string{}
+						}
+						p.UpdateAudioBookSummaryAndTags(ctx, audiobookID, summaryText, tags)
 					}
 				}
 			}

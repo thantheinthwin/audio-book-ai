@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS audiobooks (
     title VARCHAR(255) NOT NULL,
     author VARCHAR(255) NOT NULL,
     summary TEXT,
+    tags TEXT[],
     duration_seconds INTEGER,
     cover_image_url VARCHAR(500),
     language VARCHAR(2) NOT NULL,

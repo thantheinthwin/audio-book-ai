@@ -26,11 +26,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
-import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AudioBookDetailPage() {
   const params = useParams();
@@ -95,7 +93,6 @@ export default function AudioBookDetailPage() {
         return <FileAudio className="h-4 w-4" />;
       case "summarize":
       case "tag":
-      case "embed":
         return <Brain className="h-4 w-4" />;
       default:
         return <Loader2 className="h-4 w-4" />;
@@ -186,25 +183,6 @@ export default function AudioBookDetailPage() {
           </div>
         </CardContent>
       </Card>
-      {/* Header */}
-      {/* <div className="flex justify-between items-start">
-        <div>
-          <h1 className="font-bold text-3xl mb-2">{audioBook.title}</h1>
-          <p className="text-muted-foreground text-lg">by {audioBook.author}</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href={`/dashboard/audiobooks/${params.id}/edit`}>
-              <Edit className="h-4 w-4 mr-2" />
-              Edit
-            </Link>
-          </Button>
-          <Button variant="outline" className="text-red-600 hover:text-red-700">
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
-          </Button>
-        </div>
-      </div> */}
 
       {/* Processing Status */}
       {jobStatus && (
