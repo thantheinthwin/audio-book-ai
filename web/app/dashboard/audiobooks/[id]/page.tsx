@@ -188,6 +188,10 @@ export default function AudioBookDetailPage() {
                 </div>
               )}
             </div>
+            <div className="grid gap-1">
+              <h2 className="text-muted-foreground text-sm">Tags</h2>
+              <p className="text-xs">{audioBook.tags?.join(", ")}</p>
+            </div>
           </div>
         </CardContent>
       </Card>

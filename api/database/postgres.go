@@ -796,7 +796,31 @@ func (p *PostgresRepository) CheckAndUpdateAudioBookStatus(ctx context.Context, 
 				// Extract summary from JSON content
 				var summaryData map[string]interface{}
 				if err := json.Unmarshal(aiOutput.Content, &summaryData); err == nil {
-					p.UpdateAudioBookSummaryAndTags(ctx, audiobookID, summaryData["summary"].(string), summaryData["tags"].([]string))
+					// Extract summary string
+					summary, ok := summaryData["summary"].(string)
+					if !ok {
+						fmt.Printf("Warning: summary field is not a string in AI output for audiobook %s\n", audiobookID)
+					} else {
+						// Extract tags array and convert to []string
+						tagsInterface, ok := summaryData["tags"].([]interface{})
+						if !ok {
+							fmt.Printf("Warning: tags field is not an array in AI output for audiobook %s\n", audiobookID)
+						} else {
+							tags := make([]string, len(tagsInterface))
+							for i, tag := range tagsInterface {
+								if tagStr, ok := tag.(string); ok {
+									tags[i] = tagStr
+								} else {
+									fmt.Printf("Warning: tag at index %d is not a string in AI output for audiobook %s\n", i, audiobookID)
+								}
+							}
+
+							// Update the audiobook with summary and tags
+							if err := p.UpdateAudioBookSummaryAndTags(ctx, audiobookID, summary, tags); err != nil {
+								fmt.Printf("Error updating audiobook summary and tags for %s: %v\n", audiobookID, err)
+							}
+						}
+					}
 				}
 			}
 		}

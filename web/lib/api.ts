@@ -28,6 +28,7 @@ interface AudioBook {
   title: string;
   author: string;
   summary?: string;
+  tags?: string[];
   duration_seconds?: number;
   file_size_bytes?: number;
   file_path: string;

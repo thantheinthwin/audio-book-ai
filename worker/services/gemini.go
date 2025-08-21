@@ -51,15 +51,17 @@ func (g *GeminiService) GenerateSummaryAndTags(text string) (*models.SummaryAndT
 	Requirements:
 	1. Summary: Provide a concise summary (2-3 paragraphs) focusing on main themes, key events, and important characters.
 	2. Tags: Choose ONLY from the following available tags: %s
+	3. IMPORTANT: Return EXACTLY 3 tags maximum. If fewer than 3 tags are relevant, return fewer.
 
 	IMPORTANT: 
 	- You must ONLY use tags from the provided list. Do not create new tags.
+	- Return EXACTLY 3 tags maximum.
 	- Respond with ONLY the JSON object, no markdown formatting, no code blocks, no additional text.
 
 	Please respond with ONLY this JSON format:
 	{
 	"summary": "Your summary here...",
-	"tags": ["tag1", "tag2", "tag3", ...]
+	"tags": ["tag1", "tag2", "tag3"]
 	}
 
 	Available tags: %s
@@ -160,6 +162,11 @@ func (g *GeminiService) filterValidTags(providedTags []string, availableTags []s
 		}
 	}
 
+	// Safeguard: Limit the number of tags to 3
+	if len(validTags) > 3 {
+		validTags = validTags[:3]
+	}
+
 	return validTags
 }
 
@@ -215,6 +222,11 @@ func (g *GeminiService) extractSummaryAndTagsFromText(text string) (*models.Summ
 
 	// Filter tags to ensure only valid tags from the database are used
 	filteredTags := g.filterValidTags(tags, availableTags)
+
+	// Safeguard: Limit the number of tags to 3
+	if len(filteredTags) > 3 {
+		filteredTags = filteredTags[:3]
+	}
 
 	return &models.SummaryAndTags{
 		Summary: summary,
