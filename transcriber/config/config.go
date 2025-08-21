@@ -47,7 +47,7 @@ func New() *Config {
 		// Processing
 		MaxConcurrentJobs: getEnvAsInt("MAX_CONCURRENT_JOBS", 5),
 		JobPollInterval:   getEnvAsInt("JOB_POLL_INTERVAL", 5),
-		JobTimeout:        getEnvAsInt("JOB_TIMEOUT", 300), // 5 minutes
+		JobTimeout:        getEnvAsInt("JOB_TIMEOUT", 1800), // 30 minutes
 	}
 }
 

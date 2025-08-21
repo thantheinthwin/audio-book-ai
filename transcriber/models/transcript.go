@@ -10,6 +10,7 @@ import (
 type Transcript struct {
 	ID                    uuid.UUID `json:"id"`
 	AudiobookID           uuid.UUID `json:"audiobook_id"`
+	FilePath              string    `json:"file_path"`
 	Content               string    `json:"content"`
 	Segments              []Segment `json:"segments"`
 	Language              string    `json:"language"`
@@ -51,7 +52,7 @@ type RevAITranscript struct {
 	CreatedOn   string `json:"created_on"`
 	CompletedOn string `json:"completed_on"`
 	Monologues  []struct {
-		Speaker int `json:"speaker"`
+		Speaker  int `json:"speaker"`
 		Elements []struct {
 			Type       string  `json:"type"`
 			Value      string  `json:"value"`

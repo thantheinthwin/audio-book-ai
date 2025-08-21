@@ -71,3 +71,22 @@ type GeminiSafetyRating struct {
 	Category    string `json:"category"`
 	Probability string `json:"probability"`
 }
+
+// ChapterTranscript represents a chapter transcript for processing
+type ChapterTranscript struct {
+	ID                    uuid.UUID `json:"id"`
+	ChapterID             uuid.UUID `json:"chapter_id"`
+	AudiobookID           uuid.UUID `json:"audiobook_id"`
+	Content               string    `json:"content"`
+	Segments              []byte    `json:"segments,omitempty"`
+	Language              *string   `json:"language,omitempty"`
+	ConfidenceScore       *float64  `json:"confidence_score,omitempty"`
+	ProcessingTimeSeconds *int      `json:"processing_time_seconds,omitempty"`
+	CreatedAt             time.Time `json:"created_at"`
+}
+
+// SummaryAndTags represents the combined response from Gemini for summary and tags
+type SummaryAndTags struct {
+	Summary string   `json:"summary"`
+	Tags    []string `json:"tags"`
+}

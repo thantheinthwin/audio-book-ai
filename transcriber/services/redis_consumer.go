@@ -84,76 +84,87 @@ func (r *RedisConsumer) ConsumeJobs(ctx context.Context, jobType string, process
 	log.Printf("Starting transcription consumer for queue: %s", queueName)
 
 	for {
+		// Check for context cancellation before each iteration
 		select {
 		case <-ctx.Done():
+			log.Printf("Context cancelled, stopping consumer: %v", ctx.Err())
 			return ctx.Err()
 		default:
-			// Get next job from queue (blocking with timeout)
-			result, err := r.client.BZPopMin(ctx, 5*time.Second, queueName).Result()
-			if err != nil {
-				if err == redis.Nil {
-					// No jobs available, continue
-					continue
-				}
-				log.Printf("Error getting job from queue: %v", err)
-				time.Sleep(1 * time.Second)
-				continue
-			}
-
-			if result == nil {
-				continue
-			}
-
-			// Parse job message
-			var message JobMessage
-			memberStr, ok := result.Member.(string)
-			if !ok {
-				log.Printf("Invalid member type in queue")
-				continue
-			}
-			if err := json.Unmarshal([]byte(memberStr), &message); err != nil {
-				log.Printf("Error unmarshaling job message: %v", err)
-				continue
-			}
-
-			log.Printf("Processing transcription job %s for audiobook %s", message.ID, message.AudiobookID)
-
-			// Move to processing queue
-			processingBytes, _ := json.Marshal(message)
-			r.client.ZAdd(ctx, processingQueueName, redis.Z{
-				Score:  float64(time.Now().Unix()),
-				Member: processingBytes,
-			})
-
-			// Process the job
-			if err := processor(message); err != nil {
-				log.Printf("Error processing transcription job %s: %v", message.ID, err)
-
-				// Handle retry logic
-				if message.RetryCount < message.MaxRetries {
-					message.RetryCount++
-					message.Priority = 10 // Higher priority for retries
-
-					// Add back to main queue with delay
-					retryBytes, _ := json.Marshal(message)
-					score := float64(time.Now().Add(time.Duration(message.RetryCount*30) * time.Second).Unix())
-					r.client.ZAdd(ctx, queueName, redis.Z{
-						Score:  score,
-						Member: retryBytes,
-					})
-				} else {
-					// Move to failed queue
-					failedBytes, _ := json.Marshal(message)
-					r.client.ZAdd(ctx, failedQueueName, redis.Z{
-						Score:  float64(time.Now().Unix()),
-						Member: failedBytes,
-					})
-				}
-			}
-
-			// Remove from processing queue
-			r.client.ZRem(ctx, processingQueueName, processingBytes)
 		}
+
+		// Create a shorter timeout for the blocking operation to allow for context cancellation
+		timeoutCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		result, err := r.client.BZPopMin(timeoutCtx, 2*time.Second, queueName).Result()
+		cancel()
+
+		if err != nil {
+			if err == redis.Nil {
+				// No jobs available, continue
+				continue
+			}
+			if ctx.Err() != nil {
+				// Context was cancelled during the operation
+				log.Printf("Context cancelled during Redis operation: %v", ctx.Err())
+				return ctx.Err()
+			}
+			log.Printf("Error getting job from queue: %v", err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		if result == nil {
+			continue
+		}
+
+		// Parse job message
+		var message JobMessage
+		memberStr, ok := result.Member.(string)
+		if !ok {
+			log.Printf("Invalid member type in queue")
+			continue
+		}
+		if err := json.Unmarshal([]byte(memberStr), &message); err != nil {
+			log.Printf("Error unmarshaling job message: %v", err)
+			continue
+		}
+
+		log.Printf("Processing transcription job %s for audiobook %s", message.ID, message.AudiobookID)
+
+		// Move to processing queue
+		processingBytes, _ := json.Marshal(message)
+		r.client.ZAdd(ctx, processingQueueName, redis.Z{
+			Score:  float64(time.Now().Unix()),
+			Member: processingBytes,
+		})
+
+		// Process the job
+		if err := processor(message); err != nil {
+			log.Printf("Error processing transcription job %s: %v", message.ID, err)
+
+			// Handle retry logic
+			if message.RetryCount < message.MaxRetries {
+				message.RetryCount++
+				message.Priority = 10 // Higher priority for retries
+
+				// Add back to main queue with delay
+				retryBytes, _ := json.Marshal(message)
+				score := float64(time.Now().Add(time.Duration(message.RetryCount*30) * time.Second).Unix())
+				r.client.ZAdd(ctx, queueName, redis.Z{
+					Score:  score,
+					Member: retryBytes,
+				})
+			} else {
+				// Move to failed queue
+				failedBytes, _ := json.Marshal(message)
+				r.client.ZAdd(ctx, failedQueueName, redis.Z{
+					Score:  float64(time.Now().Unix()),
+					Member: failedBytes,
+				})
+			}
+		}
+
+		// Remove from processing queue
+		r.client.ZRem(ctx, processingQueueName, processingBytes)
 	}
 }
 

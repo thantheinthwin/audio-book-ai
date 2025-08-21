@@ -58,10 +58,10 @@ func (d *DatabaseService) Close() error {
 // GetPendingJobs retrieves pending transcription jobs from database
 func (d *DatabaseService) GetPendingJobs(limit int) ([]models.Job, error) {
 	query := `
-		SELECT pj.id, pj.audiobook_id, pj.job_type, pj.status, ab.file_path, ab.language,
+		SELECT pj.id, pj.audiobook_id, pj.job_type, pj.status, c.file_path, c.mime_type,
 		       pj.created_at, pj.started_at, pj.completed_at, pj.error_message
 		FROM processing_jobs pj
-		JOIN audiobooks ab ON pj.audiobook_id = ab.id
+		JOIN chapters c ON pj.audiobook_id = c.audiobook_id
 		WHERE pj.job_type = $1 
 		AND pj.status = $2
 		ORDER BY pj.created_at ASC
@@ -77,11 +77,15 @@ func (d *DatabaseService) GetPendingJobs(limit int) ([]models.Job, error) {
 	var jobs []models.Job
 	for rows.Next() {
 		var job models.Job
+		var mimeType *string
 		if err := rows.Scan(
-			&job.ID, &job.AudiobookID, &job.JobType, &job.Status, &job.FilePath, &job.Language,
+			&job.ID, &job.AudiobookID, &job.JobType, &job.Status, &job.FilePath, &mimeType,
 			&job.CreatedAt, &job.StartedAt, &job.CompletedAt, &job.ErrorMessage,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan job: %v", err)
+		}
+		if mimeType != nil {
+			job.Language = *mimeType
 		}
 		jobs = append(jobs, job)
 	}
@@ -126,12 +130,25 @@ func (d *DatabaseService) SaveTranscript(transcript *models.Transcript) error {
 		return fmt.Errorf("failed to marshal segments: %v", err)
 	}
 
+	// First, get the chapter ID for this audiobook and file path
+	chapterQuery := `
+		SELECT id FROM chapters 
+		WHERE audiobook_id = $1 AND file_path = $2
+		LIMIT 1
+	`
+
+	var chapterID uuid.UUID
+	err = d.pool.QueryRow(context.Background(), chapterQuery, transcript.AudiobookID, transcript.FilePath).Scan(&chapterID)
+	if err != nil {
+		return fmt.Errorf("failed to find chapter for audiobook %s and file path %s: %v", transcript.AudiobookID, transcript.FilePath, err)
+	}
+
 	query := `
-		INSERT INTO transcripts (
-			id, audiobook_id, content, segments, language, 
+		INSERT INTO chapter_transcripts (
+			id, chapter_id, audiobook_id, content, segments, language, 
 			confidence_score, processing_time_seconds, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		ON CONFLICT (audiobook_id) DO UPDATE SET
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		ON CONFLICT (chapter_id) DO UPDATE SET
 			content = EXCLUDED.content,
 			segments = EXCLUDED.segments,
 			language = EXCLUDED.language,
@@ -142,6 +159,7 @@ func (d *DatabaseService) SaveTranscript(transcript *models.Transcript) error {
 
 	_, err = d.pool.Exec(context.Background(), query,
 		uuid.New(),
+		chapterID,
 		transcript.AudiobookID,
 		transcript.Content,
 		segmentsJSON,
@@ -155,6 +173,26 @@ func (d *DatabaseService) SaveTranscript(transcript *models.Transcript) error {
 		return fmt.Errorf("failed to save transcript: %v", err)
 	}
 
-	log.Printf("Saved transcript for audiobook %s", transcript.AudiobookID)
+	log.Printf("Saved transcript for chapter %s in audiobook %s", chapterID, transcript.AudiobookID)
 	return nil
+}
+
+// AreAllChaptersTranscribed checks if all chapters for an audiobook have been transcribed
+func (d *DatabaseService) AreAllChaptersTranscribed(audiobookID string) (bool, error) {
+	query := `
+		SELECT COUNT(*) as total_chapters,
+		       COUNT(ct.id) as transcribed_chapters
+		FROM chapters c
+		LEFT JOIN chapter_transcripts ct ON c.id = ct.chapter_id
+		WHERE c.audiobook_id = $1
+	`
+
+	var totalChapters, transcribedChapters int
+	err := d.pool.QueryRow(context.Background(), query, audiobookID).Scan(&totalChapters, &transcribedChapters)
+	if err != nil {
+		return false, fmt.Errorf("failed to check chapter transcription status: %v", err)
+	}
+
+	log.Printf("Audiobook %s: %d/%d chapters transcribed", audiobookID, transcribedChapters, totalChapters)
+	return totalChapters > 0 && totalChapters == transcribedChapters, nil
 }

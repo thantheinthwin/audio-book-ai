@@ -14,7 +14,7 @@ import (
 
 // RevAIService handles Rev.ai API interactions
 type RevAIService struct {
-	apiKey string
+	apiKey  string
 	baseURL string
 	client  *http.Client
 }
@@ -100,13 +100,22 @@ func (r *RevAIService) WaitForJobCompletion(jobID string, maxRetries int) (*mode
 			continue
 		}
 
-		if transcript.Status == "completed" {
+		log.Printf("Job %s status: %s, waiting...", jobID, transcript.Status)
+
+		// Check for various completion statuses
+		if transcript.Status == "completed" || transcript.Status == "transcribed" || transcript.Status == "done" {
+			log.Printf("Job %s completed successfully with status: %s", jobID, transcript.Status)
 			return &transcript, nil
-		} else if transcript.Status == "failed" {
-			return nil, fmt.Errorf("Rev.ai job failed")
+		} else if transcript.Status == "failed" || transcript.Status == "error" {
+			log.Printf("Job %s failed with status: %s", jobID, transcript.Status)
+			return nil, fmt.Errorf("Rev.ai job failed with status: %s", transcript.Status)
+		} else if transcript.Status == "canceled" || transcript.Status == "cancelled" {
+			log.Printf("Job %s was canceled with status: %s", jobID, transcript.Status)
+			return nil, fmt.Errorf("Rev.ai job was canceled with status: %s", transcript.Status)
 		}
 
-		log.Printf("Job %s status: %s, waiting...", jobID, transcript.Status)
+		// Log the current status for debugging
+		log.Printf("Job %s current status: %s, retry %d/%d", jobID, transcript.Status, i+1, maxRetries)
 		time.Sleep(5 * time.Second)
 	}
 
@@ -153,7 +162,7 @@ func (r *RevAIService) ProcessTranscript(revTranscript *models.RevAITranscript) 
 		for _, element := range monologue.Elements {
 			if element.Type == "text" {
 				content += element.Value + " "
-				
+
 				segment := models.Segment{
 					Start:      element.StartTs,
 					End:        element.EndTs,
@@ -162,7 +171,7 @@ func (r *RevAIService) ProcessTranscript(revTranscript *models.RevAITranscript) 
 					Speaker:    monologue.Speaker,
 				}
 				segments = append(segments, segment)
-				
+
 				totalConfidence += element.Confidence
 				confidenceCount++
 			}

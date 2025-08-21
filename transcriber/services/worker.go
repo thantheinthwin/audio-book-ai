@@ -2,7 +2,9 @@ package services
 
 import (
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -14,6 +16,8 @@ type Worker struct {
 	dbService    *DatabaseService
 	revAIService *RevAIService
 	config       *Config
+	apiBaseURL   string
+	httpClient   *http.Client
 }
 
 // Config holds worker configuration
@@ -21,6 +25,7 @@ type Config struct {
 	MaxConcurrentJobs int
 	JobPollInterval   int
 	JobTimeout        int
+	APIBaseURL        string
 }
 
 // NewWorker creates a new worker
@@ -29,6 +34,10 @@ func NewWorker(dbService *DatabaseService, revAIService *RevAIService, config *C
 		dbService:    dbService,
 		revAIService: revAIService,
 		config:       config,
+		apiBaseURL:   config.APIBaseURL,
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
 	}
 }
 
@@ -56,8 +65,9 @@ func (w *Worker) ProcessJob(job models.Job) error {
 		return err
 	}
 
-	// Set audiobook ID and processing time
+	// Set audiobook ID, file path, and processing time
 	transcript.AudiobookID = job.AudiobookID
+	transcript.FilePath = job.FilePath
 
 	// Save transcript to database
 	if err := w.dbService.SaveTranscript(transcript); err != nil {
@@ -69,6 +79,12 @@ func (w *Worker) ProcessJob(job models.Job) error {
 	// Update job status to completed
 	if err := w.dbService.UpdateJobStatus(job.ID, models.JobStatusCompleted, nil); err != nil {
 		return err
+	}
+
+	// Check if all chapters are transcribed and trigger summarize/tag jobs if so
+	if err := w.checkAndTriggerSummarizeTagJobs(job.AudiobookID.String()); err != nil {
+		log.Printf("Warning: Failed to check/trigger summarize and tag jobs: %v", err)
+		// Don't fail the transcription job if this fails
 	}
 
 	log.Printf("Successfully processed transcription job %s", job.ID)
@@ -88,10 +104,13 @@ func (w *Worker) transcribeAudio(filePath string) (*models.Transcript, error) {
 	log.Printf("Submitted job to Rev.ai: %s", jobID)
 
 	// Wait for job completion
+	log.Printf("Waiting for Rev.ai job %s to complete (timeout: %d seconds)", jobID, w.config.JobTimeout/5)
 	_, err = w.revAIService.WaitForJobCompletion(jobID, w.config.JobTimeout/5) // 5-second intervals
 	if err != nil {
+		log.Printf("Rev.ai job %s failed to complete: %v", jobID, err)
 		return nil, fmt.Errorf("failed to wait for job completion: %v", err)
 	}
+	log.Printf("Rev.ai job %s completed successfully", jobID)
 
 	// Get the transcript
 	transcript, err := w.revAIService.GetTranscript(jobID)
@@ -104,6 +123,50 @@ func (w *Worker) transcribeAudio(filePath string) (*models.Transcript, error) {
 	processedTranscript.ProcessingTimeSeconds = int(time.Since(startTime).Seconds())
 
 	return processedTranscript, nil
+}
+
+// checkAndTriggerSummarizeTagJobs checks if all chapters are transcribed and triggers summarize/tag jobs
+func (w *Worker) checkAndTriggerSummarizeTagJobs(audiobookID string) error {
+	// Check if all chapters have transcripts
+	allTranscribed, err := w.dbService.AreAllChaptersTranscribed(audiobookID)
+	if err != nil {
+		return fmt.Errorf("failed to check chapter transcription status: %v", err)
+	}
+
+	if !allTranscribed {
+		log.Printf("Not all chapters are transcribed for audiobook %s, skipping summarize/tag trigger", audiobookID)
+		return nil
+	}
+
+	log.Printf("All chapters transcribed for audiobook %s, triggering summarize and tag jobs", audiobookID)
+
+	// Call the webhook to trigger summarize and tag jobs
+	url := fmt.Sprintf("%s/v1/admin/audiobooks/%s/trigger-summarize-tag", w.apiBaseURL, audiobookID)
+	log.Printf("Calling webhook URL: %s", url)
+
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create webhook request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := w.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to call webhook: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Read response body for better error reporting
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("Webhook call failed with status: %d, response: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("webhook call failed with status: %d, response: %s", resp.StatusCode, string(body))
+	}
+
+	log.Printf("Successfully triggered summarize and tag jobs for audiobook %s, response: %s", audiobookID, string(body))
+	return nil
 }
 
 // Run starts the main worker loop

@@ -178,3 +178,36 @@ func (d *DatabaseService) SaveAIOutput(output *models.AIOutput) error {
 	log.Printf("Saved %s output for audiobook %s", output.OutputType, output.AudiobookID)
 	return nil
 }
+
+// GetChapterTranscripts retrieves all chapter transcripts for an audiobook
+func (d *DatabaseService) GetChapterTranscripts(audiobookID uuid.UUID) ([]models.ChapterTranscript, error) {
+	query := `
+		SELECT ct.id, ct.chapter_id, ct.audiobook_id, ct.content, ct.segments, 
+		       ct.language, ct.confidence_score, ct.processing_time_seconds, ct.created_at
+		FROM chapter_transcripts ct
+		JOIN chapters c ON ct.chapter_id = c.id
+		WHERE ct.audiobook_id = $1
+		ORDER BY c.chapter_number ASC
+	`
+
+	rows, err := d.pool.Query(context.Background(), query, audiobookID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query chapter transcripts: %v", err)
+	}
+	defer rows.Close()
+
+	var transcripts []models.ChapterTranscript
+	for rows.Next() {
+		var transcript models.ChapterTranscript
+		if err := rows.Scan(
+			&transcript.ID, &transcript.ChapterID, &transcript.AudiobookID, &transcript.Content,
+			&transcript.Segments, &transcript.Language, &transcript.ConfidenceScore,
+			&transcript.ProcessingTimeSeconds, &transcript.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan chapter transcript: %v", err)
+		}
+		transcripts = append(transcripts, transcript)
+	}
+
+	return transcripts, nil
+}

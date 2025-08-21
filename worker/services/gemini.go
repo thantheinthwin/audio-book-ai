@@ -78,6 +78,91 @@ Tags:`, text)
 	return cleanTags, nil
 }
 
+// GenerateSummaryAndTags generates both summary and tags in a single API call
+func (g *GeminiService) GenerateSummaryAndTags(text string) (*models.SummaryAndTags, error) {
+	prompt := fmt.Sprintf(`Please analyze the following audiobook transcript and provide both a summary and relevant tags.
+
+Requirements:
+1. Summary: Provide a concise summary (2-3 paragraphs) focusing on main themes, key events, and important characters.
+2. Tags: Generate relevant tags focusing on genre, themes, setting, target audience, and content warnings.
+
+Please respond in the following JSON format:
+{
+  "summary": "Your summary here...",
+  "tags": ["tag1", "tag2", "tag3", ...]
+}
+
+Transcript:
+%s
+
+Response:`, text)
+
+	response, err := g.generateText(prompt, 0.3, 1000)
+	if err != nil {
+		return nil, err
+	}
+
+	// Try to parse the response as JSON
+	var summaryAndTags models.SummaryAndTags
+	if err := json.Unmarshal([]byte(response), &summaryAndTags); err != nil {
+		// If JSON parsing fails, try to extract summary and tags manually
+		return g.extractSummaryAndTagsFromText(response)
+	}
+
+	return &summaryAndTags, nil
+}
+
+// extractSummaryAndTagsFromText extracts summary and tags from plain text response
+func (g *GeminiService) extractSummaryAndTagsFromText(text string) (*models.SummaryAndTags, error) {
+	// Simple extraction logic - look for common patterns
+	lines := strings.Split(text, "\n")
+	var summaryLines []string
+	var tags []string
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Look for tag indicators
+		if strings.Contains(strings.ToLower(line), "tags:") ||
+			strings.Contains(strings.ToLower(line), "tag:") ||
+			strings.HasPrefix(line, "-") ||
+			strings.HasPrefix(line, "*") {
+			// Extract tags from this line
+			tagLine := strings.TrimPrefix(line, "Tags:")
+			tagLine = strings.TrimPrefix(tagLine, "Tag:")
+			tagLine = strings.TrimSpace(tagLine)
+
+			// Split by commas or other separators
+			potentialTags := strings.Split(tagLine, ",")
+			for _, tag := range potentialTags {
+				tag = strings.TrimSpace(tag)
+				tag = strings.TrimPrefix(tag, "-")
+				tag = strings.TrimPrefix(tag, "*")
+				tag = strings.TrimSpace(tag)
+				if tag != "" {
+					tags = append(tags, tag)
+				}
+			}
+		} else {
+			// Assume it's part of the summary
+			summaryLines = append(summaryLines, line)
+		}
+	}
+
+	summary := strings.Join(summaryLines, "\n")
+	if summary == "" {
+		summary = "Summary could not be extracted from response."
+	}
+
+	return &models.SummaryAndTags{
+		Summary: summary,
+		Tags:    tags,
+	}, nil
+}
+
 // GenerateEmbedding generates embeddings using Gemini API
 func (g *GeminiService) GenerateEmbedding(text string) ([]float64, error) {
 	// For now, we'll use a simplified approach

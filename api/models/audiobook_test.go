@@ -11,9 +11,9 @@ import (
 
 func TestAudioBook_Validation(t *testing.T) {
 	tests := []struct {
-		name    string
+		name      string
 		audiobook AudioBook
-		wantErr bool
+		wantErr   bool
 	}{
 		{
 			name: "valid audio book",
@@ -21,7 +21,6 @@ func TestAudioBook_Validation(t *testing.T) {
 				ID:        uuid.New(),
 				Title:     "Test Book",
 				Author:    "Test Author",
-				FilePath:  "/path/to/file.mp3",
 				Language:  "en",
 				Status:    StatusPending,
 				CreatedBy: uuid.New(),
@@ -35,7 +34,6 @@ func TestAudioBook_Validation(t *testing.T) {
 			audiobook: AudioBook{
 				ID:        uuid.New(),
 				Author:    "Test Author",
-				FilePath:  "/path/to/file.mp3",
 				Language:  "en",
 				Status:    StatusPending,
 				CreatedBy: uuid.New(),
@@ -49,7 +47,6 @@ func TestAudioBook_Validation(t *testing.T) {
 			audiobook: AudioBook{
 				ID:        uuid.New(),
 				Title:     "Test Book",
-				FilePath:  "/path/to/file.mp3",
 				Language:  "en",
 				Status:    StatusPending,
 				CreatedBy: uuid.New(),
@@ -78,7 +75,6 @@ func TestAudioBook_Validation(t *testing.T) {
 				ID:        uuid.New(),
 				Title:     "Test Book",
 				Author:    "Test Author",
-				FilePath:  "/path/to/file.mp3",
 				Language:  "english",
 				Status:    StatusPending,
 				CreatedBy: uuid.New(),
@@ -93,7 +89,6 @@ func TestAudioBook_Validation(t *testing.T) {
 				ID:        uuid.New(),
 				Title:     "Test Book",
 				Author:    "Test Author",
-				FilePath:  "/path/to/file.mp3",
 				Language:  "en",
 				Status:    StatusPending,
 				CreatedAt: time.Now(),
@@ -257,9 +252,9 @@ func TestChapter_GetDurationFormatted(t *testing.T) {
 
 func TestChapterTranscript_Validation(t *testing.T) {
 	tests := []struct {
-		name    string
+		name       string
 		transcript ChapterTranscript
-		wantErr bool
+		wantErr    bool
 	}{
 		{
 			name: "valid chapter transcript",
@@ -318,7 +313,7 @@ func TestChapterTranscript_Validation(t *testing.T) {
 
 func TestChapterAIOutput_Validation(t *testing.T) {
 	validContent := json.RawMessage(`{"summary": "This is a chapter summary"}`)
-	
+
 	tests := []struct {
 		name     string
 		aiOutput ChapterAIOutput
@@ -445,7 +440,7 @@ func TestAudioBook_StatusMethods(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			audiobook := AudioBook{Status: tt.status}
-			
+
 			assert.Equal(t, tt.expected["isCompleted"], audiobook.IsCompleted())
 			assert.Equal(t, tt.expected["isFailed"], audiobook.IsFailed())
 			assert.Equal(t, tt.expected["isProcessing"], audiobook.IsProcessing())
@@ -543,9 +538,9 @@ func TestAudioBook_GetFileSizeFormatted(t *testing.T) {
 
 func TestTranscript_Validation(t *testing.T) {
 	tests := []struct {
-		name      string
+		name       string
 		transcript Transcript
-		wantErr   bool
+		wantErr    bool
 	}{
 		{
 			name: "valid transcript",
@@ -591,7 +586,7 @@ func TestTranscript_Validation(t *testing.T) {
 
 func TestAIOutput_Validation(t *testing.T) {
 	validContent := json.RawMessage(`{"summary": "This is a summary"}`)
-	
+
 	tests := []struct {
 		name     string
 		aiOutput AIOutput
@@ -761,9 +756,9 @@ func TestTag_Validation(t *testing.T) {
 
 func TestAudioBookEmbedding_Validation(t *testing.T) {
 	validEmbedding := []float64{0.1, 0.2, 0.3}
-	
+
 	tests := []struct {
-		name     string
+		name      string
 		embedding AudioBookEmbedding
 		wantErr   bool
 	}{
@@ -1009,7 +1004,7 @@ func TestUpdateAudioBookRequest_Validation(t *testing.T) {
 	validTitle := "Updated Title"
 	validAuthor := "Updated Author"
 	validLanguage := "es"
-	
+
 	tests := []struct {
 		name    string
 		request UpdateAudioBookRequest

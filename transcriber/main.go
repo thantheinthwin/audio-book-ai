@@ -42,7 +42,7 @@ func main() {
 	revAIService := services.NewRevAIService(cfg.RevAIAPIKey, cfg.RevAIURL)
 
 	// Initialize Redis consumer
-	redisConsumer, err := services.NewRedisConsumer(cfg.RedisURL, "audiobook", &services.Config{
+	redisConsumer, err := services.NewRedisConsumer(cfg.RedisURL, "audiobooks", &services.Config{
 		MaxConcurrentJobs: cfg.MaxConcurrentJobs,
 		JobPollInterval:   cfg.JobPollInterval,
 		JobTimeout:        cfg.JobTimeout,
@@ -57,6 +57,7 @@ func main() {
 		MaxConcurrentJobs: cfg.MaxConcurrentJobs,
 		JobPollInterval:   cfg.JobPollInterval,
 		JobTimeout:        cfg.JobTimeout,
+		APIBaseURL:        cfg.APIBaseURL,
 	}
 
 	// Initialize worker
@@ -104,6 +105,8 @@ func processTranscriptionJob(worker *services.Worker, httpClient *http.Client, a
 	// Set file path if available
 	if message.FilePath != nil {
 		job.FilePath = *message.FilePath
+	} else {
+		return fmt.Errorf("no file path provided in job message")
 	}
 
 	// Process the job
@@ -117,6 +120,8 @@ func processTranscriptionJob(worker *services.Worker, httpClient *http.Client, a
 	// Update job status to completed
 	now := time.Now()
 	updateJobStatus(httpClient, apiBaseURL, message.ID.String(), "completed", "", &now, &now)
+
+	log.Printf("Transcription job %s completed successfully for audiobook %s", message.ID, message.AudiobookID)
 	return nil
 }
 

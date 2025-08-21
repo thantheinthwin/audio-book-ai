@@ -621,59 +621,41 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 	}
 	log.Printf("CreateAudioBook: All chapters created successfully")
 
-	// Create processing jobs and enqueue them to Redis
-	log.Printf("CreateAudioBook: Creating processing jobs")
-	jobTypes := []models.JobType{
-		models.JobTypeTranscribe,
-		models.JobTypeSummarize,
-		models.JobTypeTag,
-		models.JobTypeEmbed,
-	}
-
+	// Create transcription jobs for each chapter and enqueue them to Redis
+	log.Printf("CreateAudioBook: Creating transcription jobs for %d chapters", len(chapters))
 	jobsCreated := 0
-	for _, jobType := range jobTypes {
-		log.Printf("CreateAudioBook: Creating job of type: %s", jobType)
+
+	for _, chapter := range chapters {
+		log.Printf("CreateAudioBook: Creating transcription job for chapter %d", chapter.ChapterNumber)
 		job := &models.ProcessingJob{
 			ID:          uuid.New(),
 			AudiobookID: audiobook.ID,
-			JobType:     jobType,
+			JobType:     models.JobTypeTranscribe,
 			Status:      models.JobStatusPending,
 			CreatedAt:   time.Now(),
 		}
 
 		// Save job to database
 		if err := h.repo.CreateProcessingJob(context.Background(), job); err != nil {
-			log.Printf("CreateAudioBook: Failed to create processing job %s: %v", jobType, err)
+			log.Printf("CreateAudioBook: Failed to create transcription job for chapter %d: %v", chapter.ChapterNumber, err)
 			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to create processing job",
+				"error": "Failed to create transcription job",
 			})
 		}
-		log.Printf("CreateAudioBook: Job %s created in database", jobType)
+		log.Printf("CreateAudioBook: Transcription job for chapter %d created in database", chapter.ChapterNumber)
 
 		// Enqueue job to Redis if Redis service is available
 		if h.redisQueue != nil {
-			var enqueueErr error
-			if jobType == models.JobTypeTranscribe {
-				// For transcription jobs, pass the first chapter's file path
-				// Since we always create at least one chapter, we can use the first one
-				firstChapterFilePath := chapters[0].FilePath
-				log.Printf("CreateAudioBook: Enqueueing transcription job with file path: %s", firstChapterFilePath)
-				enqueueErr = h.redisQueue.EnqueueTranscriptionJob(context.Background(), job, firstChapterFilePath)
-			} else {
-				// For other AI jobs, don't pass file path
-				log.Printf("CreateAudioBook: Enqueueing AI job: %s", jobType)
-				enqueueErr = h.redisQueue.EnqueueAIJob(context.Background(), job)
-			}
-
-			if enqueueErr != nil {
-				log.Printf("CreateAudioBook: Failed to enqueue job %s to Redis: %v", jobType, enqueueErr)
+			log.Printf("CreateAudioBook: Enqueueing transcription job for chapter %d with file path: %s", chapter.ChapterNumber, chapter.FilePath)
+			if err := h.redisQueue.EnqueueTranscriptionJob(context.Background(), job, chapter.FilePath); err != nil {
+				log.Printf("CreateAudioBook: Failed to enqueue transcription job for chapter %d to Redis: %v", chapter.ChapterNumber, err)
 				// Continue with other jobs even if one fails to enqueue
 			} else {
-				log.Printf("CreateAudioBook: Job %s enqueued to Redis successfully", jobType)
+				log.Printf("CreateAudioBook: Transcription job for chapter %d enqueued to Redis successfully", chapter.ChapterNumber)
 				jobsCreated++
 			}
 		} else {
-			log.Printf("CreateAudioBook: Redis queue service not available, job %s created in database only", jobType)
+			log.Printf("CreateAudioBook: Redis queue service not available, transcription job for chapter %d created in database only", chapter.ChapterNumber)
 			jobsCreated++
 		}
 	}
@@ -689,14 +671,119 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 		log.Printf("CreateAudioBook: Upload status updated successfully")
 	}
 
-	log.Printf("CreateAudioBook: Request completed successfully - AudioBookID: %s, JobsCreated: %d/%d",
-		audiobook.ID, jobsCreated, len(jobTypes))
+	log.Printf("CreateAudioBook: Request completed successfully - AudioBookID: %s, TranscriptionJobsCreated: %d/%d",
+		audiobook.ID, jobsCreated, len(chapters))
 	return c.Status(http.StatusCreated).JSON(fiber.Map{
-		"audiobook_id": audiobook.ID,
-		"status":       audiobook.Status,
-		"message":      "Audio book created successfully",
-		"jobs_created": jobsCreated,
-		"total_jobs":   len(jobTypes),
+		"audiobook_id":               audiobook.ID,
+		"status":                     audiobook.Status,
+		"message":                    "Audio book created successfully",
+		"transcription_jobs_created": jobsCreated,
+		"total_chapters":             len(chapters),
+	})
+}
+
+// TriggerSummarizeAndTagJobs triggers summarize and tag jobs for an audiobook after transcription is complete
+// POST /v1/admin/audiobooks/{id}/trigger-summarize-tag
+func (h *Handler) TriggerSummarizeAndTagJobs(c *fiber.Ctx) error {
+	log.Printf("TriggerSummarizeAndTagJobs: Request received from IP %s", c.IP())
+
+	// Parse audiobook ID
+	audiobookID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		log.Printf("TriggerSummarizeAndTagJobs: Invalid audiobook ID: %v", err)
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid audiobook ID",
+		})
+	}
+
+	log.Printf("TriggerSummarizeAndTagJobs: Processing audiobook ID: %s", audiobookID)
+
+	// Get audiobook to check if it exists
+	_, err = h.repo.GetAudioBookByID(context.Background(), audiobookID)
+	if err != nil {
+		log.Printf("TriggerSummarizeAndTagJobs: Failed to get audiobook: %v", err)
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{
+			"error": "Audiobook not found",
+		})
+	}
+
+	// Get all chapters for this audiobook
+	chapters, err := h.repo.GetChaptersByAudioBookID(context.Background(), audiobookID)
+	if err != nil {
+		log.Printf("TriggerSummarizeAndTagJobs: Failed to get chapters: %v", err)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get chapters",
+		})
+	}
+
+	if len(chapters) == 0 {
+		log.Printf("TriggerSummarizeAndTagJobs: No chapters found for audiobook")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "No chapters found for audiobook",
+		})
+	}
+
+	// Check if all chapters have been transcribed successfully
+	allTranscribed := true
+	var failedChapters []int
+
+	for _, chapter := range chapters {
+		// Check if chapter has a transcript
+		transcript, err := h.repo.GetChapterTranscriptByChapterID(context.Background(), chapter.ID)
+		if err != nil || transcript == nil {
+			log.Printf("TriggerSummarizeAndTagJobs: Chapter %d has no transcript", chapter.ChapterNumber)
+			allTranscribed = false
+			failedChapters = append(failedChapters, chapter.ChapterNumber)
+		}
+	}
+
+	if !allTranscribed {
+		log.Printf("TriggerSummarizeAndTagJobs: Not all chapters are transcribed. Failed chapters: %v", failedChapters)
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error":           "Not all chapters are transcribed",
+			"failed_chapters": failedChapters,
+		})
+	}
+
+	log.Printf("TriggerSummarizeAndTagJobs: All %d chapters are transcribed, proceeding with summarize and tag jobs", len(chapters))
+
+	// Create combined summarize and tag job
+	job := &models.ProcessingJob{
+		ID:          uuid.New(),
+		AudiobookID: audiobookID,
+		JobType:     models.JobTypeSummarize, // We'll use this for the combined job
+		Status:      models.JobStatusPending,
+		CreatedAt:   time.Now(),
+	}
+
+	// Save job to database
+	if err := h.repo.CreateProcessingJob(context.Background(), job); err != nil {
+		log.Printf("TriggerSummarizeAndTagJobs: Failed to create summarize and tag job: %v", err)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to create summarize and tag job",
+		})
+	}
+
+	// Enqueue job to Redis if Redis service is available
+	if h.redisQueue != nil {
+		if err := h.redisQueue.EnqueueAIJob(context.Background(), job); err != nil {
+			log.Printf("TriggerSummarizeAndTagJobs: Failed to enqueue summarize and tag job to Redis: %v", err)
+			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to enqueue summarize and tag job",
+			})
+		}
+		log.Printf("TriggerSummarizeAndTagJobs: Summarize and tag job enqueued to Redis successfully")
+	} else {
+		log.Printf("TriggerSummarizeAndTagJobs: Redis queue service not available, job created in database only")
+	}
+
+	log.Printf("TriggerSummarizeAndTagJobs: Successfully triggered summarize and tag jobs for audiobook %s", audiobookID)
+
+	return c.JSON(fiber.Map{
+		"audiobook_id":      audiobookID,
+		"message":           "Summarize and tag jobs triggered successfully",
+		"job_id":            job.ID,
+		"chapters_verified": len(chapters),
 	})
 }
 

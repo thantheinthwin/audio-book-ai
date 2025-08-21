@@ -135,6 +135,85 @@ func (w *Worker) processEmbedding(audiobookID uuid.UUID, transcript string) (*mo
 	}, nil
 }
 
+// ProcessCombinedSummarizeAndTagJob processes a combined summarize and tag job
+func (w *Worker) ProcessCombinedSummarizeAndTagJob(job models.Job) error {
+	log.Printf("Processing combined summarize and tag job %s for audiobook %s", job.ID, job.AudiobookID)
+
+	// Update job status to running
+	if err := w.dbService.UpdateJobStatus(job.ID, models.JobStatusRunning, nil); err != nil {
+		return err
+	}
+
+	// Get all chapter transcripts for the audiobook
+	transcripts, err := w.dbService.GetChapterTranscripts(job.AudiobookID)
+	if err != nil {
+		errorMsg := fmt.Sprintf("Failed to get chapter transcripts: %v", err)
+		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
+		return err
+	}
+
+	if len(transcripts) == 0 {
+		errorMsg := "No transcripts found for audiobook"
+		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
+		return fmt.Errorf("no transcripts found for audiobook")
+	}
+
+	// Combine all transcripts
+	var combinedTranscript string
+	for i, transcript := range transcripts {
+		if i > 0 {
+			combinedTranscript += "\n\n"
+		}
+		combinedTranscript += transcript.Content
+	}
+
+	// Process combined summary and tags
+	summaryAndTags, err := w.geminiService.GenerateSummaryAndTags(combinedTranscript)
+	if err != nil {
+		errorMsg := fmt.Sprintf("Failed to generate summary and tags: %v", err)
+		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
+		return err
+	}
+
+	// Save summary output
+	summaryOutput := &models.AIOutput{
+		AudiobookID: job.AudiobookID,
+		OutputType:  models.OutputTypeSummary,
+		Content:     summaryAndTags.Summary,
+		ModelUsed:   w.geminiService.model,
+		CreatedAt:   time.Now(),
+	}
+
+	if err := w.dbService.SaveAIOutput(summaryOutput); err != nil {
+		errorMsg := fmt.Sprintf("Failed to save summary output: %v", err)
+		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
+		return err
+	}
+
+	// Save tags output
+	tagsOutput := &models.AIOutput{
+		AudiobookID: job.AudiobookID,
+		OutputType:  models.OutputTypeTags,
+		Content:     summaryAndTags.Tags,
+		ModelUsed:   w.geminiService.model,
+		CreatedAt:   time.Now(),
+	}
+
+	if err := w.dbService.SaveAIOutput(tagsOutput); err != nil {
+		errorMsg := fmt.Sprintf("Failed to save tags output: %v", err)
+		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
+		return err
+	}
+
+	// Update job status to completed
+	if err := w.dbService.UpdateJobStatus(job.ID, models.JobStatusCompleted, nil); err != nil {
+		return err
+	}
+
+	log.Printf("Successfully processed combined summarize and tag job %s", job.ID)
+	return nil
+}
+
 // Run starts the main worker loop
 func (w *Worker) Run() {
 	log.Println("Starting Gemini AI Processing Worker")
