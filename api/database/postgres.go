@@ -828,8 +828,8 @@ func (p *PostgresRepository) CheckAndUpdateAudioBookStatus(ctx context.Context, 
 
 func (p *PostgresRepository) CreateChapter(ctx context.Context, chapter *models.Chapter) error {
 	query := `
-		INSERT INTO chapters (id, audiobook_id, chapter_number, title, file_path, file_url, file_size_bytes, mime_type, start_time_seconds, end_time_seconds, duration_seconds, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		INSERT INTO chapters (id, audiobook_id, upload_id, chapter_number, title, file_path, file_url, file_size_bytes, mime_type, start_time_seconds, end_time_seconds, duration_seconds, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 	`
 
 	fmt.Printf("CreateChapter: Executing insert for chapter ID: %s, AudiobookID: %s, ChapterNumber: %d\n",
@@ -839,6 +839,7 @@ func (p *PostgresRepository) CreateChapter(ctx context.Context, chapter *models.
 	_, err := p.pool.Exec(ctx, query,
 		chapter.ID,
 		chapter.AudiobookID,
+		chapter.UploadID,
 		chapter.ChapterNumber,
 		chapter.Title,
 		chapter.FilePath,
@@ -862,12 +863,43 @@ func (p *PostgresRepository) CreateChapter(ctx context.Context, chapter *models.
 }
 
 func (p *PostgresRepository) GetChapterByID(ctx context.Context, id uuid.UUID) (*models.Chapter, error) {
-	return nil, ErrNotFound
+	query := `
+		SELECT id, audiobook_id, upload_id, chapter_number, title, file_path, file_url, file_size_bytes, mime_type, 
+		       start_time_seconds, end_time_seconds, duration_seconds, created_at
+		FROM chapters
+		WHERE id = $1
+	`
+
+	var chapter models.Chapter
+	err := p.pool.QueryRow(ctx, query, id).Scan(
+		&chapter.ID,
+		&chapter.AudiobookID,
+		&chapter.UploadID,
+		&chapter.ChapterNumber,
+		&chapter.Title,
+		&chapter.FilePath,
+		&chapter.FileURL,
+		&chapter.FileSizeBytes,
+		&chapter.MimeType,
+		&chapter.StartTime,
+		&chapter.EndTime,
+		&chapter.DurationSeconds,
+		&chapter.CreatedAt,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get chapter: %w", err)
+	}
+
+	return &chapter, nil
 }
 
 func (p *PostgresRepository) GetChaptersByAudioBookID(ctx context.Context, audiobookID uuid.UUID) ([]models.Chapter, error) {
 	query := `
-		SELECT id, audiobook_id, chapter_number, title, file_path, file_url, file_size_bytes, mime_type, 
+		SELECT id, audiobook_id, upload_id, chapter_number, title, file_path, file_url, file_size_bytes, mime_type, 
 		       start_time_seconds, end_time_seconds, duration_seconds, created_at
 		FROM chapters
 		WHERE audiobook_id = $1
@@ -886,6 +918,7 @@ func (p *PostgresRepository) GetChaptersByAudioBookID(ctx context.Context, audio
 		err := rows.Scan(
 			&chapter.ID,
 			&chapter.AudiobookID,
+			&chapter.UploadID,
 			&chapter.ChapterNumber,
 			&chapter.Title,
 			&chapter.FilePath,
@@ -912,7 +945,7 @@ func (p *PostgresRepository) GetChaptersByAudioBookID(ctx context.Context, audio
 
 func (p *PostgresRepository) GetFirstChapterByAudioBookID(ctx context.Context, audiobookID uuid.UUID) (*models.Chapter, error) {
 	query := `
-		SELECT id, audiobook_id, chapter_number, title, file_path, file_url, file_size_bytes, mime_type, 
+		SELECT id, audiobook_id, upload_id, chapter_number, title, file_path, file_url, file_size_bytes, mime_type, 
 		       start_time_seconds, end_time_seconds, duration_seconds, created_at
 		FROM chapters
 		WHERE audiobook_id = $1 AND chapter_number = 1
@@ -922,6 +955,7 @@ func (p *PostgresRepository) GetFirstChapterByAudioBookID(ctx context.Context, a
 	err := p.pool.QueryRow(ctx, query, audiobookID).Scan(
 		&chapter.ID,
 		&chapter.AudiobookID,
+		&chapter.UploadID,
 		&chapter.ChapterNumber,
 		&chapter.Title,
 		&chapter.FilePath,
@@ -945,14 +979,63 @@ func (p *PostgresRepository) GetFirstChapterByAudioBookID(ctx context.Context, a
 }
 
 func (p *PostgresRepository) UpdateChapter(ctx context.Context, chapter *models.Chapter) error {
+	query := `
+		UPDATE chapters 
+		SET audiobook_id = $2, upload_id = $3, chapter_number = $4, title = $5, file_path = $6, 
+		    file_url = $7, file_size_bytes = $8, mime_type = $9, start_time_seconds = $10, 
+		    end_time_seconds = $11, duration_seconds = $12
+		WHERE id = $1
+	`
+
+	result, err := p.pool.Exec(ctx, query,
+		chapter.ID,
+		chapter.AudiobookID,
+		chapter.UploadID,
+		chapter.ChapterNumber,
+		chapter.Title,
+		chapter.FilePath,
+		chapter.FileURL,
+		chapter.FileSizeBytes,
+		chapter.MimeType,
+		chapter.StartTime,
+		chapter.EndTime,
+		chapter.DurationSeconds,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to update chapter: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
 	return nil
 }
 
 func (p *PostgresRepository) DeleteChapter(ctx context.Context, id uuid.UUID) error {
+	query := `DELETE FROM chapters WHERE id = $1`
+
+	result, err := p.pool.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete chapter: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
 	return nil
 }
 
 func (p *PostgresRepository) DeleteChaptersByAudioBookID(ctx context.Context, audiobookID uuid.UUID) error {
+	query := `DELETE FROM chapters WHERE audiobook_id = $1`
+
+	_, err := p.pool.Exec(ctx, query, audiobookID)
+	if err != nil {
+		return fmt.Errorf("failed to delete chapters by audiobook ID: %w", err)
+	}
+
 	return nil
 }
 

@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS audiobooks (
 CREATE TABLE IF NOT EXISTS chapters (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     audiobook_id UUID NOT NULL REFERENCES audiobooks(id) ON DELETE CASCADE,
+    upload_id UUID REFERENCES uploads(id) ON DELETE CASCADE,
     chapter_number INTEGER NOT NULL,
     title VARCHAR(255) NOT NULL,
     file_path VARCHAR(500) NOT NULL,
@@ -38,19 +39,6 @@ CREATE TABLE IF NOT EXISTS chapters (
     duration_seconds INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(audiobook_id, chapter_number)
-);
-
--- Transcripts table
-CREATE TABLE IF NOT EXISTS transcripts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    audiobook_id UUID NOT NULL REFERENCES audiobooks(id) ON DELETE CASCADE,
-    content TEXT NOT NULL,
-    segments JSONB,
-    language VARCHAR(10),
-    confidence_score DECIMAL(3,2),
-    processing_time_seconds INTEGER,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(audiobook_id)
 );
 
 -- Chapter Transcripts table
@@ -79,18 +67,6 @@ CREATE TABLE IF NOT EXISTS ai_outputs (
     UNIQUE(audiobook_id, output_type)
 );
 
--- Chapter AI Outputs table
-CREATE TABLE IF NOT EXISTS chapter_ai_outputs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    chapter_id UUID NOT NULL REFERENCES chapters(id) ON DELETE CASCADE,
-    audiobook_id UUID NOT NULL REFERENCES audiobooks(id) ON DELETE CASCADE,
-    output_type VARCHAR(20) NOT NULL,
-    content JSONB NOT NULL,
-    model_used VARCHAR(100),
-    processing_time_seconds INTEGER,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
 -- Processing Jobs table
 CREATE TABLE IF NOT EXISTS processing_jobs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -109,25 +85,6 @@ CREATE TABLE IF NOT EXISTS tags (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(100) NOT NULL UNIQUE,
     category VARCHAR(50),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Audio Book Tags junction table
-CREATE TABLE IF NOT EXISTS audiobook_tags (
-    audiobook_id UUID NOT NULL REFERENCES audiobooks(id) ON DELETE CASCADE,
-    tag_id UUID NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
-    confidence_score DECIMAL(3,2),
-    is_ai_generated BOOLEAN DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    PRIMARY KEY (audiobook_id, tag_id)
-);
-
--- Audio Book Embeddings table
-CREATE TABLE IF NOT EXISTS audiobook_embeddings (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    audiobook_id UUID NOT NULL REFERENCES audiobooks(id) ON DELETE CASCADE,
-    embedding vector(1536), -- OpenAI embedding dimension
-    embedding_type VARCHAR(20) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -173,10 +130,8 @@ CREATE INDEX IF NOT EXISTS idx_audiobooks_created_at ON audiobooks(created_at);
 
 -- Chapters indexes
 CREATE INDEX IF NOT EXISTS idx_chapters_audiobook_id ON chapters(audiobook_id);
+CREATE INDEX IF NOT EXISTS idx_chapters_upload_id ON chapters(upload_id);
 CREATE INDEX IF NOT EXISTS idx_chapters_chapter_number ON chapters(chapter_number);
-
--- Transcripts indexes
-CREATE INDEX IF NOT EXISTS idx_transcripts_audiobook_id ON transcripts(audiobook_id);
 
 -- Chapter Transcripts indexes
 CREATE INDEX IF NOT EXISTS idx_chapter_transcripts_chapter_id ON chapter_transcripts(chapter_id);
@@ -186,11 +141,6 @@ CREATE INDEX IF NOT EXISTS idx_chapter_transcripts_audiobook_id ON chapter_trans
 CREATE INDEX IF NOT EXISTS idx_ai_outputs_audiobook_id ON ai_outputs(audiobook_id);
 CREATE INDEX IF NOT EXISTS idx_ai_outputs_output_type ON ai_outputs(output_type);
 
--- Chapter AI Outputs indexes
-CREATE INDEX IF NOT EXISTS idx_chapter_ai_outputs_chapter_id ON chapter_ai_outputs(chapter_id);
-CREATE INDEX IF NOT EXISTS idx_chapter_ai_outputs_audiobook_id ON chapter_ai_outputs(audiobook_id);
-CREATE INDEX IF NOT EXISTS idx_chapter_ai_outputs_output_type ON chapter_ai_outputs(output_type);
-
 -- Processing Jobs indexes
 CREATE INDEX IF NOT EXISTS idx_processing_jobs_audiobook_id ON processing_jobs(audiobook_id);
 CREATE INDEX IF NOT EXISTS idx_processing_jobs_status ON processing_jobs(status);
@@ -199,14 +149,6 @@ CREATE INDEX IF NOT EXISTS idx_processing_jobs_job_type ON processing_jobs(job_t
 -- Tags indexes
 CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name);
 CREATE INDEX IF NOT EXISTS idx_tags_category ON tags(category);
-
--- Audio Book Tags indexes
-CREATE INDEX IF NOT EXISTS idx_audiobook_tags_audiobook_id ON audiobook_tags(audiobook_id);
-CREATE INDEX IF NOT EXISTS idx_audiobook_tags_tag_id ON audiobook_tags(tag_id);
-
--- Audio Book Embeddings indexes
-CREATE INDEX IF NOT EXISTS idx_audiobook_embeddings_audiobook_id ON audiobook_embeddings(audiobook_id);
-CREATE INDEX IF NOT EXISTS idx_audiobook_embeddings_type ON audiobook_embeddings(embedding_type);
 
 -- Uploads indexes
 CREATE INDEX IF NOT EXISTS idx_uploads_user_id ON uploads(user_id);
@@ -240,14 +182,10 @@ CREATE TRIGGER update_upload_files_updated_at BEFORE UPDATE ON upload_files
 -- Enable RLS on all tables
 ALTER TABLE audiobooks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chapters ENABLE ROW LEVEL SECURITY;
-ALTER TABLE transcripts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chapter_transcripts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_outputs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE chapter_ai_outputs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE processing_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
-ALTER TABLE audiobook_tags ENABLE ROW LEVEL SECURITY;
-ALTER TABLE audiobook_embeddings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE uploads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE upload_files ENABLE ROW LEVEL SECURITY;
 
@@ -327,8 +265,63 @@ CREATE POLICY "Users can delete own upload files" ON upload_files
         )
     );
 
+-- Chapters policies
+CREATE POLICY "Users can view chapters by audiobook ownership" ON chapters
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM audiobooks 
+            WHERE audiobooks.id = chapters.audiobook_id 
+            AND audiobooks.created_by = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can view chapters by upload ownership" ON chapters
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM uploads 
+            WHERE uploads.id = chapters.upload_id 
+            AND uploads.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can create chapters by audiobook ownership" ON chapters
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM audiobooks 
+            WHERE audiobooks.id = chapters.audiobook_id 
+            AND audiobooks.created_by = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can update chapters by audiobook ownership" ON chapters
+    FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM audiobooks 
+            WHERE audiobooks.id = chapters.audiobook_id 
+            AND audiobooks.created_by = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can delete chapters by audiobook ownership" ON chapters
+    FOR DELETE USING (
+        EXISTS (
+            SELECT 1 FROM audiobooks 
+            WHERE audiobooks.id = chapters.audiobook_id 
+            AND audiobooks.created_by = auth.uid()
+        )
+    );
+
 -- Similar policies for other tables...
 -- (I'll create a separate file for all RLS policies to keep this clean)
+
+-- Add comments to document the cascading delete behavior
+COMMENT ON TABLE audiobooks IS 'Audiobooks table. When deleted, cascades to: chapters, transcripts, chapter_transcripts, ai_outputs, chapter_ai_outputs, processing_jobs, audiobook_tags, audiobook_embeddings, and related uploads via audiobook_uploads junction table.';
+
+COMMENT ON TABLE uploads IS 'Uploads table. When deleted, cascades to: upload_files and chapters (via upload_id).';
+
+COMMENT ON TABLE chapters IS 'Chapters table. When deleted, cascades to: chapter_transcripts and chapter_ai_outputs. References both audiobook_id and upload_id for proper tracking and cleanup.';
+
+COMMENT ON COLUMN chapters.upload_id IS 'References the upload session that created this chapter. Allows tracking and cascading deletes from uploads.';
 
 -- Insert some default tags
 INSERT INTO tags (name, category) VALUES
