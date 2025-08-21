@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAudioBook, useAudioBookJobStatus } from "@/hooks/use-audiobooks";
 import { notFound } from "next/navigation";
@@ -17,7 +17,6 @@ import {
   FileAudio,
   Brain,
 } from "lucide-react";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -29,22 +28,20 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import Image from "next/image";
+import { Skeleton } from "@/components/ui/skeleton";
 
-interface PageProps {
-  params: {
-    id: string;
-  };
-}
-
-export default function AudioBookDetailPage({ params }: PageProps) {
+export default function AudioBookDetailPage() {
+  const params = useParams();
   const router = useRouter();
+
   const {
     data: audioBookResponse,
     error: audioBookError,
     isLoading: audioBookLoading,
-  } = useAudioBook(params.id);
+  } = useAudioBook(params.id as string);
   const { data: jobStatusResponse, error: jobStatusError } =
-    useAudioBookJobStatus(params.id);
+    useAudioBookJobStatus(params.id as string);
 
   const audioBook = audioBookResponse?.data;
   const jobStatus = jobStatusResponse?.data;
@@ -140,8 +137,55 @@ export default function AudioBookDetailPage({ params }: PageProps) {
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardContent className="p-6 flex gap-4">
+          <div className="flex flex-col gap-4">
+            <Image
+              src={"/images/placeholder.png"}
+              alt={audioBook.title}
+              width={100}
+              height={100}
+              className="w-48 h-48 object-cover rounded-md"
+            />
+            <div className="flex gap-2">
+              <Button variant="outline">
+                <Edit className="h-4 w-4" />
+                Edit
+              </Button>
+              <Button variant={"destructive"}>
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-col flex-1 gap-2">
+            <div className="grid gap-1">
+              <h2 className="text-muted-foreground text-sm">Title</h2>
+              <p className="font-semibold text-lg">{audioBook.title}</p>
+            </div>
+            <div className="grid gap-1">
+              <h2 className="text-muted-foreground text-sm">Author</h2>
+              <p className="font-semibold text-lg">{audioBook.author}</p>
+            </div>
+            <div className="grid gap-1">
+              <h2 className="text-muted-foreground text-sm">Summary</h2>
+              {jobStatus?.overall_status === "processing" ? (
+                <div className="flex flex-col gap-1">
+                  <Skeleton className="h-4 w-full rounded" />
+                  <Skeleton className="h-4 w-full rounded" />
+                  <Skeleton className="h-4 w-full rounded" />
+                  <Skeleton className="h-4 w-full rounded" />
+                  <Skeleton className="h-4 w-40 rounded" />
+                </div>
+              ) : (
+                <p className="text-sm">{audioBook.summary}</p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
       {/* Header */}
-      <div className="flex justify-between items-start">
+      {/* <div className="flex justify-between items-start">
         <div>
           <h1 className="font-bold text-3xl mb-2">{audioBook.title}</h1>
           <p className="text-muted-foreground text-lg">by {audioBook.author}</p>
@@ -158,7 +202,7 @@ export default function AudioBookDetailPage({ params }: PageProps) {
             Delete
           </Button>
         </div>
-      </div>
+      </div> */}
 
       {/* Processing Status */}
       {jobStatus && (
@@ -251,113 +295,6 @@ export default function AudioBookDetailPage({ params }: PageProps) {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Cover Image and Basic Info */}
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex gap-6">
-                {audioBook.cover_image_url && (
-                  <img
-                    src={audioBook.cover_image_url}
-                    alt={audioBook.title}
-                    className="w-32 h-48 object-cover rounded-md"
-                  />
-                )}
-                <div className="flex-1">
-                  <div className="space-y-4">
-                    <div className="flex gap-4">
-                      {audioBook.duration_seconds && (
-                        <div>
-                          <span className="text-sm text-muted-foreground">
-                            Duration:
-                          </span>
-                          <p className="font-medium">
-                            {formatDuration(audioBook.duration_seconds)}
-                          </p>
-                        </div>
-                      )}
-                      <div>
-                        <span className="text-sm text-muted-foreground">
-                          Added:
-                        </span>
-                        <p className="font-medium">
-                          {new Date(audioBook.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button size="sm" disabled={isProcessing}>
-                        <Play className="h-4 w-4 mr-2" />
-                        Play
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={isProcessing}
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Download
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={isProcessing}
-                      >
-                        <Share2 className="h-4 w-4 mr-2" />
-                        Share
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Audio Book Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Audio Book Information</CardTitle>
-              <CardDescription>
-                Basic information about this audio book
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <span className="text-sm text-muted-foreground">Title:</span>
-                <p className="font-medium">{audioBook.title}</p>
-              </div>
-              <div>
-                <span className="text-sm text-muted-foreground">Author:</span>
-                <p className="font-medium">{audioBook.author}</p>
-              </div>
-              {audioBook.summary && (
-                <div>
-                  <span className="text-sm text-muted-foreground">
-                    Summary:
-                  </span>
-                  <p className="text-sm mt-1">{audioBook.summary}</p>
-                </div>
-              )}
-              <div>
-                <span className="text-sm text-muted-foreground">Created:</span>
-                <p className="text-sm">
-                  {new Date(audioBook.created_at).toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <span className="text-sm text-muted-foreground">
-                  Last Updated:
-                </span>
-                <p className="text-sm">
-                  {new Date(audioBook.updated_at).toLocaleString()}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Quick Actions */}
