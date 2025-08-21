@@ -78,7 +78,7 @@ type AudioBook struct {
 type Chapter struct {
 	ID              uuid.UUID  `json:"id" db:"id"`
 	AudiobookID     uuid.UUID  `json:"audiobook_id" db:"audiobook_id" validate:"required"`
-	UploadID        *uuid.UUID `json:"upload_id,omitempty" db:"upload_id"` // Optional: tracks which upload session created this chapter
+	UploadFileID    *uuid.UUID `json:"upload_file_id,omitempty" db:"upload_file_id"`
 	ChapterNumber   int        `json:"chapter_number" db:"chapter_number" validate:"required,min=1"`
 	Title           string     `json:"title" db:"title" validate:"required,min=1,max=255"`
 	FilePath        string     `json:"file_path" db:"file_path" validate:"required"`

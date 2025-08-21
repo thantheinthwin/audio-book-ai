@@ -534,6 +534,7 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 		chapter := &models.Chapter{
 			ID:            uuid.New(),
 			AudiobookID:   audiobook.ID,
+			UploadFileID:  &file.ID,
 			ChapterNumber: 1,
 			Title:         req.Title, // Use audiobook title for single file
 			FilePath:      file.FilePath,
@@ -541,6 +542,7 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 			FileSizeBytes: &file.FileSize,
 			MimeType:      &file.MimeType,
 			CreatedAt:     time.Now(),
+
 		}
 		chapters = append(chapters, chapter)
 
@@ -587,6 +589,7 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 			chapter := &models.Chapter{
 				ID:            uuid.New(),
 				AudiobookID:   audiobook.ID,
+				UploadFileID:  &file.ID,
 				ChapterNumber: chapterNum,
 				Title:         chapterTitle,
 				FilePath:      file.FilePath,
@@ -632,6 +635,7 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 			AudiobookID: audiobook.ID,
 			JobType:     models.JobTypeTranscribe,
 			Status:      models.JobStatusPending,
+			ChapterID:   &chapter.ID,
 			CreatedAt:   time.Now(),
 		}
 
@@ -643,6 +647,24 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 			})
 		}
 		log.Printf("CreateAudioBook: Transcription job for chapter %d created in database", chapter.ChapterNumber)
+
+		// Summarize job (should be created only once per audiobook, not per chapter)
+		if jobsCreated == 0 {
+			summarizeJob := &models.ProcessingJob{
+				ID:          uuid.New(),
+				AudiobookID: audiobook.ID,
+				JobType:     models.JobTypeSummarize,
+				Status:      models.JobStatusPending,
+				CreatedAt:   time.Now(),
+			}
+			if err := h.repo.CreateProcessingJob(context.Background(), summarizeJob); err != nil {
+				log.Printf("CreateAudioBook: Failed to create summarize job: %v", err)
+				return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+					"error": "Failed to create summarize job",
+				})
+			}
+			log.Printf("CreateAudioBook: Summarize job for audiobook %s created in database", audiobook.ID)
+		}
 
 		// Enqueue job to Redis if Redis service is available
 		if h.redisQueue != nil {

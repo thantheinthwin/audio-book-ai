@@ -85,7 +85,6 @@ func main() {
 
 	// Start consuming transcription jobs from Redis
 	log.Println("Starting transcriber service...")
-	fmt.Println("Worker config:", workerConfig)
 	if err := redisConsumer.ConsumeJobs(ctx, "transcribe", func(message services.JobMessage) error {
 		return processTranscriptionJob(worker, httpClient, cfg.APIBaseURL, cfg.InternalAPIKey, message)
 	}); err != nil {

@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS upload_files (
 CREATE TABLE IF NOT EXISTS chapters (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     audiobook_id UUID NOT NULL REFERENCES audiobooks(id) ON DELETE CASCADE,
-    upload_id UUID REFERENCES uploads(id) ON DELETE CASCADE,
+    upload_file_id UUID REFERENCES upload_files(id),
     chapter_number INTEGER NOT NULL,
     title VARCHAR(255) NOT NULL,
     file_path VARCHAR(500) NOT NULL,
@@ -102,6 +102,7 @@ CREATE TABLE IF NOT EXISTS ai_outputs (
 CREATE TABLE IF NOT EXISTS processing_jobs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     audiobook_id UUID NOT NULL REFERENCES audiobooks(id) ON DELETE CASCADE,
+    chapter_id UUID REFERENCES chapters(id) ON DELETE CASCADE,
     job_type VARCHAR(20) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     redis_job_id VARCHAR(100),
@@ -130,7 +131,7 @@ CREATE INDEX IF NOT EXISTS idx_audiobooks_created_at ON audiobooks(created_at);
 
 -- Chapters indexes
 CREATE INDEX IF NOT EXISTS idx_chapters_audiobook_id ON chapters(audiobook_id);
-CREATE INDEX IF NOT EXISTS idx_chapters_upload_id ON chapters(upload_id);
+CREATE INDEX IF NOT EXISTS idx_chapters_upload_file_id ON chapters(upload_file_id);
 CREATE INDEX IF NOT EXISTS idx_chapters_chapter_number ON chapters(chapter_number);
 
 -- Chapter Transcripts indexes
@@ -275,11 +276,12 @@ CREATE POLICY "Users can view chapters by audiobook ownership" ON chapters
         )
     );
 
-CREATE POLICY "Users can view chapters by upload ownership" ON chapters
+CREATE POLICY "Users can view chapters by upload file ownership" ON chapters
     FOR SELECT USING (
         EXISTS (
-            SELECT 1 FROM uploads 
-            WHERE uploads.id = chapters.upload_id 
+            SELECT 1 FROM upload_files 
+            JOIN uploads ON uploads.id = upload_files.upload_id
+            WHERE upload_files.id = chapters.upload_file_id 
             AND uploads.user_id = auth.uid()
         )
     );
@@ -317,11 +319,11 @@ CREATE POLICY "Users can delete chapters by audiobook ownership" ON chapters
 -- Add comments to document the cascading delete behavior
 COMMENT ON TABLE audiobooks IS 'Audiobooks table. When deleted, cascades to: chapters, transcripts, chapter_transcripts, ai_outputs, chapter_ai_outputs, processing_jobs, audiobook_tags, audiobook_embeddings, and related uploads via audiobook_uploads junction table.';
 
-COMMENT ON TABLE uploads IS 'Uploads table. When deleted, cascades to: upload_files and chapters (via upload_id).';
+COMMENT ON TABLE uploads IS 'Uploads table. When deleted, cascades to: upload_files and chapters (via upload_file_id).';
 
-COMMENT ON TABLE chapters IS 'Chapters table. When deleted, cascades to: chapter_transcripts and chapter_ai_outputs. References both audiobook_id and upload_id for proper tracking and cleanup.';
+COMMENT ON TABLE chapters IS 'Chapters table. When deleted, cascades to: chapter_transcripts and chapter_ai_outputs. References both audiobook_id and upload_file_id for proper tracking and cleanup.';
 
-COMMENT ON COLUMN chapters.upload_id IS 'References the upload session that created this chapter. Allows tracking and cascading deletes from uploads.';
+COMMENT ON COLUMN chapters.upload_file_id IS 'References the upload file that created this chapter. Allows tracking and cascading deletes from upload_files.';
 
 -- Insert some default tags
 INSERT INTO tags (name, category) VALUES
