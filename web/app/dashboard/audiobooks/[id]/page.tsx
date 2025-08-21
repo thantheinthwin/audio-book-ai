@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useState, useRef } from "react";
+import { useParams } from "next/navigation";
 import { useAudioBook, useAudioBookJobStatus } from "@/hooks/use-audiobooks";
 import { notFound } from "next/navigation";
 import {
@@ -10,7 +9,6 @@ import {
   Pause,
   Edit,
   Trash2,
-  Download,
   Loader2,
   CheckCircle,
   AlertCircle,
@@ -28,7 +26,6 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Slider } from "@/components/ui/slider";
 
 import {
   Table,
@@ -42,10 +39,7 @@ import Image from "next/image";
 
 export default function AudioBookDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const [playingChapter, setPlayingChapter] = useState<string | null>(null);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
   const [isJobStatusExpanded, setIsJobStatusExpanded] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -61,141 +55,74 @@ export default function AudioBookDetailPage() {
   const audioBook = audioBookResponse?.data;
   const jobStatus = jobStatusResponse?.data;
 
-  console.log(jobStatus, audioBook);
-
   // Handle play/pause for a chapter
   const handlePlayPause = (chapterId: string, audioUrl: string) => {
     if (playingChapter === chapterId) {
       // Pause current chapter
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-      setPlayingChapter(null);
-      setCurrentTime(0);
-      setDuration(0);
+      stopAllAudio();
     } else {
       // Always stop any currently playing audio first
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
+      stopAllAudio();
 
-      // Reset playing state and time
-      setPlayingChapter(null);
-      setCurrentTime(0);
-      setDuration(0);
+      // Wait a bit to ensure the previous audio is fully stopped
+      setTimeout(() => {
+        // Play new chapter
+        const audio = new Audio();
+        audioRef.current = audio;
 
-      // Play new chapter
-      const audio = new Audio(audioUrl);
-      audioRef.current = audio;
-
-      // Add event listeners
-      const handleEnded = () => {
-        setPlayingChapter(null);
-        audioRef.current = null;
-        setCurrentTime(0);
-        setDuration(0);
-      };
-
-      const handlePause = () => {
-        setPlayingChapter(null);
-        audioRef.current = null;
-      };
-
-      const handleError = () => {
-        console.error("Error playing audio:", audio.error);
-        setPlayingChapter(null);
-        audioRef.current = null;
-        setCurrentTime(0);
-        setDuration(0);
-      };
-
-      const handleLoadedMetadata = () => {
-        setDuration(audio.duration);
-      };
-
-      const handleTimeUpdate = () => {
-        setCurrentTime(audio.currentTime);
-      };
-
-      audio.addEventListener("ended", handleEnded);
-      audio.addEventListener("pause", handlePause);
-      audio.addEventListener("error", handleError);
-      audio.addEventListener("loadedmetadata", handleLoadedMetadata);
-      audio.addEventListener("timeupdate", handleTimeUpdate);
-
-      audio
-        .play()
-        .then(() => {
-          setPlayingChapter(chapterId);
-        })
-        .catch((error) => {
-          console.error("Error playing audio:", error);
+        // Add event listeners
+        const handleEnded = () => {
           setPlayingChapter(null);
           audioRef.current = null;
-          // Remove event listeners on error
-          audio.removeEventListener("ended", handleEnded);
-          audio.removeEventListener("pause", handlePause);
-          audio.removeEventListener("error", handleError);
-          audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
-          audio.removeEventListener("timeupdate", handleTimeUpdate);
-        });
+        };
+
+        const handlePause = () => {
+          setPlayingChapter(null);
+          audioRef.current = null;
+        };
+
+        const handleError = () => {
+          console.error("Error playing audio:", audio.error);
+          setPlayingChapter(null);
+          audioRef.current = null;
+        };
+
+        audio.addEventListener("ended", handleEnded);
+        audio.addEventListener("pause", handlePause);
+        audio.addEventListener("error", handleError);
+
+        // Set the source and play
+        audio.src = audioUrl;
+        audio.load(); // Load the audio before playing
+
+        audio
+          .play()
+          .then(() => {
+            setPlayingChapter(chapterId);
+          })
+          .catch((error) => {
+            console.error("Error playing audio:", error);
+            setPlayingChapter(null);
+            audioRef.current = null;
+            // Remove event listeners on error
+            audio.removeEventListener("ended", handleEnded);
+            audio.removeEventListener("pause", handlePause);
+            audio.removeEventListener("error", handleError);
+          });
+      }, 100); // Small delay to ensure previous audio is stopped
     }
   };
 
-  // Handle slider change
-  const handleSliderChange = (value: number[]) => {
-    if (audioRef.current && duration > 0) {
-      const newTime = (value[0] / 100) * duration;
-      audioRef.current.currentTime = newTime;
-      setCurrentTime(newTime);
+  // Function to stop all audio
+  const stopAllAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+      audioRef.current.load();
+      // Don't set to null immediately, let the pause event handle it
     }
+    setPlayingChapter(null);
   };
-
-  // Handle download
-  const handleDownload = (audioUrl: string, chapterTitle: string) => {
-    const link = document.createElement("a");
-    link.href = audioUrl;
-    link.download = `${chapterTitle}.mp3`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-      setPlayingChapter(null);
-      setCurrentTime(0);
-      setDuration(0);
-    };
-  }, []);
-
-  // Check authentication
-  useEffect(() => {
-    const checkAuth = async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase.auth.getSession();
-
-      if (error || !data.session) {
-        router.push("/auth/login");
-        return;
-      }
-
-      // Check if user is admin
-      const userRole = data.session.user.user_metadata.role || "user";
-      if (userRole !== "admin") {
-        router.push("/");
-      }
-    };
-
-    checkAuth();
-  }, [router]);
 
   if (audioBookLoading) {
     return (
@@ -208,15 +135,6 @@ export default function AudioBookDetailPage() {
   if (audioBookError || !audioBook) {
     notFound();
   }
-
-  const formatDuration = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`;
-  };
 
   const getJobStatusIcon = (jobType: string) => {
     switch (jobType) {
@@ -458,7 +376,6 @@ export default function AudioBookDetailPage() {
                   <TableRow>
                     <TableHead className="w-16">No</TableHead>
                     <TableHead>Title</TableHead>
-                    <TableHead className="w-64">Track</TableHead>
                     <TableHead className="w-32">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -469,41 +386,7 @@ export default function AudioBookDetailPage() {
                         {chapter.chapter_number}
                       </TableCell>
                       <TableCell>{chapter.title}</TableCell>
-                      <TableCell>
-                        <div className="space-y-2">
-                          <Slider
-                            value={[
-                              playingChapter === chapter.id && duration > 0
-                                ? (currentTime / duration) * 100
-                                : 0,
-                            ]}
-                            onValueChange={(value) => {
-                              if (
-                                chapter.file_url &&
-                                playingChapter === chapter.id
-                              ) {
-                                handleSliderChange(value);
-                              }
-                            }}
-                            max={100}
-                            step={0.1}
-                            className="w-full"
-                            disabled={!chapter.file_url}
-                          />
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>
-                              {playingChapter === chapter.id
-                                ? formatDuration(currentTime)
-                                : "0:00:00"}
-                            </span>
-                            <span>
-                              {chapter.duration_seconds
-                                ? formatDuration(chapter.duration_seconds)
-                                : "N/A"}
-                            </span>
-                          </div>
-                        </div>
-                      </TableCell>
+
                       <TableCell>
                         <div className="flex gap-2">
                           {chapter.file_url && (
@@ -519,17 +402,6 @@ export default function AudioBookDetailPage() {
                               ) : (
                                 <Play className="h-4 w-4" />
                               )}
-                            </Button>
-                          )}
-                          {chapter.file_url && (
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={() =>
-                                handleDownload(chapter.file_url!, chapter.title)
-                              }
-                            >
-                              <Download className="h-4 w-4" />
                             </Button>
                           )}
                         </div>
