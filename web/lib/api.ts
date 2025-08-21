@@ -40,6 +40,7 @@ interface AudioBook {
   created_by: string;
   created_at: string;
   updated_at: string;
+  chapters?: Chapter[];
   // Frontend convenience fields
   cover_image?: string; // Alias for cover_image_url
   duration?: number; // Alias for duration_seconds
@@ -50,6 +51,10 @@ interface Chapter {
   audiobook_id: string;
   chapter_number: number;
   title: string;
+  file_path: string;
+  file_url?: string;
+  file_size_bytes?: number;
+  mime_type?: string;
   start_time_seconds?: number;
   end_time_seconds?: number;
   duration_seconds?: number;
@@ -505,6 +510,7 @@ export const audiobooksAPI = {
           started_at?: string;
           completed_at?: string;
           error_message?: string;
+          chapter_id?: string;
         }>;
         overall_status: string;
         progress: number;
