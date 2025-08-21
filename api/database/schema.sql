@@ -14,9 +14,6 @@ CREATE TABLE IF NOT EXISTS audiobooks (
     author VARCHAR(255) NOT NULL,
     summary TEXT,
     duration_seconds INTEGER,
-    file_size_bytes BIGINT,
-    file_path VARCHAR(500) NOT NULL,
-    file_url VARCHAR(500),
     cover_image_url VARCHAR(500),
     language VARCHAR(2) NOT NULL,
     is_public BOOLEAN DEFAULT false,
@@ -32,6 +29,10 @@ CREATE TABLE IF NOT EXISTS chapters (
     audiobook_id UUID NOT NULL REFERENCES audiobooks(id) ON DELETE CASCADE,
     chapter_number INTEGER NOT NULL,
     title VARCHAR(255) NOT NULL,
+    file_path VARCHAR(500) NOT NULL,
+    file_url VARCHAR(500),
+    file_size_bytes BIGINT,
+    mime_type VARCHAR(100),
     start_time_seconds INTEGER,
     end_time_seconds INTEGER,
     duration_seconds INTEGER,
@@ -154,7 +155,10 @@ CREATE TABLE IF NOT EXISTS upload_files (
     chapter_title VARCHAR(255),
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     error TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    retry_count INTEGER DEFAULT 0,
+    max_retries INTEGER DEFAULT 3,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Indexes for better performance
@@ -226,6 +230,9 @@ CREATE TRIGGER update_audiobooks_updated_at BEFORE UPDATE ON audiobooks
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_uploads_updated_at BEFORE UPDATE ON uploads
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_upload_files_updated_at BEFORE UPDATE ON upload_files
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Row Level Security (RLS) policies

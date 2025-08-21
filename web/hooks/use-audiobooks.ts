@@ -21,6 +21,24 @@ export function useAudioBook(id: string) {
   });
 }
 
+// Hook to get job status for an audiobook
+export function useAudioBookJobStatus(id: string) {
+  return useQuery({
+    queryKey: [...audiobookKeys.detail(id), "jobs"],
+    queryFn: () => audiobooksAPI.getJobStatus(id),
+    enabled: !!id,
+    refetchInterval: (data) => {
+      // If still processing, refetch every 5 seconds
+      if (data?.data?.overall_status === "processing") {
+        return 5000;
+      }
+      // If completed or failed, stop refetching
+      return false;
+    },
+    staleTime: 1000 * 30, // 30 seconds
+  });
+}
+
 // Hook to create a new audiobook
 export function useCreateAudioBook() {
   const queryClient = useQueryClient();

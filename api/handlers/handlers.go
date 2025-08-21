@@ -10,7 +10,11 @@ import (
 	"net/http"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
+
+	"mime/multipart"
+	"sync"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -35,65 +39,112 @@ func NewHandler(repo database.Repository, storage *services.SupabaseStorageServi
 // CreateAudioBook creates an audio book from a completed upload session
 // POST /v1/admin/audiobooks
 func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("CreateAudioBook: PANIC recovered: %v", r)
+		}
+	}()
+
+	log.Printf("CreateAudioBook: Request received from IP %s", c.IP())
+	log.Printf("CreateAudioBook: User agent: %s", c.Get("User-Agent"))
+
+	// Log raw request body for debugging
+	body := c.Body()
+	log.Printf("CreateAudioBook: Raw request body: %s", string(body))
+
 	var req models.CreateAudioBookFromUploadRequest
 	if err := c.BodyParser(&req); err != nil {
+		log.Printf("CreateAudioBook: Failed to parse request body: %v", err)
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
 	}
 
+	log.Printf("CreateAudioBook: Request parsed successfully - UploadID: %s, Title: %s, Author: %s, Language: %s, IsPublic: %v",
+		req.UploadID, req.Title, req.Author, req.Language, req.IsPublic)
+
 	if err := req.Validate(); err != nil {
+		log.Printf("CreateAudioBook: Validation failed: %v", err)
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
 			"error": fmt.Sprintf("Validation error: %v", err),
 		})
 	}
 
+	log.Printf("CreateAudioBook: Request validation passed")
+
 	// Get user ID from context
 	userCtx, ok := c.Locals("user").(*models.UserContext)
+	log.Printf("CreateAudioBook: User context: %v", userCtx)
 	if !ok || userCtx == nil {
+		log.Printf("CreateAudioBook: User not authenticated - user context not found in context")
 		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
 			"error": "User not authenticated",
 		})
 	}
+
+	log.Printf("CreateAudioBook: User authenticated - UserID: %s", userCtx.ID)
 	userID := uuid.MustParse(userCtx.ID)
 
 	// Get upload session
+	log.Printf("CreateAudioBook: Looking up upload session with ID: %s", req.UploadID)
 	upload, err := h.repo.GetUploadByID(context.Background(), req.UploadID)
 	if err != nil {
+		log.Printf("CreateAudioBook: Failed to get upload session: %v", err)
+		// Log more details about the error
+		if strings.Contains(err.Error(), "connection") {
+			log.Printf("CreateAudioBook: Database connection error detected")
+		}
 		return c.Status(http.StatusNotFound).JSON(fiber.Map{
 			"error": "Upload session not found",
 		})
 	}
 
+	log.Printf("CreateAudioBook: Upload session found - Status: %s, UserID: %s, UploadType: %s",
+		upload.Status, upload.UserID, upload.UploadType)
+
 	// Check if user owns this upload
+	log.Printf("CreateAudioBook: Checking ownership - Upload UserID: %s, Request UserID: %s", upload.UserID, userID)
 	if upload.UserID != userID {
+		log.Printf("CreateAudioBook: Access denied - user does not own this upload")
 		return c.Status(http.StatusForbidden).JSON(fiber.Map{
 			"error": "Access denied",
 		})
 	}
 
+	log.Printf("CreateAudioBook: Ownership verified")
+
 	// Check if upload is completed
+	log.Printf("CreateAudioBook: Checking upload status - Current: %s, Expected: %s", upload.Status, models.UploadStatusCompleted)
 	if upload.Status != models.UploadStatusCompleted {
+		log.Printf("CreateAudioBook: Upload session is not completed")
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
 			"error": "Upload session is not completed",
 		})
 	}
 
+	log.Printf("CreateAudioBook: Upload status verified as completed")
+
 	// Get upload files
+	log.Printf("CreateAudioBook: Getting upload files for upload ID: %s", req.UploadID)
 	uploadFiles, err := h.repo.GetUploadFiles(context.Background(), req.UploadID)
 	if err != nil {
+		log.Printf("CreateAudioBook: Failed to get upload files: %v", err)
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to get upload files",
 		})
 	}
 
+	log.Printf("CreateAudioBook: Found %d upload files", len(uploadFiles))
+
 	if len(uploadFiles) == 0 {
+		log.Printf("CreateAudioBook: No files found in upload session")
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
 			"error": "No files found in upload session",
 		})
 	}
 
 	// Create audio book
+	log.Printf("CreateAudioBook: Creating audio book with title: %s, author: %s", req.Title, req.Author)
 	audiobook := &models.AudioBook{
 		ID:        uuid.New(),
 		Title:     req.Title,
@@ -117,22 +168,40 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 	}
 
 	// Handle different upload types
+	log.Printf("CreateAudioBook: Processing upload type: %s", upload.UploadType)
+	var chapters []*models.Chapter
+
 	if upload.UploadType == models.UploadTypeSingle {
-		// Single file upload
+		// Single file upload - create one chapter
+		log.Printf("CreateAudioBook: Processing single file upload")
 		if len(uploadFiles) != 1 {
+			log.Printf("CreateAudioBook: Single upload type requires exactly one file, found %d", len(uploadFiles))
 			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
 				"error": "Single upload type requires exactly one file",
 			})
 		}
 
 		file := uploadFiles[0]
-		audiobook.FilePath = file.FilePath
-		audiobook.FileSizeBytes = &file.FileSize
-		audiobook.DurationSeconds = nil
+		log.Printf("CreateAudioBook: Creating single chapter with file: %s, size: %d", file.FilePath, file.FileSize)
+
+		chapter := &models.Chapter{
+			ID:            uuid.New(),
+			AudiobookID:   audiobook.ID,
+			ChapterNumber: 1,
+			Title:         req.Title, // Use audiobook title for single file
+			FilePath:      file.FilePath,
+			FileURL:       &file.FilePath, // For now, use file path as URL
+			FileSizeBytes: &file.FileSize,
+			MimeType:      &file.MimeType,
+			CreatedAt:     time.Now(),
+		}
+		chapters = append(chapters, chapter)
 
 	} else if upload.UploadType == models.UploadTypeChapters {
 		// Chaptered upload
+		log.Printf("CreateAudioBook: Processing chaptered upload")
 		if len(uploadFiles) == 0 {
+			log.Printf("CreateAudioBook: No chapter files found")
 			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
 				"error": "No chapter files found",
 			})
@@ -140,31 +209,28 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 
 		// Sort files by chapter number
 		chapterFiles := make(map[int]*models.UploadFile)
-		var totalSize int64
 		for _, file := range uploadFiles {
+			log.Printf("CreateAudioBook: Processing file: %s, chapter number: %v", file.FileName, file.ChapterNumber)
 			if file.ChapterNumber == nil {
+				log.Printf("CreateAudioBook: File %s missing chapter number", file.FileName)
 				return c.Status(http.StatusBadRequest).JSON(fiber.Map{
 					"error": "All files must have chapter numbers for chaptered uploads",
 				})
 			}
 			chapterFiles[*file.ChapterNumber] = &file
-			totalSize += file.FileSize
 		}
 
-		// Use the first chapter file as the main file path
-		firstChapter := chapterFiles[1]
-		if firstChapter == nil {
+		log.Printf("CreateAudioBook: Processed %d chapter files", len(chapterFiles))
+
+		// Check if chapter 1 exists
+		if chapterFiles[1] == nil {
+			log.Printf("CreateAudioBook: Chapter 1 is required but not found")
 			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
 				"error": "Chapter 1 is required",
 			})
 		}
 
-		audiobook.FilePath = firstChapter.FilePath
-		audiobook.FileSizeBytes = &totalSize
-		audiobook.DurationSeconds = nil
-
 		// Create chapter records
-		chapters := make([]*models.Chapter, 0, len(chapterFiles))
 		for chapterNum, file := range chapterFiles {
 			chapterTitle := file.FileName
 			if file.ChapterTitle != nil && *file.ChapterTitle != "" {
@@ -176,29 +242,40 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 				AudiobookID:   audiobook.ID,
 				ChapterNumber: chapterNum,
 				Title:         chapterTitle,
+				FilePath:      file.FilePath,
+				FileURL:       &file.FilePath, // For now, use file path as URL
+				FileSizeBytes: &file.FileSize,
+				MimeType:      &file.MimeType,
 				CreatedAt:     time.Now(),
 			}
 			chapters = append(chapters, chapter)
 		}
-
-		// Save chapters to database
-		for _, chapter := range chapters {
-			if err := h.repo.CreateChapter(context.Background(), chapter); err != nil {
-				return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-					"error": "Failed to create chapter",
-				})
-			}
-		}
 	}
 
-	// Save audio book to database
+	// Save audio book to database first (required for foreign key constraint)
+	log.Printf("CreateAudioBook: Saving audio book to database with ID: %s", audiobook.ID)
 	if err := h.repo.CreateAudioBook(context.Background(), audiobook); err != nil {
+		log.Printf("CreateAudioBook: Failed to create audio book in database: %v", err)
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to create audio book",
 		})
 	}
+	log.Printf("CreateAudioBook: Audio book saved to database successfully")
+
+	// Save chapters to database
+	log.Printf("CreateAudioBook: Creating %d chapters in database", len(chapters))
+	for _, chapter := range chapters {
+		if err := h.repo.CreateChapter(context.Background(), chapter); err != nil {
+			log.Printf("CreateAudioBook: Failed to create chapter %d: %v", chapter.ChapterNumber, err)
+			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to create chapter",
+			})
+		}
+	}
+	log.Printf("CreateAudioBook: All chapters created successfully")
 
 	// Create processing jobs and enqueue them to Redis
+	log.Printf("CreateAudioBook: Creating processing jobs")
 	jobTypes := []models.JobType{
 		models.JobTypeTranscribe,
 		models.JobTypeSummarize,
@@ -208,6 +285,7 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 
 	jobsCreated := 0
 	for _, jobType := range jobTypes {
+		log.Printf("CreateAudioBook: Creating job of type: %s", jobType)
 		job := &models.ProcessingJob{
 			ID:          uuid.New(),
 			AudiobookID: audiobook.ID,
@@ -218,42 +296,54 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 
 		// Save job to database
 		if err := h.repo.CreateProcessingJob(context.Background(), job); err != nil {
+			log.Printf("CreateAudioBook: Failed to create processing job %s: %v", jobType, err)
 			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
 				"error": "Failed to create processing job",
 			})
 		}
+		log.Printf("CreateAudioBook: Job %s created in database", jobType)
 
 		// Enqueue job to Redis if Redis service is available
 		if h.redisQueue != nil {
 			var enqueueErr error
 			if jobType == models.JobTypeTranscribe {
-				// For transcription jobs, pass the file path
-				enqueueErr = h.redisQueue.EnqueueTranscriptionJob(context.Background(), job, audiobook.FilePath)
+				// For transcription jobs, pass the first chapter's file path
+				// Since we always create at least one chapter, we can use the first one
+				firstChapterFilePath := chapters[0].FilePath
+				log.Printf("CreateAudioBook: Enqueueing transcription job with file path: %s", firstChapterFilePath)
+				enqueueErr = h.redisQueue.EnqueueTranscriptionJob(context.Background(), job, firstChapterFilePath)
 			} else {
 				// For other AI jobs, don't pass file path
+				log.Printf("CreateAudioBook: Enqueueing AI job: %s", jobType)
 				enqueueErr = h.redisQueue.EnqueueAIJob(context.Background(), job)
 			}
 
 			if enqueueErr != nil {
-				log.Printf("Failed to enqueue job %s to Redis: %v", jobType, enqueueErr)
+				log.Printf("CreateAudioBook: Failed to enqueue job %s to Redis: %v", jobType, enqueueErr)
 				// Continue with other jobs even if one fails to enqueue
 			} else {
+				log.Printf("CreateAudioBook: Job %s enqueued to Redis successfully", jobType)
 				jobsCreated++
 			}
 		} else {
-			log.Printf("Redis queue service not available, job %s created in database only", jobType)
+			log.Printf("CreateAudioBook: Redis queue service not available, job %s created in database only", jobType)
 			jobsCreated++
 		}
 	}
 
 	// Update upload status to indicate it's been processed
+	log.Printf("CreateAudioBook: Updating upload status to processed")
 	upload.Status = "processed"
 	upload.UpdatedAt = time.Now()
 	if err := h.repo.UpdateUpload(context.Background(), upload); err != nil {
 		// Log error but don't fail the request
-		fmt.Printf("Failed to update upload status: %v\n", err)
+		log.Printf("CreateAudioBook: Failed to update upload status: %v", err)
+	} else {
+		log.Printf("CreateAudioBook: Upload status updated successfully")
 	}
 
+	log.Printf("CreateAudioBook: Request completed successfully - AudioBookID: %s, JobsCreated: %d/%d",
+		audiobook.ID, jobsCreated, len(jobTypes))
 	return c.Status(http.StatusCreated).JSON(fiber.Map{
 		"audiobook_id": audiobook.ID,
 		"status":       audiobook.Status,
@@ -441,7 +531,7 @@ func (h *Handler) UploadFile(c *fiber.Ctx) error {
 		FilePath:      fileURL, // Store the Supabase Storage URL
 		ChapterNumber: chapterNumber,
 		ChapterTitle:  &chapterTitle,
-		Status:        models.UploadStatusCompleted,
+		Status:        models.FileUploadStatusCompleted,
 		CreatedAt:     time.Now(),
 	}
 
@@ -464,7 +554,229 @@ func (h *Handler) UploadFile(c *fiber.Ctx) error {
 
 	if upload.UploadedFiles >= upload.TotalFiles {
 		upload.Status = models.UploadStatusCompleted
-		log.Printf("UploadFile: Upload session completed")
+		log.Printf("UploadFile: Upload session completed - Status set to: %s", upload.Status)
+	} else {
+		upload.Status = models.UploadStatusUploading
+		log.Printf("UploadFile: Upload session still in progress - Status set to: %s", upload.Status)
+	}
+
+	log.Printf("UploadFile: Updating upload session in database with status: %s", upload.Status)
+	if err := h.repo.UpdateUpload(context.Background(), upload); err != nil {
+		log.Printf("UploadFile: Failed to update upload session: %v", err)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to update upload session",
+		})
+	}
+	log.Printf("UploadFile: Upload session updated successfully in database")
+
+	return c.Status(http.StatusCreated).JSON(models.FileUploadResponse{
+		FileID:        uploadFile.ID,
+		UploadID:      uploadID,
+		FileName:      uploadFile.FileName,
+		FileSize:      uploadFile.FileSize,
+		UploadedAt:    uploadFile.CreatedAt,
+		ChapterNumber: uploadFile.ChapterNumber,
+		ChapterTitle:  uploadFile.ChapterTitle,
+	})
+}
+
+// UploadFilesBatch uploads multiple files in parallel with retry logic
+// POST /v1/admin/uploads/:id/files/batch
+func (h *Handler) UploadFilesBatch(c *fiber.Ctx) error {
+	uploadID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid upload ID",
+		})
+	}
+
+	// Get user ID from context
+	userCtx, ok := c.Locals("user").(*models.UserContext)
+	if !ok || userCtx == nil {
+		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "User not authenticated",
+		})
+	}
+
+	// Get upload session
+	upload, err := h.repo.GetUploadByID(context.Background(), uploadID)
+	if err != nil {
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{
+			"error": "Upload session not found",
+		})
+	}
+
+	// Check if user owns this upload
+	if upload.UserID != uuid.MustParse(userCtx.ID) {
+		return c.Status(http.StatusForbidden).JSON(fiber.Map{
+			"error": "Access denied",
+		})
+	}
+
+	// Parse multipart form
+	form, err := c.MultipartForm()
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid multipart form",
+		})
+	}
+
+	files := form.File["files"]
+	chapterNumbers := form.Value["chapter_numbers"]
+	chapterTitles := form.Value["chapter_titles"]
+
+	if len(files) == 0 {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "No files provided",
+		})
+	}
+
+	// Validate arrays have same length
+	if len(chapterNumbers) != len(files) || len(chapterTitles) != len(files) {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Mismatched array lengths",
+		})
+	}
+
+	// Create a channel to collect results
+	type uploadResult struct {
+		index    int
+		file     *multipart.FileHeader
+		response *models.FileUploadResponse
+		error    error
+	}
+
+	resultChan := make(chan uploadResult, len(files))
+	var wg sync.WaitGroup
+
+	// Upload files in parallel
+	for i, file := range files {
+		wg.Add(1)
+		go func(index int, file *multipart.FileHeader) {
+			defer wg.Done()
+
+			// Parse chapter number
+			var chapterNumber *int
+			if chapterNumbers[index] != "" {
+				if num, err := strconv.Atoi(chapterNumbers[index]); err == nil {
+					chapterNumber = &num
+				}
+			}
+
+			chapterTitle := chapterTitles[index]
+
+			// Validate file size
+			if file.Size > 500*1024*1024 { // 500MB limit
+				resultChan <- uploadResult{
+					index: index,
+					file:  file,
+					error: fmt.Errorf("file too large (max 500MB)"),
+				}
+				return
+			}
+
+			// Validate file type
+			if err := h.storage.ValidateFileType(file.Filename); err != nil {
+				resultChan <- uploadResult{
+					index: index,
+					file:  file,
+					error: err,
+				}
+				return
+			}
+
+			// Generate unique filename
+			fileExt := filepath.Ext(file.Filename)
+			fileName := fmt.Sprintf("%s%s", uuid.New().String(), fileExt)
+
+			// Upload file to Supabase Storage
+			fileURL, err := h.storage.UploadFile(file, uploadID.String(), fileName)
+			if err != nil {
+				resultChan <- uploadResult{
+					index: index,
+					file:  file,
+					error: fmt.Errorf("failed to upload file to storage: %v", err),
+				}
+				return
+			}
+
+			// Create upload file record
+			uploadFile := &models.UploadFile{
+				ID:            uuid.New(),
+				UploadID:      uploadID,
+				FileName:      file.Filename,
+				FileSize:      file.Size,
+				MimeType:      file.Header.Get("Content-Type"),
+				FilePath:      fileURL,
+				ChapterNumber: chapterNumber,
+				ChapterTitle:  &chapterTitle,
+				Status:        models.FileUploadStatusCompleted,
+				RetryCount:    0,
+				MaxRetries:    3,
+				CreatedAt:     time.Now(),
+				UpdatedAt:     time.Now(),
+			}
+
+			if err := h.repo.CreateUploadFile(context.Background(), uploadFile); err != nil {
+				// Clean up file from Supabase Storage if database insert fails
+				if err := h.storage.DeleteFile(uploadID.String(), fileName); err != nil {
+					log.Printf("UploadFilesBatch: Failed to delete file from storage after database error: %v", err)
+				}
+				resultChan <- uploadResult{
+					index: index,
+					file:  file,
+					error: fmt.Errorf("failed to save file metadata: %v", err),
+				}
+				return
+			}
+
+			resultChan <- uploadResult{
+				index: index,
+				file:  file,
+				response: &models.FileUploadResponse{
+					FileID:        uploadFile.ID,
+					UploadID:      uploadID,
+					FileName:      uploadFile.FileName,
+					FileSize:      uploadFile.FileSize,
+					Status:        uploadFile.Status,
+					RetryCount:    uploadFile.RetryCount,
+					UploadedAt:    uploadFile.CreatedAt,
+					ChapterNumber: uploadFile.ChapterNumber,
+					ChapterTitle:  uploadFile.ChapterTitle,
+				},
+			}
+		}(i, file)
+	}
+
+	// Wait for all uploads to complete
+	wg.Wait()
+	close(resultChan)
+
+	// Collect results
+	var responses []models.FileUploadResponse
+	var errors []string
+	successCount := 0
+	failedCount := 0
+
+	for result := range resultChan {
+		if result.error != nil {
+			failedCount++
+			errors = append(errors, fmt.Sprintf("File %s: %v", result.file.Filename, result.error))
+		} else {
+			successCount++
+			responses = append(responses, *result.response)
+		}
+	}
+
+	// Update upload session
+	upload.UploadedFiles += successCount
+	upload.TotalSize += int64(successCount) * 1024 // Approximate size for now
+	upload.UpdatedAt = time.Now()
+
+	if upload.UploadedFiles >= upload.TotalFiles {
+		upload.Status = models.UploadStatusCompleted
+	} else if failedCount > 0 {
+		upload.Status = models.UploadStatusRetrying
 	} else {
 		upload.Status = models.UploadStatusUploading
 	}
@@ -475,14 +787,108 @@ func (h *Handler) UploadFile(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.Status(http.StatusCreated).JSON(models.FileUploadResponse{
-		FileID:        uploadFile.ID,
+	return c.Status(http.StatusOK).JSON(models.BatchUploadResponse{
 		UploadID:      uploadID,
-		FileName:      uploadFile.FileName,
-		FileSize:      uploadFile.FileSize,
-		UploadedAt:    uploadFile.CreatedAt,
-		ChapterNumber: uploadFile.ChapterNumber,
-		ChapterTitle:  uploadFile.ChapterTitle,
+		TotalFiles:    len(files),
+		SuccessCount:  successCount,
+		FailedCount:   failedCount,
+		RetryingCount: 0,
+		Files:         responses,
+		Errors:        errors,
+	})
+}
+
+// RetryFailedUpload retries a failed file upload
+// POST /v1/admin/uploads/:id/files/:file_id/retry
+func (h *Handler) RetryFailedUpload(c *fiber.Ctx) error {
+	uploadID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid upload ID",
+		})
+	}
+
+	fileID, err := uuid.Parse(c.Params("file_id"))
+	if err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid file ID",
+		})
+	}
+
+	// Get user ID from context
+	userCtx, ok := c.Locals("user").(*models.UserContext)
+	if !ok || userCtx == nil {
+		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "User not authenticated",
+		})
+	}
+
+	// Get upload session
+	upload, err := h.repo.GetUploadByID(context.Background(), uploadID)
+	if err != nil {
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{
+			"error": "Upload session not found",
+		})
+	}
+
+	// Check if user owns this upload
+	if upload.UserID != uuid.MustParse(userCtx.ID) {
+		return c.Status(http.StatusForbidden).JSON(fiber.Map{
+			"error": "Access denied",
+		})
+	}
+
+	// Get upload file
+	uploadFile, err := h.repo.GetUploadFileByID(context.Background(), fileID)
+	if err != nil {
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{
+			"error": "Upload file not found",
+		})
+	}
+
+	// Check if file belongs to this upload
+	if uploadFile.UploadID != uploadID {
+		return c.Status(http.StatusForbidden).JSON(fiber.Map{
+			"error": "File does not belong to this upload",
+		})
+	}
+
+	// Check if file is in failed status
+	if uploadFile.Status != models.FileUploadStatusFailed {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "File is not in failed status",
+		})
+	}
+
+	// Check retry limit
+	if uploadFile.RetryCount >= uploadFile.MaxRetries {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Maximum retry attempts exceeded",
+		})
+	}
+
+	// Increment retry count
+	if err := h.repo.IncrementUploadFileRetryCount(context.Background(), fileID); err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to update retry count",
+		})
+	}
+
+	// Update file status to retrying
+	uploadFile.Status = models.FileUploadStatusRetrying
+	uploadFile.RetryCount++
+	uploadFile.UpdatedAt = time.Now()
+
+	if err := h.repo.UpdateUploadFile(context.Background(), uploadFile); err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to update file status",
+		})
+	}
+
+	return c.Status(http.StatusOK).JSON(fiber.Map{
+		"message":     "Retry initiated",
+		"file_id":     fileID,
+		"retry_count": uploadFile.RetryCount,
 	})
 }
 
@@ -520,6 +926,29 @@ func (h *Handler) GetUploadProgress(c *fiber.Ctx) error {
 		})
 	}
 
+	// Get upload files
+	files, err := h.repo.GetUploadFiles(context.Background(), uploadID)
+	if err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get upload files",
+		})
+	}
+
+	// Get failed and retrying files
+	failedFiles, err := h.repo.GetFailedUploadFiles(context.Background(), uploadID)
+	if err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get failed files",
+		})
+	}
+
+	retryingFiles, err := h.repo.GetRetryingUploadFiles(context.Background(), uploadID)
+	if err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get retrying files",
+		})
+	}
+
 	// Calculate uploaded size
 	uploadedSize, err := h.repo.GetUploadedSize(context.Background(), uploadID)
 	if err != nil {
@@ -530,14 +959,33 @@ func (h *Handler) GetUploadProgress(c *fiber.Ctx) error {
 
 	progress := upload.GetProgress()
 
+	// Convert files to file info format
+	fileInfos := make([]models.UploadFileInfo, len(files))
+	for i, file := range files {
+		fileInfos[i] = models.UploadFileInfo{
+			ID:            file.ID,
+			FileName:      file.FileName,
+			FileSize:      file.FileSize,
+			MimeType:      file.MimeType,
+			ChapterNumber: file.ChapterNumber,
+			ChapterTitle:  file.ChapterTitle,
+			Status:        file.Status,
+			Error:         file.Error,
+			UploadedAt:    file.CreatedAt,
+		}
+	}
+
 	return c.JSON(models.UploadProgressResponse{
 		UploadID:      uploadID,
 		Status:        upload.Status,
 		TotalFiles:    upload.TotalFiles,
 		UploadedFiles: upload.UploadedFiles,
+		FailedFiles:   len(failedFiles),
+		RetryingFiles: len(retryingFiles),
 		Progress:      progress,
 		TotalSize:     upload.TotalSize,
 		UploadedSize:  uploadedSize,
+		Files:         fileInfos,
 	})
 }
 

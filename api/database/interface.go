@@ -107,6 +107,10 @@ type Repository interface {
 	DeleteUploadFile(ctx context.Context, id uuid.UUID) error
 	DeleteUploadFilesByUploadID(ctx context.Context, uploadID uuid.UUID) error
 	GetUploadedSize(ctx context.Context, uploadID uuid.UUID) (int64, error)
+	GetFailedUploadFiles(ctx context.Context, uploadID uuid.UUID) ([]models.UploadFile, error)
+	GetRetryingUploadFiles(ctx context.Context, uploadID uuid.UUID) ([]models.UploadFile, error)
+	IncrementUploadFileRetryCount(ctx context.Context, fileID uuid.UUID) error
+	ResetUploadFileRetryCount(ctx context.Context, fileID uuid.UUID) error
 
 	// Search operations
 	SearchAudioBooks(ctx context.Context, query string, limit, offset int, language *string, isPublic *bool) ([]models.AudioBook, int, error)

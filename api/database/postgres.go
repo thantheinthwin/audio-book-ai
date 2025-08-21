@@ -75,6 +75,8 @@ func (p *PostgresRepository) GetUploadByID(ctx context.Context, id uuid.UUID) (*
 		WHERE id = $1
 	`
 
+	fmt.Printf("GetUploadByID: Executing query for upload ID: %s\n", id)
+
 	var upload models.Upload
 	err := p.pool.QueryRow(ctx, query, id).Scan(
 		&upload.ID,
@@ -90,11 +92,15 @@ func (p *PostgresRepository) GetUploadByID(ctx context.Context, id uuid.UUID) (*
 
 	if err != nil {
 		if err == pgx.ErrNoRows {
+			fmt.Printf("GetUploadByID: Upload not found for ID: %s\n", id)
 			return nil, ErrNotFound
 		}
+		fmt.Printf("GetUploadByID: Database error for ID %s: %v\n", id, err)
 		return nil, fmt.Errorf("failed to get upload: %w", err)
 	}
 
+	fmt.Printf("GetUploadByID: Successfully retrieved upload - ID: %s, Status: %s, UserID: %s\n",
+		upload.ID, upload.Status, upload.UserID)
 	return &upload, nil
 }
 
@@ -152,6 +158,8 @@ func (p *PostgresRepository) UpdateUpload(ctx context.Context, upload *models.Up
 		WHERE id = $1
 	`
 
+	fmt.Printf("UpdateUpload: Executing update for upload ID: %s, Status: %s\n", upload.ID, upload.Status)
+
 	now := time.Now()
 	result, err := p.pool.Exec(ctx, query,
 		upload.ID,
@@ -164,14 +172,17 @@ func (p *PostgresRepository) UpdateUpload(ctx context.Context, upload *models.Up
 	)
 
 	if err != nil {
+		fmt.Printf("UpdateUpload: Database error for upload ID %s: %v\n", upload.ID, err)
 		return fmt.Errorf("failed to update upload: %w", err)
 	}
 
 	if result.RowsAffected() == 0 {
+		fmt.Printf("UpdateUpload: No rows affected for upload ID: %s\n", upload.ID)
 		return ErrNotFound
 	}
 
 	upload.UpdatedAt = now
+	fmt.Printf("UpdateUpload: Successfully updated upload with ID: %s\n", upload.ID)
 	return nil
 }
 
@@ -193,8 +204,8 @@ func (p *PostgresRepository) DeleteUpload(ctx context.Context, id uuid.UUID) err
 // Upload File operations
 func (p *PostgresRepository) CreateUploadFile(ctx context.Context, uploadFile *models.UploadFile) error {
 	query := `
-		INSERT INTO upload_files (id, upload_id, file_name, file_size_bytes, mime_type, file_path, chapter_number, chapter_title, status, error, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		INSERT INTO upload_files (id, upload_id, file_name, file_size_bytes, mime_type, file_path, chapter_number, chapter_title, status, error, retry_count, max_retries, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 	`
 
 	now := time.Now()
@@ -209,6 +220,9 @@ func (p *PostgresRepository) CreateUploadFile(ctx context.Context, uploadFile *m
 		uploadFile.ChapterTitle,
 		uploadFile.Status,
 		uploadFile.Error,
+		uploadFile.RetryCount,
+		uploadFile.MaxRetries,
+		now,
 		now,
 	)
 
@@ -217,12 +231,13 @@ func (p *PostgresRepository) CreateUploadFile(ctx context.Context, uploadFile *m
 	}
 
 	uploadFile.CreatedAt = now
+	uploadFile.UpdatedAt = now
 	return nil
 }
 
 func (p *PostgresRepository) GetUploadFileByID(ctx context.Context, id uuid.UUID) (*models.UploadFile, error) {
 	query := `
-		SELECT id, upload_id, file_name, file_size_bytes, mime_type, file_path, chapter_number, chapter_title, status, error, created_at
+		SELECT id, upload_id, file_name, file_size_bytes, mime_type, file_path, chapter_number, chapter_title, status, error, retry_count, max_retries, created_at, updated_at
 		FROM upload_files
 		WHERE id = $1
 	`
@@ -239,7 +254,10 @@ func (p *PostgresRepository) GetUploadFileByID(ctx context.Context, id uuid.UUID
 		&uploadFile.ChapterTitle,
 		&uploadFile.Status,
 		&uploadFile.Error,
+		&uploadFile.RetryCount,
+		&uploadFile.MaxRetries,
 		&uploadFile.CreatedAt,
+		&uploadFile.UpdatedAt,
 	)
 
 	if err != nil {
@@ -254,14 +272,17 @@ func (p *PostgresRepository) GetUploadFileByID(ctx context.Context, id uuid.UUID
 
 func (p *PostgresRepository) GetUploadFiles(ctx context.Context, uploadID uuid.UUID) ([]models.UploadFile, error) {
 	query := `
-		SELECT id, upload_id, file_name, file_size_bytes, mime_type, file_path, chapter_number, chapter_title, status, error, created_at
+		SELECT id, upload_id, file_name, file_size_bytes, mime_type, file_path, chapter_number, chapter_title, status, error, retry_count, max_retries, created_at, updated_at
 		FROM upload_files
 		WHERE upload_id = $1
 		ORDER BY chapter_number NULLS LAST, created_at
 	`
 
+	fmt.Printf("GetUploadFiles: Executing query for upload ID: %s\n", uploadID)
+
 	rows, err := p.pool.Query(ctx, query, uploadID)
 	if err != nil {
+		fmt.Printf("GetUploadFiles: Database error for upload ID %s: %v\n", uploadID, err)
 		return nil, fmt.Errorf("failed to query upload files: %w", err)
 	}
 	defer rows.Close()
@@ -280,21 +301,26 @@ func (p *PostgresRepository) GetUploadFiles(ctx context.Context, uploadID uuid.U
 			&file.ChapterTitle,
 			&file.Status,
 			&file.Error,
+			&file.RetryCount,
+			&file.MaxRetries,
 			&file.CreatedAt,
+			&file.UpdatedAt,
 		)
 		if err != nil {
+			fmt.Printf("GetUploadFiles: Failed to scan upload file: %v\n", err)
 			return nil, fmt.Errorf("failed to scan upload file: %w", err)
 		}
 		files = append(files, file)
 	}
 
+	fmt.Printf("GetUploadFiles: Found %d files for upload ID: %s\n", len(files), uploadID)
 	return files, nil
 }
 
 func (p *PostgresRepository) UpdateUploadFile(ctx context.Context, uploadFile *models.UploadFile) error {
 	query := `
 		UPDATE upload_files
-		SET file_name = $2, file_size_bytes = $3, mime_type = $4, file_path = $5, chapter_number = $6, chapter_title = $7, status = $8, error = $9
+		SET file_name = $2, file_size_bytes = $3, mime_type = $4, file_path = $5, chapter_number = $6, chapter_title = $7, status = $8, error = $9, retry_count = $10, max_retries = $11, updated_at = $12
 		WHERE id = $1
 	`
 
@@ -308,6 +334,9 @@ func (p *PostgresRepository) UpdateUploadFile(ctx context.Context, uploadFile *m
 		uploadFile.ChapterTitle,
 		uploadFile.Status,
 		uploadFile.Error,
+		uploadFile.RetryCount,
+		uploadFile.MaxRetries,
+		time.Now(),
 	)
 
 	if err != nil {
@@ -359,12 +388,136 @@ func (p *PostgresRepository) GetUploadedSize(ctx context.Context, uploadID uuid.
 	return totalSize, nil
 }
 
+func (p *PostgresRepository) GetFailedUploadFiles(ctx context.Context, uploadID uuid.UUID) ([]models.UploadFile, error) {
+	query := `
+		SELECT id, upload_id, file_name, file_size_bytes, mime_type, file_path, chapter_number, chapter_title, status, error, retry_count, max_retries, created_at, updated_at
+		FROM upload_files
+		WHERE upload_id = $1 AND status = 'failed'
+		ORDER BY chapter_number NULLS LAST, created_at
+	`
+
+	rows, err := p.pool.Query(ctx, query, uploadID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query failed upload files: %w", err)
+	}
+	defer rows.Close()
+
+	var files []models.UploadFile
+	for rows.Next() {
+		var file models.UploadFile
+		err := rows.Scan(
+			&file.ID,
+			&file.UploadID,
+			&file.FileName,
+			&file.FileSize,
+			&file.MimeType,
+			&file.FilePath,
+			&file.ChapterNumber,
+			&file.ChapterTitle,
+			&file.Status,
+			&file.Error,
+			&file.RetryCount,
+			&file.MaxRetries,
+			&file.CreatedAt,
+			&file.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan upload file: %w", err)
+		}
+		files = append(files, file)
+	}
+
+	return files, nil
+}
+
+func (p *PostgresRepository) GetRetryingUploadFiles(ctx context.Context, uploadID uuid.UUID) ([]models.UploadFile, error) {
+	query := `
+		SELECT id, upload_id, file_name, file_size_bytes, mime_type, file_path, chapter_number, chapter_title, status, error, retry_count, max_retries, created_at, updated_at
+		FROM upload_files
+		WHERE upload_id = $1 AND status = 'retrying'
+		ORDER BY chapter_number NULLS LAST, created_at
+	`
+
+	rows, err := p.pool.Query(ctx, query, uploadID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query retrying upload files: %w", err)
+	}
+	defer rows.Close()
+
+	var files []models.UploadFile
+	for rows.Next() {
+		var file models.UploadFile
+		err := rows.Scan(
+			&file.ID,
+			&file.UploadID,
+			&file.FileName,
+			&file.FileSize,
+			&file.MimeType,
+			&file.FilePath,
+			&file.ChapterNumber,
+			&file.ChapterTitle,
+			&file.Status,
+			&file.Error,
+			&file.RetryCount,
+			&file.MaxRetries,
+			&file.CreatedAt,
+			&file.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan upload file: %w", err)
+		}
+		files = append(files, file)
+	}
+
+	return files, nil
+}
+
+func (p *PostgresRepository) IncrementUploadFileRetryCount(ctx context.Context, fileID uuid.UUID) error {
+	query := `
+		UPDATE upload_files
+		SET retry_count = retry_count + 1, updated_at = NOW()
+		WHERE id = $1
+	`
+
+	result, err := p.pool.Exec(ctx, query, fileID)
+	if err != nil {
+		return fmt.Errorf("failed to increment retry count: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
+func (p *PostgresRepository) ResetUploadFileRetryCount(ctx context.Context, fileID uuid.UUID) error {
+	query := `
+		UPDATE upload_files
+		SET retry_count = 0, updated_at = NOW()
+		WHERE id = $1
+	`
+
+	result, err := p.pool.Exec(ctx, query, fileID)
+	if err != nil {
+		return fmt.Errorf("failed to reset retry count: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
 // Stub implementations for other interface methods (to be implemented as needed)
 func (p *PostgresRepository) CreateAudioBook(ctx context.Context, audiobook *models.AudioBook) error {
 	query := `
-		INSERT INTO audiobooks (id, title, author, summary, duration_seconds, file_size_bytes, file_path, file_url, cover_image_url, language, is_public, status, created_by, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+		INSERT INTO audiobooks (id, title, author, summary, duration_seconds, cover_image_url, language, is_public, status, created_by, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
+
+	fmt.Printf("CreateAudioBook: Executing insert for audiobook ID: %s, Title: %s\n", audiobook.ID, audiobook.Title)
 
 	now := time.Now()
 	_, err := p.pool.Exec(ctx, query,
@@ -373,9 +526,6 @@ func (p *PostgresRepository) CreateAudioBook(ctx context.Context, audiobook *mod
 		audiobook.Author,
 		audiobook.Summary,
 		audiobook.DurationSeconds,
-		audiobook.FileSizeBytes,
-		audiobook.FilePath,
-		audiobook.FileURL,
 		audiobook.CoverImageURL,
 		audiobook.Language,
 		audiobook.IsPublic,
@@ -386,17 +536,19 @@ func (p *PostgresRepository) CreateAudioBook(ctx context.Context, audiobook *mod
 	)
 
 	if err != nil {
+		fmt.Printf("CreateAudioBook: Database error for audiobook ID %s: %v\n", audiobook.ID, err)
 		return fmt.Errorf("failed to create audiobook: %w", err)
 	}
 
 	audiobook.CreatedAt = now
 	audiobook.UpdatedAt = now
+	fmt.Printf("CreateAudioBook: Successfully created audiobook with ID: %s\n", audiobook.ID)
 	return nil
 }
 
 func (p *PostgresRepository) GetAudioBookByID(ctx context.Context, id uuid.UUID) (*models.AudioBook, error) {
 	query := `
-		SELECT id, title, author, summary, duration_seconds, file_size_bytes, file_path, file_url, cover_image_url, language, is_public, status, created_by, created_at, updated_at
+		SELECT id, title, author, summary, duration_seconds, cover_image_url, language, is_public, status, created_by, created_at, updated_at
 		FROM audiobooks
 		WHERE id = $1
 	`
@@ -408,9 +560,6 @@ func (p *PostgresRepository) GetAudioBookByID(ctx context.Context, id uuid.UUID)
 		&audiobook.Author,
 		&audiobook.Summary,
 		&audiobook.DurationSeconds,
-		&audiobook.FileSizeBytes,
-		&audiobook.FilePath,
-		&audiobook.FileURL,
 		&audiobook.CoverImageURL,
 		&audiobook.Language,
 		&audiobook.IsPublic,
@@ -437,9 +586,9 @@ func (p *PostgresRepository) GetAudioBookWithDetails(ctx context.Context, id uui
 func (p *PostgresRepository) UpdateAudioBook(ctx context.Context, audiobook *models.AudioBook) error {
 	query := `
 		UPDATE audiobooks 
-		SET title = $2, author = $3, summary = $4, duration_seconds = $5, file_size_bytes = $6, 
-		    file_path = $7, file_url = $8, cover_image_url = $9, language = $10, is_public = $11, 
-		    status = $12, updated_at = $13
+		SET title = $2, author = $3, summary = $4, duration_seconds = $5, 
+		    cover_image_url = $6, language = $7, is_public = $8, 
+		    status = $9, updated_at = $10
 		WHERE id = $1
 	`
 
@@ -450,9 +599,6 @@ func (p *PostgresRepository) UpdateAudioBook(ctx context.Context, audiobook *mod
 		audiobook.Author,
 		audiobook.Summary,
 		audiobook.DurationSeconds,
-		audiobook.FileSizeBytes,
-		audiobook.FilePath,
-		audiobook.FileURL,
 		audiobook.CoverImageURL,
 		audiobook.Language,
 		audiobook.IsPublic,
@@ -586,9 +732,12 @@ func (p *PostgresRepository) CheckAndUpdateAudioBookStatus(ctx context.Context, 
 
 func (p *PostgresRepository) CreateChapter(ctx context.Context, chapter *models.Chapter) error {
 	query := `
-		INSERT INTO chapters (id, audiobook_id, chapter_number, title, start_time_seconds, end_time_seconds, duration_seconds, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO chapters (id, audiobook_id, chapter_number, title, file_path, file_url, file_size_bytes, mime_type, start_time_seconds, end_time_seconds, duration_seconds, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
+
+	fmt.Printf("CreateChapter: Executing insert for chapter ID: %s, AudiobookID: %s, ChapterNumber: %d\n",
+		chapter.ID, chapter.AudiobookID, chapter.ChapterNumber)
 
 	now := time.Now()
 	_, err := p.pool.Exec(ctx, query,
@@ -596,6 +745,10 @@ func (p *PostgresRepository) CreateChapter(ctx context.Context, chapter *models.
 		chapter.AudiobookID,
 		chapter.ChapterNumber,
 		chapter.Title,
+		chapter.FilePath,
+		chapter.FileURL,
+		chapter.FileSizeBytes,
+		chapter.MimeType,
 		chapter.StartTime,
 		chapter.EndTime,
 		chapter.DurationSeconds,
@@ -603,10 +756,12 @@ func (p *PostgresRepository) CreateChapter(ctx context.Context, chapter *models.
 	)
 
 	if err != nil {
+		fmt.Printf("CreateChapter: Database error for chapter ID %s: %v\n", chapter.ID, err)
 		return fmt.Errorf("failed to create chapter: %w", err)
 	}
 
 	chapter.CreatedAt = now
+	fmt.Printf("CreateChapter: Successfully created chapter with ID: %s\n", chapter.ID)
 	return nil
 }
 
@@ -615,11 +770,82 @@ func (p *PostgresRepository) GetChapterByID(ctx context.Context, id uuid.UUID) (
 }
 
 func (p *PostgresRepository) GetChaptersByAudioBookID(ctx context.Context, audiobookID uuid.UUID) ([]models.Chapter, error) {
-	return []models.Chapter{}, nil
+	query := `
+		SELECT id, audiobook_id, chapter_number, title, file_path, file_url, file_size_bytes, mime_type, 
+		       start_time_seconds, end_time_seconds, duration_seconds, created_at
+		FROM chapters
+		WHERE audiobook_id = $1
+		ORDER BY chapter_number
+	`
+
+	rows, err := p.pool.Query(ctx, query, audiobookID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query chapters: %w", err)
+	}
+	defer rows.Close()
+
+	var chapters []models.Chapter
+	for rows.Next() {
+		var chapter models.Chapter
+		err := rows.Scan(
+			&chapter.ID,
+			&chapter.AudiobookID,
+			&chapter.ChapterNumber,
+			&chapter.Title,
+			&chapter.FilePath,
+			&chapter.FileURL,
+			&chapter.FileSizeBytes,
+			&chapter.MimeType,
+			&chapter.StartTime,
+			&chapter.EndTime,
+			&chapter.DurationSeconds,
+			&chapter.CreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan chapter: %w", err)
+		}
+		chapters = append(chapters, chapter)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating chapters: %w", err)
+	}
+
+	return chapters, nil
 }
 
 func (p *PostgresRepository) GetFirstChapterByAudioBookID(ctx context.Context, audiobookID uuid.UUID) (*models.Chapter, error) {
-	return nil, ErrNotFound
+	query := `
+		SELECT id, audiobook_id, chapter_number, title, file_path, file_url, file_size_bytes, mime_type, 
+		       start_time_seconds, end_time_seconds, duration_seconds, created_at
+		FROM chapters
+		WHERE audiobook_id = $1 AND chapter_number = 1
+	`
+
+	var chapter models.Chapter
+	err := p.pool.QueryRow(ctx, query, audiobookID).Scan(
+		&chapter.ID,
+		&chapter.AudiobookID,
+		&chapter.ChapterNumber,
+		&chapter.Title,
+		&chapter.FilePath,
+		&chapter.FileURL,
+		&chapter.FileSizeBytes,
+		&chapter.MimeType,
+		&chapter.StartTime,
+		&chapter.EndTime,
+		&chapter.DurationSeconds,
+		&chapter.CreatedAt,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get first chapter: %w", err)
+	}
+
+	return &chapter, nil
 }
 
 func (p *PostgresRepository) UpdateChapter(ctx context.Context, chapter *models.Chapter) error {
@@ -853,6 +1079,9 @@ func (p *PostgresRepository) CreateProcessingJob(ctx context.Context, job *model
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 
+	fmt.Printf("CreateProcessingJob: Executing insert for job ID: %s, AudiobookID: %s, JobType: %s\n",
+		job.ID, job.AudiobookID, job.JobType)
+
 	now := time.Now()
 	_, err := p.pool.Exec(ctx, query,
 		job.ID,
@@ -867,10 +1096,12 @@ func (p *PostgresRepository) CreateProcessingJob(ctx context.Context, job *model
 	)
 
 	if err != nil {
+		fmt.Printf("CreateProcessingJob: Database error for job ID %s: %v\n", job.ID, err)
 		return fmt.Errorf("failed to create processing job: %w", err)
 	}
 
 	job.CreatedAt = now
+	fmt.Printf("CreateProcessingJob: Successfully created job with ID: %s\n", job.ID)
 	return nil
 }
 

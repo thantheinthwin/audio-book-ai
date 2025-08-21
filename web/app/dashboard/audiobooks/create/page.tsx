@@ -21,9 +21,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Progress } from "@/components/ui/progress";
 import { audiobooksAPI } from "@/lib/api";
-import { Upload, FileAudio, CheckCircle, AlertCircle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import CoverImageUpload from "@/components/cover-image-upload";
 import AudioFilesUpload from "@/components/audio-files-upload";
 
@@ -40,27 +39,10 @@ interface FormData {
   }>;
 }
 
-interface UploadState {
-  uploadId: string | null;
-  status: "idle" | "creating" | "uploading" | "completed" | "error";
-  progress: number;
-  uploadedFiles: number;
-  totalFiles: number;
-  error: string | null;
-}
-
 export default function CreateAudioBookPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [coverImage, setCoverImage] = useState<File | null>(null);
-  const [uploadState, setUploadState] = useState<UploadState>({
-    uploadId: null,
-    status: "idle",
-    progress: 0,
-    uploadedFiles: 0,
-    totalFiles: 0,
-    error: null,
-  });
 
   const {
     register,
@@ -100,10 +82,9 @@ export default function CreateAudioBookPage() {
     }
 
     setIsLoading(true);
-    setUploadState((prev) => ({ ...prev, status: "creating", error: null }));
 
     try {
-      // Create FormData for the Next.js API route
+      // Create audio book using the Next.js API route
       const formData = new FormData();
       formData.append("title", data.title);
       formData.append("author", data.author);
@@ -114,16 +95,15 @@ export default function CreateAudioBookPage() {
         formData.append("coverImage", coverImage);
       }
 
-      // Add chapters metadata (without files) as JSON
+      // Add chapters metadata
       const chaptersMetadata = data.chapters.map((chapter) => ({
         id: chapter.id,
         chapter_number: chapter.chapter_number,
         title: chapter.title,
-        // Don't include audio_file here as it will be added separately
       }));
       formData.append("chapters", JSON.stringify(chaptersMetadata));
 
-      // Add each file separately with its chapter index
+      // Add each file separately
       data.chapters.forEach((chapter, index) => {
         if (chapter.audio_file) {
           formData.append(`file_${index}`, chapter.audio_file);
@@ -138,54 +118,17 @@ export default function CreateAudioBookPage() {
         }
       });
 
-      // Call the Next.js API route
-      const response = await audiobooksAPI.createAudioBookWithFiles(formData);
+      const audioBookResponse = await audiobooksAPI.createAudioBookWithFiles(
+        formData
+      );
 
-      console.log("Audio book created:", response);
+      console.log("Audio book created:", audioBookResponse);
       router.push("/dashboard/audiobooks");
     } catch (error) {
       console.error("Failed to create audio book:", error);
-      setUploadState((prev) => ({
-        ...prev,
-        status: "error",
-        error: error instanceof Error ? error.message : "Unknown error",
-      }));
+      alert("Failed to create audio book. Please try again.");
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const getStatusIcon = () => {
-    switch (uploadState.status) {
-      case "idle":
-        return <Upload className="h-5 w-5" />;
-      case "creating":
-        return <FileAudio className="h-5 w-5 animate-pulse" />;
-      case "uploading":
-        return <FileAudio className="h-5 w-5 animate-pulse" />;
-      case "completed":
-        return <CheckCircle className="h-5 w-5 text-green-500" />;
-      case "error":
-        return <AlertCircle className="h-5 w-5 text-red-500" />;
-      default:
-        return <Upload className="h-5 w-5" />;
-    }
-  };
-
-  const getStatusText = () => {
-    switch (uploadState.status) {
-      case "idle":
-        return "Ready to upload";
-      case "creating":
-        return "Creating upload session...";
-      case "uploading":
-        return `Uploading files... (${uploadState.uploadedFiles}/${uploadState.totalFiles})`;
-      case "completed":
-        return "Upload completed! Creating audio book...";
-      case "error":
-        return `Error: ${uploadState.error}`;
-      default:
-        return "Ready to upload";
     }
   };
 
@@ -197,32 +140,6 @@ export default function CreateAudioBookPage() {
           Upload your audio files and create a new audio book
         </p>
       </div>
-
-      {/* Upload Progress */}
-      {uploadState.status !== "idle" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {getStatusIcon()}
-              Upload Progress
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between text-sm">
-              <span>{getStatusText()}</span>
-              {uploadState.status === "uploading" && (
-                <span>{Math.round(uploadState.progress)}%</span>
-              )}
-            </div>
-            {uploadState.status === "uploading" && (
-              <Progress value={uploadState.progress} className="w-full" />
-            )}
-            {uploadState.error && (
-              <div className="text-red-500 text-sm">{uploadState.error}</div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Basic Information */}
@@ -331,12 +248,15 @@ export default function CreateAudioBookPage() {
 
         {/* Submit Button */}
         <div className="flex justify-end">
-          <Button
-            type="submit"
-            disabled={isLoading || uploadState.status === "uploading"}
-            className="min-w-[200px]"
-          >
-            {isLoading ? "Creating..." : "Create Audio Book"}
+          <Button type="submit" disabled={isLoading} className="min-w-[200px]">
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              "Create Audio Book"
+            )}
           </Button>
         </div>
       </form>

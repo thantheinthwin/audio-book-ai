@@ -28,9 +28,15 @@ interface AudioBook {
   title: string;
   author: string;
   summary?: string;
-  duration?: number;
+  duration_seconds?: number;
+  file_size_bytes?: number;
+  file_path: string;
   file_url?: string;
-  cover_image?: string;
+  cover_image_url?: string;
+  language: string;
+  is_public: boolean;
+  status: string;
+  created_by: string;
   created_at: string;
   updated_at: string;
 }
@@ -308,11 +314,85 @@ export const uploadAPI = {
         status: string;
         total_files: number;
         uploaded_files: number;
+        failed_files: number;
+        retrying_files: number;
         progress: number;
         total_size_bytes: number;
         uploaded_size_bytes: number;
+        files?: Array<{
+          id: string;
+          file_name: string;
+          file_size_bytes: number;
+          mime_type: string;
+          chapter_number?: number;
+          chapter_title?: string;
+          status: string;
+          error?: string;
+          uploaded_at: string;
+        }>;
       }>
     >(`/admin/uploads/${uploadId}/progress`),
+
+  // Upload files in batch
+  uploadFilesBatch: (
+    uploadId: string,
+    files: File[],
+    metadata: Array<{
+      chapter_number?: number;
+      chapter_title?: string;
+    }>
+  ) => {
+    const formData = new FormData();
+
+    files.forEach((file, index) => {
+      formData.append("files", file);
+      formData.append(
+        "chapter_numbers",
+        metadata[index]?.chapter_number?.toString() || ""
+      );
+      formData.append("chapter_titles", metadata[index]?.chapter_title || "");
+    });
+
+    return apiClient<
+      ApiResponse<{
+        upload_id: string;
+        total_files: number;
+        success_count: number;
+        failed_count: number;
+        retrying_count: number;
+        files: Array<{
+          file_id: string;
+          upload_id: string;
+          file_name: string;
+          file_size_bytes: number;
+          status: string;
+          retry_count: number;
+          uploaded_at: string;
+          chapter_number?: number;
+          chapter_title?: string;
+        }>;
+        errors?: string[];
+      }>
+    >(`/admin/uploads/${uploadId}/files/batch`, {
+      method: "POST",
+      data: formData,
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
+
+  // Retry failed upload
+  retryFailedUpload: (uploadId: string, fileId: string) =>
+    apiClient<
+      ApiResponse<{
+        message: string;
+        file_id: string;
+        retry_count: number;
+      }>
+    >(`/admin/uploads/${uploadId}/files/${fileId}/retry`, {
+      method: "POST",
+    }),
 
   // Get upload details
   getUploadDetails: (uploadId: string) =>
@@ -423,6 +503,9 @@ export const audiobooksAPI = {
         }>;
         overall_status: string;
         progress: number;
+        total_jobs: number;
+        completed_jobs: number;
+        failed_jobs: number;
       }>
     >(`/admin/audiobooks/${id}/jobs`),
 };

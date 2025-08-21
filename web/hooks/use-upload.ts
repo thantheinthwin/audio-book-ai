@@ -49,6 +49,61 @@ export function useUploadFile() {
   });
 }
 
+// Hook to upload files in batch
+export function useUploadFilesBatch() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      sessionId,
+      files,
+      metadata,
+    }: {
+      sessionId: string;
+      files: File[];
+      metadata: Array<{
+        chapter_number?: number;
+        chapter_title?: string;
+      }>;
+    }) => uploadAPI.uploadFilesBatch(sessionId, files, metadata),
+    onSuccess: (data, variables) => {
+      // Update the upload session in cache
+      queryClient.invalidateQueries({
+        queryKey: uploadKeys.detail(variables.sessionId),
+      });
+      // Invalidate progress query
+      queryClient.invalidateQueries({
+        queryKey: uploadKeys.progress(variables.sessionId),
+      });
+    },
+  });
+}
+
+// Hook to retry failed upload
+export function useRetryFailedUpload() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      sessionId,
+      fileId,
+    }: {
+      sessionId: string;
+      fileId: string;
+    }) => uploadAPI.retryFailedUpload(sessionId, fileId),
+    onSuccess: (data, variables) => {
+      // Update the upload session in cache
+      queryClient.invalidateQueries({
+        queryKey: uploadKeys.detail(variables.sessionId),
+      });
+      // Invalidate progress query
+      queryClient.invalidateQueries({
+        queryKey: uploadKeys.progress(variables.sessionId),
+      });
+    },
+  });
+}
+
 // Hook to get upload progress
 export function useUploadProgress(sessionId: string) {
   return useQuery({

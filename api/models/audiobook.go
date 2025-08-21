@@ -66,9 +66,6 @@ type AudioBook struct {
 	Author          string          `json:"author" db:"author" validate:"required,min=1,max=255"`
 	Summary         *string         `json:"summary,omitempty" db:"summary"`
 	DurationSeconds *int            `json:"duration_seconds,omitempty" db:"duration_seconds"`
-	FileSizeBytes   *int64          `json:"file_size_bytes,omitempty" db:"file_size_bytes"`
-	FilePath        string          `json:"file_path" db:"file_path" validate:"required"`
-	FileURL         *string         `json:"file_url,omitempty" db:"file_url"`
 	CoverImageURL   *string         `json:"cover_image_url,omitempty" db:"cover_image_url"`
 	Language        string          `json:"language" db:"language" validate:"required,len=2"`
 	IsPublic        bool            `json:"is_public" db:"is_public"`
@@ -84,6 +81,10 @@ type Chapter struct {
 	AudiobookID     uuid.UUID `json:"audiobook_id" db:"audiobook_id" validate:"required"`
 	ChapterNumber   int       `json:"chapter_number" db:"chapter_number" validate:"required,min=1"`
 	Title           string    `json:"title" db:"title" validate:"required,min=1,max=255"`
+	FilePath        string    `json:"file_path" db:"file_path" validate:"required"`
+	FileURL         *string   `json:"file_url,omitempty" db:"file_url"`
+	FileSizeBytes   *int64    `json:"file_size_bytes,omitempty" db:"file_size_bytes"`
+	MimeType        *string   `json:"mime_type,omitempty" db:"mime_type"`
 	StartTime       *int      `json:"start_time_seconds,omitempty" db:"start_time_seconds"`
 	EndTime         *int      `json:"end_time_seconds,omitempty" db:"end_time_seconds"`
 	DurationSeconds *int      `json:"duration_seconds,omitempty" db:"duration_seconds"`
@@ -273,22 +274,9 @@ func (ab *AudioBook) GetDurationFormatted() string {
 }
 
 // GetFileSizeFormatted returns the file size in a human-readable format
+// Note: File size is now stored in chapters, not in the audiobook itself
 func (ab *AudioBook) GetFileSizeFormatted() string {
-	if ab.FileSizeBytes == nil {
-		return "Unknown"
-	}
-
-	bytes := *ab.FileSizeBytes
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+	return "See chapters for file sizes"
 }
 
 // IsFirstChapter returns true if this is the first chapter

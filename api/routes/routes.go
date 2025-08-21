@@ -82,6 +82,8 @@ func SetupAdminRoutes(router fiber.Router, cfg *config.Config, h *handlers.Handl
 	// Upload operations
 	router.Post("/uploads", h.CreateUpload)
 	router.Post("/uploads/:id/files", h.UploadFile)
+	router.Post("/uploads/:id/files/batch", h.UploadFilesBatch)
+	router.Post("/uploads/:id/files/:file_id/retry", h.RetryFailedUpload)
 	router.Get("/uploads/:id/progress", h.GetUploadProgress)
 	router.Get("/uploads/:id", h.GetUploadDetails)
 	router.Delete("/uploads/:id", h.DeleteUpload)
