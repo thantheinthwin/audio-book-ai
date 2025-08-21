@@ -40,7 +40,7 @@ import Image from "next/image";
 export default function AudioBookDetailPage() {
   const params = useParams();
   const [playingChapter, setPlayingChapter] = useState<string | null>(null);
-  const [isJobStatusExpanded, setIsJobStatusExpanded] = useState(true);
+  const [isJobStatusExpanded, setIsJobStatusExpanded] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const {
