@@ -542,7 +542,6 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 			FileSizeBytes: &file.FileSize,
 			MimeType:      &file.MimeType,
 			CreatedAt:     time.Now(),
-
 		}
 		chapters = append(chapters, chapter)
 
@@ -889,13 +888,15 @@ func (h *Handler) GetJobStatus(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"audiobook_id":   audiobookID,
-		"jobs":           jobs,
-		"overall_status": overallStatus,
-		"progress":       progress,
-		"total_jobs":     totalJobs,
-		"completed_jobs": completedJobs,
-		"failed_jobs":    failedJobs,
+		"data": fiber.Map{
+			"audiobook_id":   audiobookID,
+			"jobs":           jobs,
+			"overall_status": overallStatus,
+			"progress":       progress,
+			"total_jobs":     totalJobs,
+			"completed_jobs": completedJobs,
+			"failed_jobs":    failedJobs,
+		},
 	})
 }
 
