@@ -14,6 +14,7 @@ type AIOutput struct {
 	Content     any       `json:"content"`
 	ModelUsed   string    `json:"model_used"`
 	CreatedAt   time.Time `json:"created_at"`
+	ProcessingTimeSeconds int `json:"processing_time_seconds"`
 }
 
 // OutputType represents the possible output types

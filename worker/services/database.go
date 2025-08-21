@@ -159,8 +159,8 @@ func (d *DatabaseService) SaveAIOutput(output *models.AIOutput) error {
 	// Pass content directly to PostgreSQL - pgx will handle JSONB conversion automatically
 	insertQuery := `
 		INSERT INTO ai_outputs (
-			id, audiobook_id, output_type, content, model_used, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6)
+			id, audiobook_id, output_type, content, model_used, created_at, processing_time_seconds
+		) VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
 
 	_, err = d.pool.Exec(context.Background(), insertQuery,
@@ -170,6 +170,7 @@ func (d *DatabaseService) SaveAIOutput(output *models.AIOutput) error {
 		output.Content, // Pass content directly without marshaling
 		output.ModelUsed,
 		time.Now(),
+		output.ProcessingTimeSeconds,
 	)
 
 	if err != nil {

@@ -86,7 +86,7 @@ func (g *GeminiService) GenerateSummaryAndTags(text string) (*models.SummaryAndT
 		// If direct JSON parsing fails, try to extract JSON from markdown code blocks
 		cleanedResponse := g.extractJSONFromMarkdown(response)
 		if cleanedResponse != "" {
-			log.Printf("Extracted JSON from markdown: %s", cleanedResponse)
+			// log.Printf("Extracted JSON from markdown: %s", cleanedResponse)
 			if err := json.Unmarshal([]byte(cleanedResponse), &summaryAndTags); err == nil {
 				// Successfully parsed JSON from markdown
 				log.Printf("Successfully parsed JSON from markdown")

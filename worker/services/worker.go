@@ -146,6 +146,7 @@ func (w *Worker) ProcessSummarizeJob(job models.Job) error {
 	}
 
 	// Process combined summary and tags
+	startTime := time.Now()
 	summaryAndTags, err := w.geminiService.GenerateSummaryAndTags(combinedTranscript)
 	if err != nil {
 		errorMsg := fmt.Sprintf("Failed to generate summary and tags: %v", err)
@@ -155,11 +156,12 @@ func (w *Worker) ProcessSummarizeJob(job models.Job) error {
 
 	// Save summary output
 	summaryOutput := &models.AIOutput{
-		AudiobookID: job.AudiobookID,
-		OutputType:  models.OutputTypeSummary,
-		Content:     map[string]interface{}{"summary": summaryAndTags.Summary, "tags": summaryAndTags.Tags},
-		ModelUsed:   w.geminiService.model,
-		CreatedAt:   time.Now(),
+		AudiobookID:           job.AudiobookID,
+		OutputType:            models.OutputTypeSummary,
+		Content:               map[string]interface{}{"summary": summaryAndTags.Summary, "tags": summaryAndTags.Tags},
+		ModelUsed:             w.geminiService.model,
+		CreatedAt:             time.Now(),
+		ProcessingTimeSeconds: int(time.Since(startTime).Seconds()),
 	}
 
 	if err := w.dbService.SaveAIOutput(summaryOutput); err != nil {
