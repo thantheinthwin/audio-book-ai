@@ -202,7 +202,6 @@ type UpdateAudioBookRequest struct {
 type AudioBookWithDetails struct {
 	AudioBook
 	Chapters       []Chapter       `json:"chapters,omitempty"`
-	Transcript     *Transcript     `json:"transcript,omitempty"`
 	AIOutputs      []AIOutput      `json:"ai_outputs,omitempty"`
 	Tags           []Tag           `json:"tags,omitempty"`
 	ProcessingJobs []ProcessingJob `json:"processing_jobs,omitempty"`

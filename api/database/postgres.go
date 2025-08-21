@@ -592,13 +592,13 @@ func (p *PostgresRepository) GetAudioBookWithDetails(ctx context.Context, id uui
 		return nil, fmt.Errorf("failed to get chapters: %w", err)
 	}
 
-	// Get transcript
-	transcript, err := p.GetTranscriptByAudioBookID(ctx, id)
-	if err == ErrNotFound {
-		transcript = nil
-	} else if err != nil {
-		return nil, fmt.Errorf("failed to get transcript: %w", err)
-	}
+	// // Get transcript
+	// transcript, err := p.GetTranscriptByAudioBookID(ctx, id)
+	// if err == ErrNotFound {
+	// 	transcript = nil
+	// } else if err != nil {
+	// 	return nil, fmt.Errorf("failed to get transcript: %w", err)
+	// }
 
 	// Get AI outputs
 	aiOutputs, err := p.GetAIOutputsByAudioBookID(ctx, id)
@@ -627,7 +627,6 @@ func (p *PostgresRepository) GetAudioBookWithDetails(ctx context.Context, id uui
 	return &models.AudioBookWithDetails{
 		AudioBook:      *audiobook,
 		Chapters:       chapters,
-		Transcript:     transcript,
 		AIOutputs:      aiOutputs,
 		Tags:           tags,
 		ProcessingJobs: jobs,

@@ -94,27 +94,6 @@ const formatDuration = (seconds: number): string => {
     .padStart(2, "0")}`;
 };
 
-// // Function to get audio duration
-// const getAudioDuration = (file: File): Promise<string> => {
-//   return new Promise((resolve) => {
-//     const audio = new Audio();
-//     const url = URL.createObjectURL(file);
-
-//     audio.addEventListener("loadedmetadata", () => {
-//       const duration = formatDuration(audio.duration);
-//       URL.revokeObjectURL(url);
-//       resolve(duration);
-//     });
-
-//     audio.addEventListener("error", () => {
-//       URL.revokeObjectURL(url);
-//       resolve("--:--");
-//     });
-
-//     audio.src = url;
-//   });
-// };
-
 const getAudioDuration = (file: File): Promise<string> => {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
