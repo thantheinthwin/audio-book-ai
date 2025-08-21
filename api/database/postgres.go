@@ -1215,8 +1215,8 @@ func (p *PostgresRepository) DeleteChapterAIOutputsByAudioBookID(ctx context.Con
 
 func (p *PostgresRepository) CreateProcessingJob(ctx context.Context, job *models.ProcessingJob) error {
 	query := `
-		INSERT INTO processing_jobs (id, audiobook_id, job_type, status, redis_job_id, error_message, started_at, completed_at, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO processing_jobs (id, audiobook_id, chapter_id, job_type, status, redis_job_id, error_message, started_at, completed_at, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 
 	fmt.Printf("CreateProcessingJob: Executing insert for job ID: %s, AudiobookID: %s, JobType: %s\n",
@@ -1226,6 +1226,7 @@ func (p *PostgresRepository) CreateProcessingJob(ctx context.Context, job *model
 	_, err := p.pool.Exec(ctx, query,
 		job.ID,
 		job.AudiobookID,
+		job.ChapterID,
 		job.JobType,
 		job.Status,
 		job.RedisJobID,
@@ -1247,7 +1248,7 @@ func (p *PostgresRepository) CreateProcessingJob(ctx context.Context, job *model
 
 func (p *PostgresRepository) GetProcessingJobsByAudioBookID(ctx context.Context, audiobookID uuid.UUID) ([]models.ProcessingJob, error) {
 	query := `
-		SELECT id, audiobook_id, job_type, status, redis_job_id, error_message, started_at, completed_at, created_at
+		SELECT id, audiobook_id, chapter_id, job_type, status, redis_job_id, error_message, started_at, completed_at, created_at
 		FROM processing_jobs
 		WHERE audiobook_id = $1
 		ORDER BY created_at DESC
@@ -1265,6 +1266,7 @@ func (p *PostgresRepository) GetProcessingJobsByAudioBookID(ctx context.Context,
 		err := rows.Scan(
 			&job.ID,
 			&job.AudiobookID,
+			&job.ChapterID,
 			&job.JobType,
 			&job.Status,
 			&job.RedisJobID,
@@ -1284,7 +1286,7 @@ func (p *PostgresRepository) GetProcessingJobsByAudioBookID(ctx context.Context,
 
 func (p *PostgresRepository) GetPendingJobs(ctx context.Context, jobType models.JobType, limit int) ([]models.ProcessingJob, error) {
 	query := `
-		SELECT id, audiobook_id, job_type, status, redis_job_id, error_message, started_at, completed_at, created_at
+		SELECT id, audiobook_id, chapter_id, job_type, status, redis_job_id, error_message, started_at, completed_at, created_at
 		FROM processing_jobs
 		WHERE job_type = $1 AND status = $2
 		ORDER BY created_at ASC
@@ -1303,6 +1305,7 @@ func (p *PostgresRepository) GetPendingJobs(ctx context.Context, jobType models.
 		err := rows.Scan(
 			&job.ID,
 			&job.AudiobookID,
+			&job.ChapterID,
 			&job.JobType,
 			&job.Status,
 			&job.RedisJobID,
@@ -1322,7 +1325,7 @@ func (p *PostgresRepository) GetPendingJobs(ctx context.Context, jobType models.
 
 func (p *PostgresRepository) GetJobsByStatus(ctx context.Context, status models.JobStatus, limit int) ([]models.ProcessingJob, error) {
 	query := `
-		SELECT id, audiobook_id, job_type, status, redis_job_id, error_message, started_at, completed_at, created_at
+		SELECT id, audiobook_id, chapter_id, job_type, status, redis_job_id, error_message, started_at, completed_at, created_at
 		FROM processing_jobs
 		WHERE status = $1
 		ORDER BY created_at ASC
@@ -1341,6 +1344,7 @@ func (p *PostgresRepository) GetJobsByStatus(ctx context.Context, status models.
 		err := rows.Scan(
 			&job.ID,
 			&job.AudiobookID,
+			&job.ChapterID,
 			&job.JobType,
 			&job.Status,
 			&job.RedisJobID,
@@ -1360,7 +1364,7 @@ func (p *PostgresRepository) GetJobsByStatus(ctx context.Context, status models.
 
 func (p *PostgresRepository) GetProcessingJobByID(ctx context.Context, id uuid.UUID) (*models.ProcessingJob, error) {
 	query := `
-		SELECT id, audiobook_id, job_type, status, redis_job_id, error_message, started_at, completed_at, created_at
+		SELECT id, audiobook_id, chapter_id, job_type, status, redis_job_id, error_message, started_at, completed_at, created_at
 		FROM processing_jobs
 		WHERE id = $1
 	`
@@ -1369,6 +1373,7 @@ func (p *PostgresRepository) GetProcessingJobByID(ctx context.Context, id uuid.U
 	err := p.pool.QueryRow(ctx, query, id).Scan(
 		&job.ID,
 		&job.AudiobookID,
+		&job.ChapterID,
 		&job.JobType,
 		&job.Status,
 		&job.RedisJobID,

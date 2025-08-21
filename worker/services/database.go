@@ -57,7 +57,7 @@ func (d *DatabaseService) Close() error {
 // GetPendingJobs retrieves pending AI processing jobs from database
 func (d *DatabaseService) GetPendingJobs(limit int) ([]models.Job, error) {
 	query := `
-		SELECT id, audiobook_id, job_type, status, created_at, started_at, completed_at, error_message
+		SELECT id, audiobook_id, chapter_id, job_type, status, created_at, started_at, completed_at, error_message
 		FROM processing_jobs
 		WHERE job_type IN ($1, $2)
 		AND status = $3
@@ -80,7 +80,7 @@ func (d *DatabaseService) GetPendingJobs(limit int) ([]models.Job, error) {
 	for rows.Next() {
 		var job models.Job
 		if err := rows.Scan(
-			&job.ID, &job.AudiobookID, &job.JobType, &job.Status,
+			&job.ID, &job.AudiobookID, &job.ChapterID, &job.JobType, &job.Status,
 			&job.CreatedAt, &job.StartedAt, &job.CompletedAt, &job.ErrorMessage,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan job: %v", err)

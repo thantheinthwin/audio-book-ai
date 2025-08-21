@@ -10,6 +10,7 @@ import (
 type Job struct {
 	ID           uuid.UUID  `json:"id"`
 	AudiobookID  uuid.UUID  `json:"audiobook_id"`
+	ChapterID    *uuid.UUID `json:"chapter_id,omitempty"`
 	JobType      string     `json:"job_type"`
 	Status       string     `json:"status"`
 	CreatedAt    time.Time  `json:"created_at"`
@@ -28,6 +29,6 @@ const (
 
 // JobType represents the possible job types
 const (
-	JobTypeEmbed    = "embed"
+	JobTypeEmbed     = "embed"
 	JobTypeSummarize = "summarize"
 )

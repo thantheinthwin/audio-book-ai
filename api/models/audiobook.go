@@ -143,6 +143,7 @@ type ChapterAIOutput struct {
 type ProcessingJob struct {
 	ID           uuid.UUID  `json:"id" db:"id"`
 	AudiobookID  uuid.UUID  `json:"audiobook_id" db:"audiobook_id" validate:"required"`
+	ChapterID    *uuid.UUID `json:"chapter_id,omitempty" db:"chapter_id"`
 	JobType      JobType    `json:"job_type" db:"job_type" validate:"required"`
 	Status       JobStatus  `json:"status" db:"status" validate:"required"`
 	RedisJobID   *string    `json:"redis_job_id,omitempty" db:"redis_job_id"`

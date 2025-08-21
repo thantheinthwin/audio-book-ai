@@ -58,10 +58,10 @@ func (d *DatabaseService) Close() error {
 // GetPendingJobs retrieves pending transcription jobs from database
 func (d *DatabaseService) GetPendingJobs(limit int) ([]models.Job, error) {
 	query := `
-		SELECT pj.id, pj.audiobook_id, pj.job_type, pj.status, c.file_path, c.mime_type,
+		SELECT pj.id, pj.audiobook_id, pj.chapter_id, pj.job_type, pj.status, c.file_path, c.mime_type,
 		       pj.created_at, pj.started_at, pj.completed_at, pj.error_message
 		FROM processing_jobs pj
-		JOIN chapters c ON pj.audiobook_id = c.audiobook_id
+		LEFT JOIN chapters c ON pj.chapter_id = c.id
 		WHERE pj.job_type = $1 
 		AND pj.status = $2
 		ORDER BY pj.created_at ASC
@@ -79,7 +79,7 @@ func (d *DatabaseService) GetPendingJobs(limit int) ([]models.Job, error) {
 		var job models.Job
 		var mimeType *string
 		if err := rows.Scan(
-			&job.ID, &job.AudiobookID, &job.JobType, &job.Status, &job.FilePath, &mimeType,
+			&job.ID, &job.AudiobookID, &job.ChapterID, &job.JobType, &job.Status, &job.FilePath, &mimeType,
 			&job.CreatedAt, &job.StartedAt, &job.CompletedAt, &job.ErrorMessage,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan job: %v", err)
