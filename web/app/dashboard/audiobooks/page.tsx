@@ -9,6 +9,10 @@ import {
   MoreHorizontal,
   BookOpen,
   Loader2,
+  Play,
+  Edit,
+  Trash2,
+  Eye,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -26,6 +30,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { redirect } from "next/navigation";
 import { useEffect } from "react";
@@ -67,6 +79,22 @@ export default function AudioBooksPage() {
   if (!user) {
     return null; // Will redirect in useEffect
   }
+
+  const formatDuration = (seconds?: number) => {
+    if (!seconds) return "N/A";
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
+  };
+
+  const formatFileSize = (bytes?: number) => {
+    if (!bytes) return "N/A";
+    const mb = bytes / (1024 * 1024);
+    return `${mb.toFixed(1)} MB`;
+  };
 
   return (
     <div className="space-y-6">
@@ -126,77 +154,94 @@ export default function AudioBooksPage() {
         </Card>
       )}
 
-      {/* Audio Books Grid */}
-      {!audiobooksLoading && !audiobooksError && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {audioBooks.map((book) => (
-            <Card key={book.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg line-clamp-2">
-                      {book.title}
-                    </CardTitle>
-                    <CardDescription className="line-clamp-1">
-                      by {book.author}
-                    </CardDescription>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link href={`/dashboard/audiobooks/${book.id}`}>
-                          View Details
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href={`/dashboard/audiobooks/${book.id}/edit`}>
-                          Edit
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="text-red-600">
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {book.cover_image_url && (
-                  <div className="mb-4">
-                    <img
-                      src={book.cover_image_url}
-                      alt={book.title}
-                      className="w-full h-32 object-cover rounded-md"
-                    />
-                  </div>
-                )}
-
-                <div className="flex justify-between items-center">
-                  <div className="flex gap-2">
-                    {book.duration_seconds && (
-                      <Badge variant="secondary">
-                        {Math.round(book.duration_seconds / 60)} min
-                      </Badge>
-                    )}
-                    <Badge variant="outline">
-                      {new Date(book.created_at).toLocaleDateString()}
+      {/* Audio Books Table */}
+      {!audiobooksLoading && !audiobooksError && audioBooks.length > 0 && (
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Title</TableHead>
+                <TableHead>Author</TableHead>
+                <TableHead>Duration</TableHead>
+                <TableHead>File Size</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {audioBooks.map((book) => (
+                <TableRow key={book.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className="font-medium">{book.title}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>{book.author}</TableCell>
+                  <TableCell>{formatDuration(book.duration_seconds)}</TableCell>
+                  <TableCell>{formatFileSize(book.file_size_bytes)}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        book.status === "completed"
+                          ? "default"
+                          : book.status === "processing"
+                          ? "secondary"
+                          : "destructive"
+                      }
+                    >
+                      {book.status}
                     </Badge>
-                  </div>
-                  <Button size="sm" asChild>
-                    <Link href={`/dashboard/audiobooks/${book.id}`}>
-                      Manage
-                    </Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  </TableCell>
+                  <TableCell>
+                    {new Date(book.created_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <Button size="sm" variant="ghost" asChild>
+                        <Link href={`/dashboard/audiobooks/${book.id}`}>
+                          <Eye className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                      <Button size="sm" variant="ghost" asChild>
+                        <Link href={`/dashboard/audiobooks/${book.id}`}>
+                          <Play className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                      {/* <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="sm" variant="ghost">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/dashboard/audiobooks/${book.id}`}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link
+                              href={`/dashboard/audiobooks/${book.id}/edit`}
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-600">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu> */}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
       )}
 
       {!audiobooksLoading && !audiobooksError && audioBooks.length === 0 && (
