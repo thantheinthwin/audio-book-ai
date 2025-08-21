@@ -15,7 +15,8 @@ type Config struct {
 	JobsPrefix string
 
 	// API
-	APIBaseURL string
+	APIBaseURL     string
+	InternalAPIKey string
 
 	// Gemini API
 	GeminiAPIKey string
@@ -39,7 +40,8 @@ func New() *Config {
 		JobsPrefix: getEnv("JOBS_PREFIX", "audiobooks"),
 
 		// API
-		APIBaseURL: getEnv("API_BASE_URL", "http://localhost:8080"),
+		APIBaseURL:     getEnv("API_BASE_URL", "http://localhost:8080"),
+		InternalAPIKey: getEnv("INTERNAL_API_KEY", ""),
 
 		// Gemini API
 		GeminiAPIKey: getEnv("GEMINI_API_KEY", ""),

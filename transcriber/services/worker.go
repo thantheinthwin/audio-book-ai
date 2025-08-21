@@ -13,11 +13,12 @@ import (
 
 // Worker handles the transcription job processing
 type Worker struct {
-	dbService    *DatabaseService
-	revAIService *RevAIService
-	config       *Config
-	apiBaseURL   string
-	httpClient   *http.Client
+	dbService      *DatabaseService
+	revAIService   *RevAIService
+	config         *Config
+	apiBaseURL     string
+	internalAPIKey string
+	httpClient     *http.Client
 }
 
 // Config holds worker configuration
@@ -26,15 +27,17 @@ type Config struct {
 	JobPollInterval   int
 	JobTimeout        int
 	APIBaseURL        string
+	InternalAPIKey    string
 }
 
 // NewWorker creates a new worker
 func NewWorker(dbService *DatabaseService, revAIService *RevAIService, config *Config) *Worker {
 	return &Worker{
-		dbService:    dbService,
-		revAIService: revAIService,
-		config:       config,
-		apiBaseURL:   config.APIBaseURL,
+		dbService:      dbService,
+		revAIService:   revAIService,
+		config:         config,
+		apiBaseURL:     config.APIBaseURL,
+		internalAPIKey: config.InternalAPIKey,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -141,7 +144,7 @@ func (w *Worker) checkAndTriggerSummarizeTagJobs(audiobookID string) error {
 	log.Printf("All chapters transcribed for audiobook %s, triggering summarize and tag jobs", audiobookID)
 
 	// Call the webhook to trigger summarize and tag jobs
-	url := fmt.Sprintf("%s/v1/admin/audiobooks/%s/trigger-summarize-tag", w.apiBaseURL, audiobookID)
+	url := fmt.Sprintf("%s/v1/internal/audiobooks/%s/trigger-summarize-tag", w.apiBaseURL, audiobookID)
 	log.Printf("Calling webhook URL: %s", url)
 
 	req, err := http.NewRequest("POST", url, nil)
@@ -150,6 +153,7 @@ func (w *Worker) checkAndTriggerSummarizeTagJobs(audiobookID string) error {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Internal-API-Key", w.internalAPIKey)
 
 	resp, err := w.httpClient.Do(req)
 	if err != nil {

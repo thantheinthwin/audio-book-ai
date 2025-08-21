@@ -58,6 +58,7 @@ func main() {
 		JobPollInterval:   cfg.JobPollInterval,
 		JobTimeout:        cfg.JobTimeout,
 		APIBaseURL:        cfg.APIBaseURL,
+		InternalAPIKey:    cfg.InternalAPIKey,
 	}
 
 	// Initialize worker
@@ -85,14 +86,14 @@ func main() {
 	// Start consuming transcription jobs from Redis
 	log.Println("Starting transcriber service...")
 	if err := redisConsumer.ConsumeJobs(ctx, "transcribe", func(message services.JobMessage) error {
-		return processTranscriptionJob(worker, httpClient, cfg.APIBaseURL, message)
+		return processTranscriptionJob(worker, httpClient, cfg.APIBaseURL, cfg.InternalAPIKey, message)
 	}); err != nil {
 		log.Fatalf("Error consuming jobs: %v", err)
 	}
 }
 
 // processTranscriptionJob processes a transcription job and updates status via HTTP
-func processTranscriptionJob(worker *services.Worker, httpClient *http.Client, apiBaseURL string, message services.JobMessage) error {
+func processTranscriptionJob(worker *services.Worker, httpClient *http.Client, apiBaseURL string, internalAPIKey string, message services.JobMessage) error {
 	// Convert JobMessage to Job model
 	job := models.Job{
 		ID:          message.ID,
@@ -113,20 +114,20 @@ func processTranscriptionJob(worker *services.Worker, httpClient *http.Client, a
 	if err := worker.ProcessJob(job); err != nil {
 		// Update job status to failed
 		now := time.Now()
-		updateJobStatus(httpClient, apiBaseURL, message.ID.String(), "failed", err.Error(), nil, &now)
+		updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "failed", err.Error(), nil, &now)
 		return err
 	}
 
 	// Update job status to completed
 	now := time.Now()
-	updateJobStatus(httpClient, apiBaseURL, message.ID.String(), "completed", "", &now, &now)
+	updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "completed", "", &now, &now)
 
 	log.Printf("Transcription job %s completed successfully for audiobook %s", message.ID, message.AudiobookID)
 	return nil
 }
 
 // updateJobStatus sends job status update to the API
-func updateJobStatus(httpClient *http.Client, apiBaseURL string, jobID string, status string, errorMessage string, startedAt, completedAt *time.Time) {
+func updateJobStatus(httpClient *http.Client, apiBaseURL string, internalAPIKey string, jobID string, status string, errorMessage string, startedAt, completedAt *time.Time) {
 	// Build the request payload
 	payload := map[string]interface{}{
 		"status": status,
@@ -150,7 +151,7 @@ func updateJobStatus(httpClient *http.Client, apiBaseURL string, jobID string, s
 	}
 
 	// Create HTTP request
-	url := fmt.Sprintf("%s/v1/admin/jobs/%s/status", apiBaseURL, jobID)
+	url := fmt.Sprintf("%s/v1/internal/jobs/%s/status", apiBaseURL, jobID)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		log.Printf("Error creating job status update request: %v", err)
@@ -158,6 +159,7 @@ func updateJobStatus(httpClient *http.Client, apiBaseURL string, jobID string, s
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Internal-API-Key", internalAPIKey)
 
 	// Send request
 	resp, err := httpClient.Do(req)

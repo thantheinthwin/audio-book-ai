@@ -86,14 +86,14 @@ func main() {
 
 	// Start combined summarize and tag consumer
 	if err := redisConsumer.ConsumeJobs(ctx, "summarize", func(message services.JobMessage) error {
-		return processCombinedSummarizeAndTagJob(worker, httpClient, cfg.APIBaseURL, message)
+		return processCombinedSummarizeAndTagJob(worker, httpClient, cfg.APIBaseURL, cfg.InternalAPIKey, message)
 	}); err != nil {
 		log.Fatalf("Error consuming summarize and tag jobs: %v", err)
 	}
 }
 
 // processCombinedSummarizeAndTagJob processes a combined summarize and tag job and updates status via HTTP
-func processCombinedSummarizeAndTagJob(worker *services.Worker, httpClient *http.Client, apiBaseURL string, message services.JobMessage) error {
+func processCombinedSummarizeAndTagJob(worker *services.Worker, httpClient *http.Client, apiBaseURL string, internalAPIKey string, message services.JobMessage) error {
 	// Convert JobMessage to Job model
 	job := models.Job{
 		ID:          message.ID,
@@ -107,18 +107,18 @@ func processCombinedSummarizeAndTagJob(worker *services.Worker, httpClient *http
 	if err := worker.ProcessCombinedSummarizeAndTagJob(job); err != nil {
 		// Update job status to failed
 		now := time.Now()
-		updateJobStatus(httpClient, apiBaseURL, message.ID.String(), "failed", err.Error(), nil, &now)
+		updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "failed", err.Error(), nil, &now)
 		return err
 	}
 
 	// Update job status to completed
 	now := time.Now()
-	updateJobStatus(httpClient, apiBaseURL, message.ID.String(), "completed", "", &now, &now)
+	updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "completed", "", &now, &now)
 	return nil
 }
 
 // updateJobStatus sends job status update to the API
-func updateJobStatus(httpClient *http.Client, apiBaseURL string, jobID string, status string, errorMessage string, startedAt, completedAt *time.Time) {
+func updateJobStatus(httpClient *http.Client, apiBaseURL string, internalAPIKey string, jobID string, status string, errorMessage string, startedAt, completedAt *time.Time) {
 	// Build the request payload
 	payload := map[string]interface{}{
 		"status": status,
@@ -142,7 +142,7 @@ func updateJobStatus(httpClient *http.Client, apiBaseURL string, jobID string, s
 	}
 
 	// Create HTTP request
-	url := fmt.Sprintf("%s/v1/admin/jobs/%s/status", apiBaseURL, jobID)
+	url := fmt.Sprintf("%s/v1/internal/jobs/%s/status", apiBaseURL, jobID)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		log.Printf("Error creating job status update request: %v", err)
@@ -150,6 +150,7 @@ func updateJobStatus(httpClient *http.Client, apiBaseURL string, jobID string, s
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Internal-API-Key", internalAPIKey)
 
 	// Send request
 	resp, err := httpClient.Do(req)

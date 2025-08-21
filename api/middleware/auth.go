@@ -4,6 +4,7 @@ import (
 	"audio-book-ai/api/config"
 	"audio-book-ai/api/models"
 	"audio-book-ai/api/services"
+
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -120,4 +121,26 @@ func GetUserFromContext(c *fiber.Ctx) *models.UserContext {
 		return user
 	}
 	return nil
+}
+
+// InternalAPIKeyMiddleware validates the internal API key for service-to-service communication
+func InternalAPIKeyMiddleware(cfg *config.Config) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		// Get API key from header
+		apiKey := c.Get("X-Internal-API-Key")
+		if apiKey == "" {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Internal API key required",
+			})
+		}
+
+		// Validate API key
+		if apiKey != cfg.InternalAPIKey {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Invalid internal API key",
+			})
+		}
+
+		return c.Next()
+	}
 }

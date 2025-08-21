@@ -30,6 +30,9 @@ type Config struct {
 	RedisURL   string
 	JobsPrefix string
 
+	// Internal API
+	InternalAPIKey string
+
 	// CORS
 	CORSOrigins []string
 }
@@ -59,6 +62,9 @@ func New() *Config {
 		// Redis
 		RedisURL:   getEnv("REDIS_URL", "redis://redis:6379/0"),
 		JobsPrefix: getEnv("JOBS_PREFIX", "audiobooks"),
+
+		// Internal API
+		InternalAPIKey: getEnv("INTERNAL_API_KEY", ""),
 
 		// CORS
 		CORSOrigins: parseCORSOrigins(getEnv("CORS_ORIGIN", "http://localhost:3000")),

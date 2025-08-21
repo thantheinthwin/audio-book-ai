@@ -683,7 +683,8 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 }
 
 // TriggerSummarizeAndTagJobs triggers summarize and tag jobs for an audiobook after transcription is complete
-// POST /v1/admin/audiobooks/{id}/trigger-summarize-tag
+// POST /v1/internal/audiobooks/{id}/trigger-summarize-tag (internal service-to-service)
+// POST /v1/admin/audiobooks/{id}/trigger-summarize-tag (admin authenticated)
 func (h *Handler) TriggerSummarizeAndTagJobs(c *fiber.Ctx) error {
 	log.Printf("TriggerSummarizeAndTagJobs: Request received from IP %s", c.IP())
 

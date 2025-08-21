@@ -26,6 +26,10 @@ func SetupRoutes(app fiber.Router, cfg *config.Config, repo database.Repository,
 	admin := app.Group("/admin", middleware.AuthMiddleware(cfg), middleware.RequireAdmin())
 	SetupAdminRoutes(admin, cfg, h)
 
+	// Internal routes (API key authentication required, for service-to-service communication)
+	internal := app.Group("/internal", middleware.InternalAPIKeyMiddleware(cfg))
+	SetupInternalRoutes(internal, cfg, h)
+
 	// Public routes (no authentication required)
 	public := app.Group("/")
 	SetupPublicRoutes(public, cfg, h)
@@ -76,6 +80,15 @@ func SetupAdminRoutes(router fiber.Router, cfg *config.Config, h *handlers.Handl
 	router.Post("/audiobooks/:id/trigger-summarize-tag", h.TriggerSummarizeAndTagJobs)
 
 	// Job management
+	router.Post("/jobs/:job_id/status", h.UpdateJobStatus)
+}
+
+// SetupInternalRoutes configures internal service-to-service routes (no authentication required)
+func SetupInternalRoutes(router fiber.Router, cfg *config.Config, h *handlers.Handler) {
+	// Internal webhook for triggering summarize and tag jobs
+	router.Post("/audiobooks/:id/trigger-summarize-tag", h.TriggerSummarizeAndTagJobs)
+
+	// Internal job status updates
 	router.Post("/jobs/:job_id/status", h.UpdateJobStatus)
 }
 
