@@ -23,6 +23,37 @@ CREATE TABLE IF NOT EXISTS audiobooks (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Uploads table
+CREATE TABLE IF NOT EXISTS uploads (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    upload_type VARCHAR(20) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    total_files INTEGER NOT NULL,
+    uploaded_files INTEGER DEFAULT 0,
+    total_size_bytes BIGINT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Upload Files table
+CREATE TABLE IF NOT EXISTS upload_files (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    upload_id UUID NOT NULL REFERENCES uploads(id) ON DELETE CASCADE,
+    file_name VARCHAR(255) NOT NULL,
+    file_size_bytes BIGINT NOT NULL,
+    mime_type VARCHAR(100) NOT NULL,
+    file_path VARCHAR(500) NOT NULL,
+    chapter_number INTEGER,
+    chapter_title VARCHAR(255),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    error TEXT,
+    retry_count INTEGER DEFAULT 0,
+    max_retries INTEGER DEFAULT 3,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Chapters table
 CREATE TABLE IF NOT EXISTS chapters (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -86,37 +117,6 @@ CREATE TABLE IF NOT EXISTS tags (
     name VARCHAR(100) NOT NULL UNIQUE,
     category VARCHAR(50),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Uploads table
-CREATE TABLE IF NOT EXISTS uploads (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    upload_type VARCHAR(20) NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    total_files INTEGER NOT NULL,
-    uploaded_files INTEGER DEFAULT 0,
-    total_size_bytes BIGINT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Upload Files table
-CREATE TABLE IF NOT EXISTS upload_files (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    upload_id UUID NOT NULL REFERENCES uploads(id) ON DELETE CASCADE,
-    file_name VARCHAR(255) NOT NULL,
-    file_size_bytes BIGINT NOT NULL,
-    mime_type VARCHAR(100) NOT NULL,
-    file_path VARCHAR(500) NOT NULL,
-    chapter_number INTEGER,
-    chapter_title VARCHAR(255),
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    error TEXT,
-    retry_count INTEGER DEFAULT 0,
-    max_retries INTEGER DEFAULT 3,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Indexes for better performance
