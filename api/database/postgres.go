@@ -593,28 +593,12 @@ func (p *PostgresRepository) GetAudioBookWithDetails(ctx context.Context, id uui
 		return nil, fmt.Errorf("failed to get chapters: %w", err)
 	}
 
-	// // Get transcript
-	// transcript, err := p.GetTranscriptByAudioBookID(ctx, id)
-	// if err == ErrNotFound {
-	// 	transcript = nil
-	// } else if err != nil {
-	// 	return nil, fmt.Errorf("failed to get transcript: %w", err)
-	// }
-
 	// Get AI outputs
 	aiOutputs, err := p.GetAIOutputsByAudioBookID(ctx, id)
 	if err == ErrNotFound {
 		aiOutputs = nil
 	} else if err != nil {
 		return nil, fmt.Errorf("failed to get AI outputs: %w", err)
-	}
-
-	// Get tags
-	tags, err := p.GetTagsByAudioBookID(ctx, id)
-	if err == ErrNotFound {
-		tags = nil
-	} else if err != nil {
-		return nil, fmt.Errorf("failed to get tags: %w", err)
 	}
 
 	// Get processing jobs
@@ -629,7 +613,6 @@ func (p *PostgresRepository) GetAudioBookWithDetails(ctx context.Context, id uui
 		AudioBook:      *audiobook,
 		Chapters:       chapters,
 		AIOutputs:      aiOutputs,
-		Tags:           tags,
 		ProcessingJobs: jobs,
 	}, nil
 }
@@ -813,13 +796,7 @@ func (p *PostgresRepository) CheckAndUpdateAudioBookStatus(ctx context.Context, 
 				// Extract summary from JSON content
 				var summaryData map[string]interface{}
 				if err := json.Unmarshal(aiOutput.Content, &summaryData); err == nil {
-					if summaryText, ok := summaryData["summary"].(string); ok {
-						tags, ok := summaryData["tags"].([]string)
-						if !ok {
-							tags = []string{}
-						}
-						p.UpdateAudioBookSummaryAndTags(ctx, audiobookID, summaryText, tags)
-					}
+					p.UpdateAudioBookSummaryAndTags(ctx, audiobookID, summaryData["summary"].(string), summaryData["tags"].([]string))
 				}
 			}
 		}

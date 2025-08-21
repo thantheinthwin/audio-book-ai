@@ -168,10 +168,18 @@ export default function AudioBookDetailPage() {
             <div className="grid gap-1">
               <h2 className="text-muted-foreground text-sm">Summary</h2>
               {jobStatus?.overall_status === "processing" ? (
-                <div className="flex gap-1 items-center">
-                  <Bot className="h-4 w-4" />
-                  <p className="text-sm">Generating summary...</p>
-                </div>
+                jobStatus.completed_jobs + jobStatus.failed_jobs ===
+                jobStatus.total_jobs - 1 ? (
+                  <div className="flex gap-1 items-center">
+                    <Bot className="h-4 w-4" />
+                    <p className="text-sm">Generating summary...</p>
+                  </div>
+                ) : (
+                  <div className="flex gap-1 items-center">
+                    Summary will be generated once all chapters are
+                    transcribed...
+                  </div>
+                )
               ) : (
                 <div className="flex flex-col gap-2">
                   <p className="text-sm">

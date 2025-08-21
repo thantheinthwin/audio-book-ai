@@ -39,6 +39,19 @@ export function useAudioBookJobStatus(id: string) {
   });
 }
 
+// Hook to create a new audiobook with files
+export function useCreateAudioBookWithFiles() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: audiobooksAPI.createAudioBookWithFiles,
+    onSuccess: () => {
+      // Invalidate and refetch audiobooks list
+      queryClient.invalidateQueries({ queryKey: audiobookKeys.lists() });
+    },
+  });
+}
+
 // Hook to create a new audiobook
 export function useCreateAudioBook() {
   const queryClient = useQueryClient();

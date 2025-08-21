@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
+import { useCreateAudioBookWithFiles } from "@/hooks/use-audiobooks";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -13,6 +12,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -21,10 +22,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { audiobooksAPI } from "@/lib/api";
 import { Loader2 } from "lucide-react";
-import CoverImageUpload from "@/components/cover-image-upload";
 import AudioFilesUpload from "@/components/audio-files-upload";
+import CoverImageUpload from "@/components/cover-image-upload";
 
 interface FormData {
   title: string;
@@ -41,7 +41,6 @@ interface FormData {
 
 export default function CreateAudioBookPage() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
   const [coverImage, setCoverImage] = useState<File | null>(null);
 
   const {
@@ -67,6 +66,9 @@ export default function CreateAudioBookPage() {
     },
   });
 
+  // Use React Query mutation
+  const createAudioBookMutation = useCreateAudioBookWithFiles();
+
   const onSubmit = async (data: FormData) => {
     if (data.chapters.length === 0) {
       alert("Please add at least one chapter");
@@ -80,8 +82,6 @@ export default function CreateAudioBookPage() {
       alert("Please upload at least one audio file");
       return;
     }
-
-    setIsLoading(true);
 
     try {
       // Create audio book using the Next.js API route
@@ -118,17 +118,14 @@ export default function CreateAudioBookPage() {
         }
       });
 
-      const audioBookResponse = await audiobooksAPI.createAudioBookWithFiles(
-        formData
-      );
+      // Use the mutation
+      await createAudioBookMutation.mutateAsync(formData);
 
-      console.log("Audio book created:", audioBookResponse);
+      console.log("Audio book created successfully");
       router.push("/dashboard/audiobooks");
     } catch (error) {
       console.error("Failed to create audio book:", error);
       alert("Failed to create audio book. Please try again.");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -248,8 +245,12 @@ export default function CreateAudioBookPage() {
 
         {/* Submit Button */}
         <div className="flex justify-end">
-          <Button type="submit" disabled={isLoading} className="min-w-[200px]">
-            {isLoading ? (
+          <Button
+            type="submit"
+            disabled={createAudioBookMutation.isPending}
+            className="min-w-[200px]"
+          >
+            {createAudioBookMutation.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Creating...

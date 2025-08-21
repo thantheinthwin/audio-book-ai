@@ -65,7 +65,7 @@ type AudioBook struct {
 	Title           string          `json:"title" db:"title" validate:"required,min=1,max=255"`
 	Author          string          `json:"author" db:"author" validate:"required,min=1,max=255"`
 	Summary         *string         `json:"summary,omitempty" db:"summary"`
-	Tags            []string        `json:"tags,omitempty" db:"tags"`
+	Tags            []*string       `json:"tags,omitempty" db:"tags"`
 	DurationSeconds *int            `json:"duration_seconds,omitempty" db:"duration_seconds"`
 	CoverImageURL   *string         `json:"cover_image_url,omitempty" db:"cover_image_url"`
 	Language        string          `json:"language" db:"language" validate:"required,len=2"`
@@ -206,7 +206,6 @@ type AudioBookWithDetails struct {
 	AudioBook
 	Chapters       []Chapter       `json:"chapters,omitempty"`
 	AIOutputs      []AIOutput      `json:"ai_outputs,omitempty"`
-	Tags           []Tag           `json:"tags,omitempty"`
 	ProcessingJobs []ProcessingJob `json:"processing_jobs,omitempty"`
 }
 
