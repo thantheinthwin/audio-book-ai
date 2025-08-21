@@ -30,12 +30,6 @@ type Repository interface {
 	DeleteChapter(ctx context.Context, id uuid.UUID) error
 	DeleteChaptersByAudioBookID(ctx context.Context, audiobookID uuid.UUID) error
 
-	// Transcript operations
-	CreateTranscript(ctx context.Context, transcript *models.Transcript) error
-	GetTranscriptByAudioBookID(ctx context.Context, audiobookID uuid.UUID) (*models.Transcript, error)
-	UpdateTranscript(ctx context.Context, transcript *models.Transcript) error
-	DeleteTranscript(ctx context.Context, id uuid.UUID) error
-
 	// Chapter Transcript operations
 	CreateChapterTranscript(ctx context.Context, transcript *models.ChapterTranscript) error
 	GetChapterTranscriptByChapterID(ctx context.Context, chapterID uuid.UUID) (*models.ChapterTranscript, error)

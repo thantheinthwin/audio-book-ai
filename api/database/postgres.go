@@ -1038,69 +1038,6 @@ func (p *PostgresRepository) DeleteChaptersByAudioBookID(ctx context.Context, au
 	return nil
 }
 
-func (p *PostgresRepository) CreateTranscript(ctx context.Context, transcript *models.Transcript) error {
-	query := `
-		INSERT INTO transcripts (id, audiobook_id, content, segments, language, confidence_score, processing_time_seconds, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-	`
-
-	now := time.Now()
-	_, err := p.pool.Exec(ctx, query,
-		transcript.ID,
-		transcript.AudiobookID,
-		transcript.Content,
-		transcript.Segments,
-		transcript.Language,
-		transcript.ConfidenceScore,
-		transcript.ProcessingTimeSeconds,
-		now,
-	)
-
-	if err != nil {
-		return fmt.Errorf("failed to create transcript: %w", err)
-	}
-
-	transcript.CreatedAt = now
-	return nil
-}
-
-func (p *PostgresRepository) GetTranscriptByAudioBookID(ctx context.Context, audiobookID uuid.UUID) (*models.Transcript, error) {
-	query := `
-		SELECT id, audiobook_id, content, segments, language, confidence_score, processing_time_seconds, created_at
-		FROM transcripts
-		WHERE audiobook_id = $1
-	`
-
-	var transcript models.Transcript
-	err := p.pool.QueryRow(ctx, query, audiobookID).Scan(
-		&transcript.ID,
-		&transcript.AudiobookID,
-		&transcript.Content,
-		&transcript.Segments,
-		&transcript.Language,
-		&transcript.ConfidenceScore,
-		&transcript.ProcessingTimeSeconds,
-		&transcript.CreatedAt,
-	)
-
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, ErrNotFound
-		}
-		return nil, fmt.Errorf("failed to get transcript: %w", err)
-	}
-
-	return &transcript, nil
-}
-
-func (p *PostgresRepository) UpdateTranscript(ctx context.Context, transcript *models.Transcript) error {
-	return nil
-}
-
-func (p *PostgresRepository) DeleteTranscript(ctx context.Context, id uuid.UUID) error {
-	return nil
-}
-
 func (p *PostgresRepository) CreateChapterTranscript(ctx context.Context, transcript *models.ChapterTranscript) error {
 	return nil
 }
