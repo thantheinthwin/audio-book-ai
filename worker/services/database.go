@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -146,22 +145,18 @@ func (d *DatabaseService) GetTranscript(audiobookID uuid.UUID) (string, error) {
 
 // SaveAIOutput saves AI processing output to the database
 func (d *DatabaseService) SaveAIOutput(output *models.AIOutput) error {
-	contentJSON, err := json.Marshal(output.Content)
-	if err != nil {
-		return fmt.Errorf("failed to marshal content: %v", err)
-	}
-
 	// First, try to delete any existing output for this audiobook and output type
 	deleteQuery := `
 		DELETE FROM ai_outputs 
 		WHERE audiobook_id = $1 AND output_type = $2
 	`
-	_, err = d.pool.Exec(context.Background(), deleteQuery, output.AudiobookID, output.OutputType)
+	_, err := d.pool.Exec(context.Background(), deleteQuery, output.AudiobookID, output.OutputType)
 	if err != nil {
 		return fmt.Errorf("failed to delete existing AI output: %v", err)
 	}
 
 	// Then insert the new output
+	// Pass content directly to PostgreSQL - pgx will handle JSONB conversion automatically
 	insertQuery := `
 		INSERT INTO ai_outputs (
 			id, audiobook_id, output_type, content, model_used, created_at
@@ -172,7 +167,7 @@ func (d *DatabaseService) SaveAIOutput(output *models.AIOutput) error {
 		uuid.New(),
 		output.AudiobookID,
 		output.OutputType,
-		contentJSON,
+		output.Content, // Pass content directly without marshaling
 		output.ModelUsed,
 		time.Now(),
 	)

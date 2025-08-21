@@ -96,7 +96,7 @@ func (w *Worker) processEmbedding(audiobookID uuid.UUID, transcript string) (*mo
 	return &models.AIOutput{
 		AudiobookID: audiobookID,
 		OutputType:  models.OutputTypeEmbedding,
-		Content:     embedding,
+		Content:     map[string]interface{}{"embedding": embedding},
 		ModelUsed:   w.geminiService.model,
 		CreatedAt:   time.Now(),
 	}, nil
@@ -157,28 +157,13 @@ func (w *Worker) ProcessSummarizeJob(job models.Job) error {
 	summaryOutput := &models.AIOutput{
 		AudiobookID: job.AudiobookID,
 		OutputType:  models.OutputTypeSummary,
-		Content:     summaryAndTags.Summary,
+		Content:     map[string]interface{}{"summary": summaryAndTags.Summary, "tags": summaryAndTags.Tags},
 		ModelUsed:   w.geminiService.model,
 		CreatedAt:   time.Now(),
 	}
 
 	if err := w.dbService.SaveAIOutput(summaryOutput); err != nil {
 		errorMsg := fmt.Sprintf("Failed to save summary output: %v", err)
-		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
-		return err
-	}
-
-	// Save tags output
-	tagsOutput := &models.AIOutput{
-		AudiobookID: job.AudiobookID,
-		OutputType:  models.OutputTypeTags,
-		Content:     summaryAndTags.Tags,
-		ModelUsed:   w.geminiService.model,
-		CreatedAt:   time.Now(),
-	}
-
-	if err := w.dbService.SaveAIOutput(tagsOutput); err != nil {
-		errorMsg := fmt.Sprintf("Failed to save tags output: %v", err)
 		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
 		return err
 	}

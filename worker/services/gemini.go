@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -47,24 +48,26 @@ func (g *GeminiService) GenerateSummaryAndTags(text string) (*models.SummaryAndT
 
 	prompt := fmt.Sprintf(`Please analyze the following audiobook transcript and provide both a summary and relevant tags.
 
-Requirements:
-1. Summary: Provide a concise summary (2-3 paragraphs) focusing on main themes, key events, and important characters.
-2. Tags: Choose ONLY from the following available tags: %s
+	Requirements:
+	1. Summary: Provide a concise summary (2-3 paragraphs) focusing on main themes, key events, and important characters.
+	2. Tags: Choose ONLY from the following available tags: %s
 
-IMPORTANT: You must ONLY use tags from the provided list. Do not create new tags.
+	IMPORTANT: 
+	- You must ONLY use tags from the provided list. Do not create new tags.
+	- Respond with ONLY the JSON object, no markdown formatting, no code blocks, no additional text.
 
-Please respond in the following JSON format:
-{
-  "summary": "Your summary here...",
-  "tags": ["tag1", "tag2", "tag3", ...]
-}
+	Please respond with ONLY this JSON format:
+	{
+	"summary": "Your summary here...",
+	"tags": ["tag1", "tag2", "tag3", ...]
+	}
 
-Available tags: %s
+	Available tags: %s
 
-Transcript:
-%s
+	Transcript:
+	%s
 
-Response:`, availableTagsList, availableTagsList, text)
+	Response:`, availableTagsList, availableTagsList, text)
 
 	response, err := g.generateText(prompt, 0.3, 1000)
 	if err != nil {
@@ -73,15 +76,72 @@ Response:`, availableTagsList, availableTagsList, text)
 
 	// Try to parse the response as JSON
 	var summaryAndTags models.SummaryAndTags
-	if err := json.Unmarshal([]byte(response), &summaryAndTags); err != nil {
-		// If JSON parsing fails, try to extract summary and tags manually
-		return g.extractSummaryAndTagsFromText(response)
+
+	// First, try to parse the response directly as JSON
+	if err := json.Unmarshal([]byte(response), &summaryAndTags); err == nil {
+		// Successfully parsed as JSON
+		log.Printf("Successfully parsed JSON response directly")
+	} else {
+		log.Printf("Direct JSON parsing failed, attempting to extract from markdown: %v", err)
+		// If direct JSON parsing fails, try to extract JSON from markdown code blocks
+		cleanedResponse := g.extractJSONFromMarkdown(response)
+		if cleanedResponse != "" {
+			log.Printf("Extracted JSON from markdown: %s", cleanedResponse)
+			if err := json.Unmarshal([]byte(cleanedResponse), &summaryAndTags); err == nil {
+				// Successfully parsed JSON from markdown
+				log.Printf("Successfully parsed JSON from markdown")
+			} else {
+				log.Printf("JSON parsing from markdown failed: %v", err)
+				// If JSON parsing still fails, try to extract summary and tags manually
+				return g.extractSummaryAndTagsFromText(response)
+			}
+		} else {
+			log.Printf("No JSON found in markdown, falling back to text extraction")
+			// If no JSON found in markdown, try to extract summary and tags manually
+			return g.extractSummaryAndTagsFromText(response)
+		}
 	}
 
 	// Filter tags to ensure only valid tags from the database are used
 	summaryAndTags.Tags = g.filterValidTags(summaryAndTags.Tags, availableTags)
 
+	fmt.Println("Summary and tags:", summaryAndTags)
+
 	return &summaryAndTags, nil
+}
+
+// extractJSONFromMarkdown extracts JSON content from markdown code blocks
+func (g *GeminiService) extractJSONFromMarkdown(text string) string {
+	// Look for JSON code blocks (```json ... ```)
+	startMarker := "```json"
+	endMarker := "```"
+
+	startIndex := strings.Index(strings.ToLower(text), startMarker)
+	if startIndex == -1 {
+		// Also try without the language specifier
+		startMarker = "```"
+		startIndex = strings.Index(text, startMarker)
+		if startIndex == -1 {
+			return ""
+		}
+	}
+
+	// Find the end of the start marker
+	startContent := startIndex + len(startMarker)
+
+	// Find the end marker
+	endIndex := strings.Index(text[startContent:], endMarker)
+	if endIndex == -1 {
+		return ""
+	}
+
+	// Extract the content between the markers
+	jsonContent := text[startContent : startContent+endIndex]
+
+	// Clean up the content
+	jsonContent = strings.TrimSpace(jsonContent)
+
+	return jsonContent
 }
 
 // filterValidTags filters the provided tags to only include those that exist in the available tags list

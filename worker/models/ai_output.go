@@ -19,7 +19,6 @@ type AIOutput struct {
 // OutputType represents the possible output types
 const (
 	OutputTypeSummary   = "summary"
-	OutputTypeTags      = "tags"
 	OutputTypeEmbedding = "embedding"
 )
 
