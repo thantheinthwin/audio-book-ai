@@ -33,6 +33,7 @@ const (
 type JobStatus string
 
 const (
+	JobStatusIdle      JobStatus = "idle"
 	JobStatusPending   JobStatus = "pending"
 	JobStatusRunning   JobStatus = "running"
 	JobStatusCompleted JobStatus = "completed"

@@ -21,6 +21,7 @@ type Job struct {
 
 // JobStatus represents the possible job statuses
 const (
+	JobStatusIdle      = "idle"
 	JobStatusPending   = "pending"
 	JobStatusRunning   = "running"
 	JobStatusCompleted = "completed"

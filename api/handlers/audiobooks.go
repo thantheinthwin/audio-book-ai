@@ -663,6 +663,24 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 		}
 	}
 
+	// Create summarize job in idle state - it will be activated when TriggerSummarizeAndTagJobs is called
+	log.Printf("CreateAudioBook: Creating summarize job for audiobook in idle state")
+	summarizeJob := &models.ProcessingJob{
+		ID:          uuid.New(),
+		AudiobookID: audiobook.ID,
+		JobType:     models.JobTypeSummarize,
+		Status:      models.JobStatusIdle,
+		CreatedAt:   time.Now(),
+	}
+
+	// Save summarize job to database
+	if err := h.repo.CreateProcessingJob(context.Background(), summarizeJob); err != nil {
+		log.Printf("CreateAudioBook: Failed to create summarize job: %v", err)
+		// Don't fail the request if summarize job creation fails
+	} else {
+		log.Printf("CreateAudioBook: Summarize job created in database (ID: %s) in idle state - will be activated when transcription is complete", summarizeJob.ID)
+	}
+
 	// Update upload status to indicate it's been processed
 	log.Printf("CreateAudioBook: Updating upload status to processed")
 	upload.Status = "processed"
@@ -751,26 +769,63 @@ func (h *Handler) TriggerSummarizeAndTagJobs(c *fiber.Ctx) error {
 
 	log.Printf("TriggerSummarizeAndTagJobs: All %d chapters are transcribed, proceeding with summarize and tag jobs", len(chapters))
 
-	// Create summarize job
-	job := &models.ProcessingJob{
-		ID:          uuid.New(),
-		AudiobookID: audiobookID,
-		JobType:     models.JobTypeSummarize, // Summarize job type
-		Status:      models.JobStatusPending,
-		CreatedAt:   time.Now(),
-	}
-
-	// Save job to database
-	if err := h.repo.CreateProcessingJob(context.Background(), job); err != nil {
-		log.Printf("TriggerSummarizeAndTagJobs: Failed to create summarize and tag job: %v", err)
+	// Find existing summarize job for this audiobook
+	existingJobs, err := h.repo.GetProcessingJobsByAudioBookID(context.Background(), audiobookID)
+	if err != nil {
+		log.Printf("TriggerSummarizeAndTagJobs: Failed to get existing processing jobs: %v", err)
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to create summarize and tag job",
+			"error": "Failed to get existing processing jobs",
 		})
 	}
 
+	var summarizeJob *models.ProcessingJob
+	for _, job := range existingJobs {
+		if job.JobType == models.JobTypeSummarize {
+			summarizeJob = &job
+			break
+		}
+	}
+
+	if summarizeJob == nil {
+		log.Printf("TriggerSummarizeAndTagJobs: No existing summarize job found for audiobook %s", audiobookID)
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{
+			"error": "No summarize job found for this audiobook",
+		})
+	}
+
+	log.Printf("TriggerSummarizeAndTagJobs: Found existing summarize job (ID: %s) with status: %s", summarizeJob.ID, summarizeJob.Status)
+
+	// Check if job is already in progress, completed, or already pending
+	if summarizeJob.Status == models.JobStatusRunning || summarizeJob.Status == models.JobStatusCompleted || summarizeJob.Status == models.JobStatusPending {
+		log.Printf("TriggerSummarizeAndTagJobs: Summarize job is already %s", summarizeJob.Status)
+		return c.Status(http.StatusConflict).JSON(fiber.Map{
+			"error":  fmt.Sprintf("Summarize job is already %s", summarizeJob.Status),
+			"job_id": summarizeJob.ID,
+		})
+	}
+
+	// Check if job is in idle state (expected state)
+	if summarizeJob.Status != models.JobStatusIdle {
+		log.Printf("TriggerSummarizeAndTagJobs: Unexpected job status: %s (expected: idle)", summarizeJob.Status)
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error":  fmt.Sprintf("Unexpected job status: %s (expected: idle)", summarizeJob.Status),
+			"job_id": summarizeJob.ID,
+		})
+	}
+
+	// Change job status from idle to pending
+	summarizeJob.Status = models.JobStatusPending
+	if err := h.repo.UpdateProcessingJob(context.Background(), summarizeJob); err != nil {
+		log.Printf("TriggerSummarizeAndTagJobs: Failed to update job status to pending: %v", err)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to update job status",
+		})
+	}
+	log.Printf("TriggerSummarizeAndTagJobs: Job status updated from idle to pending")
+
 	// Enqueue job to Redis if Redis service is available
 	if h.redisQueue != nil {
-		if err := h.redisQueue.EnqueueAIJob(context.Background(), job); err != nil {
+		if err := h.redisQueue.EnqueueAIJob(context.Background(), summarizeJob); err != nil {
 			log.Printf("TriggerSummarizeAndTagJobs: Failed to enqueue summarize and tag job to Redis: %v", err)
 			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
 				"error": "Failed to enqueue summarize and tag job",
@@ -778,7 +833,7 @@ func (h *Handler) TriggerSummarizeAndTagJobs(c *fiber.Ctx) error {
 		}
 		log.Printf("TriggerSummarizeAndTagJobs: Summarize and tag job enqueued to Redis successfully")
 	} else {
-		log.Printf("TriggerSummarizeAndTagJobs: Redis queue service not available, job created in database only")
+		log.Printf("TriggerSummarizeAndTagJobs: Redis queue service not available, job status updated to pending but not enqueued")
 	}
 
 	log.Printf("TriggerSummarizeAndTagJobs: Successfully triggered summarize and tag jobs for audiobook %s", audiobookID)
@@ -786,7 +841,7 @@ func (h *Handler) TriggerSummarizeAndTagJobs(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"audiobook_id":      audiobookID,
 		"message":           "Summarize and tag jobs triggered successfully",
-		"job_id":            job.ID,
+		"job_id":            summarizeJob.ID,
 		"chapters_verified": len(chapters),
 	})
 }

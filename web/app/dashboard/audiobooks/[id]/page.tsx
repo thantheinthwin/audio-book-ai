@@ -16,6 +16,7 @@ import {
   AlertCircle,
   FileAudio,
   Brain,
+  Bot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -170,15 +171,16 @@ export default function AudioBookDetailPage() {
             <div className="grid gap-1">
               <h2 className="text-muted-foreground text-sm">Summary</h2>
               {jobStatus?.overall_status === "processing" ? (
-                <div className="flex flex-col gap-1">
-                  <Skeleton className="h-4 w-full rounded" />
-                  <Skeleton className="h-4 w-full rounded" />
-                  <Skeleton className="h-4 w-full rounded" />
-                  <Skeleton className="h-4 w-full rounded" />
-                  <Skeleton className="h-4 w-40 rounded" />
+                <div className="flex gap-1 items-center">
+                  <Bot className="h-4 w-4" />
+                  <p className="text-sm">Generating summary...</p>
                 </div>
               ) : (
-                <p className="text-sm">{audioBook.summary}</p>
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm">
+                    {audioBook.summary || "No summary available"}
+                  </p>
+                </div>
               )}
             </div>
           </div>
@@ -293,75 +295,6 @@ export default function AudioBookDetailPage() {
           </CardContent>
         </Card>
       )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button className="w-full" size="sm" disabled={isProcessing}>
-                <Play className="h-4 w-4 mr-2" />
-                Play Audio Book
-              </Button>
-              <Button
-                className="w-full"
-                variant="outline"
-                size="sm"
-                disabled={isProcessing}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download
-              </Button>
-              <Button
-                className="w-full"
-                variant="outline"
-                size="sm"
-                disabled={isProcessing}
-              >
-                <Share2 className="h-4 w-4 mr-2" />
-                Share
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* File Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle>File Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
-                <span className="text-sm text-muted-foreground">File URL:</span>
-                <p className="text-sm font-mono break-all">
-                  {audioBook.file_url || "Not available"}
-                </p>
-              </div>
-              <Separator />
-              <div>
-                <span className="text-sm text-muted-foreground">
-                  Cover Image:
-                </span>
-                <p className="text-sm font-mono break-all">
-                  {audioBook.cover_image_url || "Not available"}
-                </p>
-              </div>
-              <Separator />
-              <div>
-                <span className="text-sm text-muted-foreground">
-                  Last Updated:
-                </span>
-                <p className="text-sm">
-                  {new Date(audioBook.updated_at).toLocaleString()}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
     </div>
   );
 }

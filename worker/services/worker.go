@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"audio-book-ai/worker/models"
-
-	"github.com/google/uuid"
 )
 
 // Worker handles AI processing job execution
@@ -42,40 +40,47 @@ func (w *Worker) ProcessJob(job models.Job) error {
 		return err
 	}
 
-	// Get transcript for the audiobook
-	transcript, err := w.dbService.GetTranscript(job.AudiobookID)
+	// // Get transcript for the audiobook
+	// transcript, err := w.dbService.GetTranscript(job.AudiobookID)
+	// if err != nil {
+	// 	errorMsg := fmt.Sprintf("Failed to get transcript: %v", err)
+	// 	w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
+	// 	return err
+	// }
+
+	// // Process based on job type
+	// var output *models.AIOutput
+	// switch job.JobType {
+	// case models.JobTypeEmbed:
+	// 	output, err = w.processEmbedding(job.AudiobookID, transcript)
+	// case models.JobTypeSummarize:
+	// 	// For combined jobs, use the dedicated method
+	// 	return w.ProcessSummarizeJob(job)
+	// default:
+	// 	errorMsg := fmt.Sprintf("Unknown job type: %s", job.JobType)
+	// 	w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
+	// 	return fmt.Errorf("unknown job type: %s", job.JobType)
+	// }
+
+	// if err != nil {
+	// 	errorMsg := fmt.Sprintf("Failed to process %s: %v", job.JobType, err)
+	// 	w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
+	// 	return err
+	// }
+
+	err := w.ProcessSummarizeJob(job)
 	if err != nil {
-		errorMsg := fmt.Sprintf("Failed to get transcript: %v", err)
+		errorMsg := fmt.Sprintf("Failed to process summarize job: %v", err)
 		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
 		return err
 	}
 
-	// Process based on job type
-	var output *models.AIOutput
-	switch job.JobType {
-	case models.JobTypeEmbed:
-		output, err = w.processEmbedding(job.AudiobookID, transcript)
-	case models.JobTypeSummarize:
-		// For combined jobs, use the dedicated method
-		return w.ProcessSummarizeJob(job)
-	default:
-		errorMsg := fmt.Sprintf("Unknown job type: %s", job.JobType)
-		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
-		return fmt.Errorf("unknown job type: %s", job.JobType)
-	}
-
-	if err != nil {
-		errorMsg := fmt.Sprintf("Failed to process %s: %v", job.JobType, err)
-		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
-		return err
-	}
-
-	// Save the output
-	if err := w.dbService.SaveAIOutput(output); err != nil {
-		errorMsg := fmt.Sprintf("Failed to save output: %v", err)
-		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
-		return err
-	}
+	// // Save the output
+	// if err := w.dbService.SaveAIOutput(output); err != nil {
+	// 	errorMsg := fmt.Sprintf("Failed to save output: %v", err)
+	// 	w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
+	// 	return err
+	// }
 
 	// Update job status to completed
 	if err := w.dbService.UpdateJobStatus(job.ID, models.JobStatusCompleted, nil); err != nil {
@@ -87,20 +92,20 @@ func (w *Worker) ProcessJob(job models.Job) error {
 }
 
 // processEmbedding processes an embedding job
-func (w *Worker) processEmbedding(audiobookID uuid.UUID, transcript string) (*models.AIOutput, error) {
-	embedding, err := w.geminiService.GenerateEmbedding(transcript)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate embedding: %v", err)
-	}
+// func (w *Worker) processEmbedding(audiobookID uuid.UUID, transcript string) (*models.AIOutput, error) {
+// 	embedding, err := w.geminiService.GenerateEmbedding(transcript)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to generate embedding: %v", err)
+// 	}
 
-	return &models.AIOutput{
-		AudiobookID: audiobookID,
-		OutputType:  models.OutputTypeEmbedding,
-		Content:     map[string]interface{}{"embedding": embedding},
-		ModelUsed:   w.geminiService.model,
-		CreatedAt:   time.Now(),
-	}, nil
-}
+// 	return &models.AIOutput{
+// 		AudiobookID: audiobookID,
+// 		OutputType:  models.OutputTypeEmbedding,
+// 		Content:     map[string]interface{}{"embedding": embedding},
+// 		ModelUsed:   w.geminiService.model,
+// 		CreatedAt:   time.Now(),
+// 	}, nil
+// }
 
 // ProcessSummarizeJob processes a summarize job (includes both summary and tags)
 func (w *Worker) ProcessSummarizeJob(job models.Job) error {
