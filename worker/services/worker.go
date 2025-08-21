@@ -119,20 +119,9 @@ func (w *Worker) ProcessSummarizeJob(job models.Job) error {
 	// Try to get chapter transcripts first
 	transcripts, err := w.dbService.GetChapterTranscripts(job.AudiobookID)
 	if err != nil {
-		// If chapter transcripts fail, try to get a single transcript
-		log.Printf("Failed to get chapter transcripts, trying single transcript: %v", err)
-		singleTranscript, err := w.dbService.GetTranscript(job.AudiobookID)
-		if err != nil {
-			errorMsg := fmt.Sprintf("Failed to get any transcripts: %v", err)
-			w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
-			return err
-		}
-		// Use the single transcript
-		transcripts = []models.ChapterTranscript{
-			{
-				Content: singleTranscript,
-			},
-		}
+		errorMsg := fmt.Sprintf("Failed to get chapter transcripts: %v", err)
+		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
+		return err
 	}
 
 	if len(transcripts) == 0 {

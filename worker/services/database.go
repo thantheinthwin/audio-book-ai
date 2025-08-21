@@ -121,28 +121,6 @@ func (d *DatabaseService) UpdateJobStatus(jobID uuid.UUID, status string, errorM
 	return nil
 }
 
-// GetTranscript retrieves the transcript for an audiobook
-func (d *DatabaseService) GetTranscript(audiobookID uuid.UUID) (string, error) {
-	query := `
-		SELECT content
-		FROM transcripts
-		WHERE audiobook_id = $1
-		ORDER BY created_at DESC
-		LIMIT 1
-	`
-
-	var content string
-	err := d.pool.QueryRow(context.Background(), query, audiobookID).Scan(&content)
-	if err != nil {
-		if err.Error() == "no rows in result set" {
-			return "", fmt.Errorf("no transcript found for audiobook %s", audiobookID)
-		}
-		return "", fmt.Errorf("failed to get transcript: %v", err)
-	}
-
-	return content, nil
-}
-
 // SaveAIOutput saves AI processing output to the database
 func (d *DatabaseService) SaveAIOutput(output *models.AIOutput) error {
 	// First, try to delete any existing output for this audiobook and output type
