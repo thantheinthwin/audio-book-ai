@@ -75,7 +75,8 @@ CREATE TABLE IF NOT EXISTS ai_outputs (
     content JSONB NOT NULL,
     model_used VARCHAR(100),
     processing_time_seconds INTEGER,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(audiobook_id, output_type)
 );
 
 -- Chapter AI Outputs table

@@ -95,3 +95,12 @@ COMMENT ON FUNCTION delete_audiobook_related_uploads() IS 'Trigger function to d
 
 -- Add comment to document the simplified relationship
 COMMENT ON TABLE audiobooks IS 'Audiobooks table. Related uploads are tracked via the audiobook_uploads junction table. When an audiobook is deleted, related chapters are automatically deleted via CASCADE, and upload_files are deleted via the chapters table foreign key relationship.';
+
+-- Migration to add unique constraint on ai_outputs table
+-- This ensures only one output per type per audiobook
+ALTER TABLE ai_outputs ADD CONSTRAINT ai_outputs_audiobook_id_output_type_unique 
+    UNIQUE (audiobook_id, output_type);
+
+-- Add comment to document the constraint
+COMMENT ON CONSTRAINT ai_outputs_audiobook_id_output_type_unique ON ai_outputs 
+    IS 'Ensures only one AI output per type per audiobook, allowing upserts in SaveAIOutput method.';

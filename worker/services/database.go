@@ -151,17 +151,24 @@ func (d *DatabaseService) SaveAIOutput(output *models.AIOutput) error {
 		return fmt.Errorf("failed to marshal content: %v", err)
 	}
 
-	query := `
+	// First, try to delete any existing output for this audiobook and output type
+	deleteQuery := `
+		DELETE FROM ai_outputs 
+		WHERE audiobook_id = $1 AND output_type = $2
+	`
+	_, err = d.pool.Exec(context.Background(), deleteQuery, output.AudiobookID, output.OutputType)
+	if err != nil {
+		return fmt.Errorf("failed to delete existing AI output: %v", err)
+	}
+
+	// Then insert the new output
+	insertQuery := `
 		INSERT INTO ai_outputs (
 			id, audiobook_id, output_type, content, model_used, created_at
 		) VALUES ($1, $2, $3, $4, $5, $6)
-		ON CONFLICT (audiobook_id, output_type) DO UPDATE SET
-			content = EXCLUDED.content,
-			model_used = EXCLUDED.model_used,
-			created_at = EXCLUDED.created_at
 	`
 
-	_, err = d.pool.Exec(context.Background(), query,
+	_, err = d.pool.Exec(context.Background(), insertQuery,
 		uuid.New(),
 		output.AudiobookID,
 		output.OutputType,
