@@ -39,6 +39,9 @@ interface AudioBook {
   created_by: string;
   created_at: string;
   updated_at: string;
+  // Frontend convenience fields
+  cover_image?: string; // Alias for cover_image_url
+  duration?: number; // Alias for duration_seconds
 }
 
 interface Chapter {

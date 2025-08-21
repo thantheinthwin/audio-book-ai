@@ -166,10 +166,10 @@ export default function AudioBooksPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {book.cover_image && (
+                {book.cover_image_url && (
                   <div className="mb-4">
                     <img
-                      src={book.cover_image}
+                      src={book.cover_image_url}
                       alt={book.title}
                       className="w-full h-32 object-cover rounded-md"
                     />
@@ -178,9 +178,9 @@ export default function AudioBooksPage() {
 
                 <div className="flex justify-between items-center">
                   <div className="flex gap-2">
-                    {book.duration && (
+                    {book.duration_seconds && (
                       <Badge variant="secondary">
-                        {Math.round(book.duration / 60)} min
+                        {Math.round(book.duration_seconds / 60)} min
                       </Badge>
                     )}
                     <Badge variant="outline">
