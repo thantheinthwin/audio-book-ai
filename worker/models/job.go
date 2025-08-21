@@ -28,7 +28,6 @@ const (
 
 // JobType represents the possible job types
 const (
+	JobTypeEmbed    = "embed"
 	JobTypeSummarize = "summarize"
-	JobTypeTag       = "tag"
-	JobTypeEmbed     = "embed"
 )

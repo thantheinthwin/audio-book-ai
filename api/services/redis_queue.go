@@ -127,7 +127,6 @@ func (r *RedisQueueService) GetQueueStats(ctx context.Context) (map[string]inter
 	jobTypes := []models.JobType{
 		models.JobTypeTranscribe,
 		models.JobTypeSummarize,
-		models.JobTypeTag,
 		models.JobTypeEmbed,
 	}
 

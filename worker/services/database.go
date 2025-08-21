@@ -60,16 +60,15 @@ func (d *DatabaseService) GetPendingJobs(limit int) ([]models.Job, error) {
 	query := `
 		SELECT id, audiobook_id, job_type, status, created_at, started_at, completed_at, error_message
 		FROM processing_jobs
-		WHERE job_type IN ($1, $2, $3)
-		AND status = $4
+		WHERE job_type IN ($1, $2)
+		AND status = $3
 		ORDER BY created_at ASC
-		LIMIT $5
+		LIMIT $4
 	`
 
 	rows, err := d.pool.Query(context.Background(), query,
-		models.JobTypeSummarize,
-		models.JobTypeTag,
 		models.JobTypeEmbed,
+		models.JobTypeSummarize,
 		models.JobStatusPending,
 		limit,
 	)
@@ -210,4 +209,30 @@ func (d *DatabaseService) GetChapterTranscripts(audiobookID uuid.UUID) ([]models
 	}
 
 	return transcripts, nil
+}
+
+// GetAllTags retrieves all available tags from the database
+func (d *DatabaseService) GetAllTags() ([]string, error) {
+	query := `
+		SELECT name
+		FROM tags
+		ORDER BY name ASC
+	`
+
+	rows, err := d.pool.Query(context.Background(), query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tags: %v", err)
+	}
+	defer rows.Close()
+
+	var tags []string
+	for rows.Next() {
+		var tagName string
+		if err := rows.Scan(&tagName); err != nil {
+			return nil, fmt.Errorf("failed to scan tag: %v", err)
+		}
+		tags = append(tags, tagName)
+	}
+
+	return tags, nil
 }

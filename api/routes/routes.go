@@ -14,25 +14,26 @@ import (
 func SetupRoutes(app fiber.Router, cfg *config.Config, repo database.Repository, storage *services.SupabaseStorageService, redisQueue *services.RedisQueueService) {
 	// Create handler instance
 	h := handlers.NewHandler(repo, storage, redisQueue)
-	// Auth routes
-	auth := app.Group("/auth", middleware.AuthMiddleware(cfg))
-	SetupAuthRoutes(auth, cfg)
-
-	// Protected routes (authentication required)
-	protected := app.Group("/", middleware.AuthMiddleware(cfg))
-	SetupProtectedRoutes(protected, cfg, h)
-
-	// Admin routes (admin authentication required)
-	admin := app.Group("/admin", middleware.AuthMiddleware(cfg), middleware.RequireAdmin())
-	SetupAdminRoutes(admin, cfg, h)
 
 	// Internal routes (API key authentication required, for service-to-service communication)
 	internal := app.Group("/internal", middleware.InternalAPIKeyMiddleware(cfg))
 	SetupInternalRoutes(internal, cfg, h)
 
+	// Auth routes
+	auth := app.Group("/auth", middleware.AuthMiddleware(cfg))
+	SetupAuthRoutes(auth, cfg)
+
+	// Protected routes (authentication required)
+	protected := app.Group("/user", middleware.AuthMiddleware(cfg))
+	SetupProtectedRoutes(protected, cfg, h)
+
 	// Public routes (no authentication required)
-	public := app.Group("/")
+	public := app.Group("/public")
 	SetupPublicRoutes(public, cfg, h)
+
+	// Admin routes (admin authentication required)
+	admin := app.Group("/admin", middleware.AuthMiddleware(cfg), middleware.RequireAdmin())
+	SetupAdminRoutes(admin, cfg, h)
 }
 
 // SetupAuthRoutes configures authentication routes
@@ -44,8 +45,8 @@ func SetupAuthRoutes(router fiber.Router, cfg *config.Config) {
 
 // SetupProtectedRoutes configures protected routes (requires user or admin role)
 func SetupProtectedRoutes(router fiber.Router, cfg *config.Config, h *handlers.Handler) {
-	// Apply user role middleware
-	router.Use(middleware.RequireUser(), middleware.RequireAdmin())
+	// Apply user role middleware (allows both user and admin roles)
+	router.Use(middleware.RequireUser())
 
 	// User profile
 	router.Get("/profile", handlers.GetProfile)
@@ -83,7 +84,7 @@ func SetupAdminRoutes(router fiber.Router, cfg *config.Config, h *handlers.Handl
 	router.Post("/jobs/:job_id/status", h.UpdateJobStatus)
 }
 
-// SetupInternalRoutes configures internal service-to-service routes (no authentication required)
+// SetupInternalRoutes configures internal service-to-service routes (API key authentication required)
 func SetupInternalRoutes(router fiber.Router, cfg *config.Config, h *handlers.Handler) {
 	// Internal webhook for triggering summarize and tag jobs
 	router.Post("/audiobooks/:id/trigger-summarize-tag", h.TriggerSummarizeAndTagJobs)

@@ -245,15 +245,16 @@ export const authAPI = {
 
 // Profile API functions
 export const profileAPI = {
-  getProfile: () => apiClient<ApiResponse<User>>("/profile"),
+  getProfile: () => apiClient<ApiResponse<User>>("/user/profile"),
 
   updateProfile: (data: ProfileUpdateData) =>
-    apiClient<ApiResponse<User>>("/profile", {
+    apiClient<ApiResponse<User>>("/user/profile", {
       method: "PUT",
       data,
     }),
 
-  deleteProfile: () => apiClient<ApiResponse>("/profile", { method: "DELETE" }),
+  deleteProfile: () =>
+    apiClient<ApiResponse>("/user/profile", { method: "DELETE" }),
 };
 
 // Upload API functions
@@ -434,10 +435,10 @@ export const uploadAPI = {
 // Audio books API functions
 export const audiobooksAPI = {
   // User operations (protected routes)
-  getAudioBooks: () => apiClient<ApiResponse<AudioBook[]>>("/audiobooks"),
+  getAudioBooks: () => apiClient<ApiResponse<AudioBook[]>>("/user/audiobooks"),
 
   getAudioBook: (id: string) =>
-    apiClient<ApiResponse<AudioBook>>(`/audiobooks/${id}`),
+    apiClient<ApiResponse<AudioBook>>(`/user/audiobooks/${id}`),
 
   // Admin operations (admin routes)
   createAudioBook: (data: {
@@ -518,10 +519,11 @@ export const audiobooksAPI = {
 
 // Public audio books API functions (no auth required)
 export const publicAPI = {
-  getPublicAudioBooks: () => apiClient<ApiResponse<AudioBook[]>>("/audiobooks"),
+  getPublicAudioBooks: () =>
+    apiClient<ApiResponse<AudioBook[]>>("/public/audiobooks"),
 
   getPublicAudioBook: (id: string) =>
-    apiClient<ApiResponse<AudioBook>>(`/audiobooks/${id}`),
+    apiClient<ApiResponse<AudioBook>>(`/public/audiobooks/${id}`),
 };
 
 // Library API functions
@@ -576,10 +578,11 @@ export const playlistsAPI = {
 
 // Progress API functions
 export const progressAPI = {
-  getProgress: (audiobookId: string) => apiClient(`/progress/${audiobookId}`),
+  getProgress: (audiobookId: string) =>
+    apiClient(`/user/progress/${audiobookId}`),
 
   updateProgress: (audiobookId: string, data: any) =>
-    apiClient(`/progress/${audiobookId}`, {
+    apiClient(`/user/progress/${audiobookId}`, {
       method: "PUT",
       data,
     }),

@@ -14,14 +14,15 @@ import (
 
 // GeminiService handles Gemini API interactions
 type GeminiService struct {
-	apiKey  string
-	baseURL string
-	model   string
-	client  *http.Client
+	apiKey    string
+	baseURL   string
+	model     string
+	client    *http.Client
+	dbService *DatabaseService
 }
 
 // NewGeminiService creates a new Gemini service
-func NewGeminiService(apiKey, baseURL, model string) *GeminiService {
+func NewGeminiService(apiKey, baseURL, model string, dbService *DatabaseService) *GeminiService {
 	return &GeminiService{
 		apiKey:  apiKey,
 		baseURL: baseURL,
@@ -29,62 +30,28 @@ func NewGeminiService(apiKey, baseURL, model string) *GeminiService {
 		client: &http.Client{
 			Timeout: 60 * time.Second,
 		},
+		dbService: dbService,
 	}
-}
-
-// GenerateSummary generates a summary using Gemini API
-func (g *GeminiService) GenerateSummary(text string) (string, error) {
-	prompt := fmt.Sprintf(`Please provide a concise summary of the following audiobook transcript. Focus on the main themes, key events, and important characters. Keep the summary to 2-3 paragraphs maximum.
-
-Transcript:
-%s
-
-Summary:`, text)
-
-	return g.generateText(prompt, 0.3, 1000)
-}
-
-// GenerateTags generates tags using Gemini API
-func (g *GeminiService) GenerateTags(text string) ([]string, error) {
-	prompt := fmt.Sprintf(`Please analyze the following audiobook transcript and generate relevant tags. Focus on:
-- Genre (fiction, non-fiction, mystery, romance, etc.)
-- Themes (love, betrayal, adventure, etc.)
-- Setting (time period, location)
-- Target audience (young adult, adult, children, etc.)
-- Content warnings if applicable
-
-Return only the tags as a comma-separated list, no explanations.
-
-Transcript:
-%s
-
-Tags:`, text)
-
-	response, err := g.generateText(prompt, 0.2, 200)
-	if err != nil {
-		return nil, err
-	}
-
-	// Parse comma-separated tags
-	tags := strings.Split(response, ",")
-	var cleanTags []string
-	for _, tag := range tags {
-		cleanTag := strings.TrimSpace(tag)
-		if cleanTag != "" {
-			cleanTags = append(cleanTags, cleanTag)
-		}
-	}
-
-	return cleanTags, nil
 }
 
 // GenerateSummaryAndTags generates both summary and tags in a single API call
 func (g *GeminiService) GenerateSummaryAndTags(text string) (*models.SummaryAndTags, error) {
+	// Get all available tags from the database
+	availableTags, err := g.dbService.GetAllTags()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get available tags: %v", err)
+	}
+
+	// Create a list of available tags for the prompt
+	availableTagsList := strings.Join(availableTags, ", ")
+
 	prompt := fmt.Sprintf(`Please analyze the following audiobook transcript and provide both a summary and relevant tags.
 
 Requirements:
 1. Summary: Provide a concise summary (2-3 paragraphs) focusing on main themes, key events, and important characters.
-2. Tags: Generate relevant tags focusing on genre, themes, setting, target audience, and content warnings.
+2. Tags: Choose ONLY from the following available tags: %s
+
+IMPORTANT: You must ONLY use tags from the provided list. Do not create new tags.
 
 Please respond in the following JSON format:
 {
@@ -92,10 +59,12 @@ Please respond in the following JSON format:
   "tags": ["tag1", "tag2", "tag3", ...]
 }
 
+Available tags: %s
+
 Transcript:
 %s
 
-Response:`, text)
+Response:`, availableTagsList, availableTagsList, text)
 
 	response, err := g.generateText(prompt, 0.3, 1000)
 	if err != nil {
@@ -109,11 +78,38 @@ Response:`, text)
 		return g.extractSummaryAndTagsFromText(response)
 	}
 
+	// Filter tags to ensure only valid tags from the database are used
+	summaryAndTags.Tags = g.filterValidTags(summaryAndTags.Tags, availableTags)
+
 	return &summaryAndTags, nil
+}
+
+// filterValidTags filters the provided tags to only include those that exist in the available tags list
+func (g *GeminiService) filterValidTags(providedTags []string, availableTags []string) []string {
+	// Create a map for O(1) lookup
+	availableTagsMap := make(map[string]bool)
+	for _, tag := range availableTags {
+		availableTagsMap[strings.ToLower(strings.TrimSpace(tag))] = true
+	}
+
+	var validTags []string
+	for _, tag := range providedTags {
+		tag = strings.TrimSpace(tag)
+		if availableTagsMap[strings.ToLower(tag)] {
+			validTags = append(validTags, tag)
+		}
+	}
+
+	return validTags
 }
 
 // extractSummaryAndTagsFromText extracts summary and tags from plain text response
 func (g *GeminiService) extractSummaryAndTagsFromText(text string) (*models.SummaryAndTags, error) {
+	// Get all available tags from the database
+	availableTags, err := g.dbService.GetAllTags()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get available tags: %v", err)
+	}
 	// Simple extraction logic - look for common patterns
 	lines := strings.Split(text, "\n")
 	var summaryLines []string
@@ -157,9 +153,12 @@ func (g *GeminiService) extractSummaryAndTagsFromText(text string) (*models.Summ
 		summary = "Summary could not be extracted from response."
 	}
 
+	// Filter tags to ensure only valid tags from the database are used
+	filteredTags := g.filterValidTags(tags, availableTags)
+
 	return &models.SummaryAndTags{
 		Summary: summary,
-		Tags:    tags,
+		Tags:    filteredTags,
 	}, nil
 }
 

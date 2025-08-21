@@ -748,11 +748,11 @@ func (h *Handler) TriggerSummarizeAndTagJobs(c *fiber.Ctx) error {
 
 	log.Printf("TriggerSummarizeAndTagJobs: All %d chapters are transcribed, proceeding with summarize and tag jobs", len(chapters))
 
-	// Create combined summarize and tag job
+	// Create summarize job
 	job := &models.ProcessingJob{
 		ID:          uuid.New(),
 		AudiobookID: audiobookID,
-		JobType:     models.JobTypeSummarize, // We'll use this for the combined job
+		JobType:     models.JobTypeSummarize, // Summarize job type
 		Status:      models.JobStatusPending,
 		CreatedAt:   time.Now(),
 	}

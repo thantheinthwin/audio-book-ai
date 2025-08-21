@@ -85,6 +85,7 @@ func main() {
 
 	// Start consuming transcription jobs from Redis
 	log.Println("Starting transcriber service...")
+	fmt.Println("Worker config:", workerConfig)
 	if err := redisConsumer.ConsumeJobs(ctx, "transcribe", func(message services.JobMessage) error {
 		return processTranscriptionJob(worker, httpClient, cfg.APIBaseURL, cfg.InternalAPIKey, message)
 	}); err != nil {
@@ -151,7 +152,7 @@ func updateJobStatus(httpClient *http.Client, apiBaseURL string, internalAPIKey 
 	}
 
 	// Create HTTP request
-	url := fmt.Sprintf("%s/v1/internal/jobs/%s/status", apiBaseURL, jobID)
+	url := fmt.Sprintf("%s/api/v1/internal/jobs/%s/status", apiBaseURL, jobID)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		log.Printf("Error creating job status update request: %v", err)

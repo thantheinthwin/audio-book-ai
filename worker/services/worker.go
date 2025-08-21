@@ -53,12 +53,11 @@ func (w *Worker) ProcessJob(job models.Job) error {
 	// Process based on job type
 	var output *models.AIOutput
 	switch job.JobType {
-	case models.JobTypeSummarize:
-		output, err = w.processSummary(job.AudiobookID, transcript)
-	case models.JobTypeTag:
-		output, err = w.processTags(job.AudiobookID, transcript)
 	case models.JobTypeEmbed:
 		output, err = w.processEmbedding(job.AudiobookID, transcript)
+	case models.JobTypeSummarize:
+		// For combined jobs, use the dedicated method
+		return w.ProcessSummarizeJob(job)
 	default:
 		errorMsg := fmt.Sprintf("Unknown job type: %s", job.JobType)
 		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
@@ -87,38 +86,6 @@ func (w *Worker) ProcessJob(job models.Job) error {
 	return nil
 }
 
-// processSummary processes a summary job
-func (w *Worker) processSummary(audiobookID uuid.UUID, transcript string) (*models.AIOutput, error) {
-	summary, err := w.geminiService.GenerateSummary(transcript)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate summary: %v", err)
-	}
-
-	return &models.AIOutput{
-		AudiobookID: audiobookID,
-		OutputType:  models.OutputTypeSummary,
-		Content:     summary,
-		ModelUsed:   w.geminiService.model,
-		CreatedAt:   time.Now(),
-	}, nil
-}
-
-// processTags processes a tagging job
-func (w *Worker) processTags(audiobookID uuid.UUID, transcript string) (*models.AIOutput, error) {
-	tags, err := w.geminiService.GenerateTags(transcript)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate tags: %v", err)
-	}
-
-	return &models.AIOutput{
-		AudiobookID: audiobookID,
-		OutputType:  models.OutputTypeTags,
-		Content:     tags,
-		ModelUsed:   w.geminiService.model,
-		CreatedAt:   time.Now(),
-	}, nil
-}
-
 // processEmbedding processes an embedding job
 func (w *Worker) processEmbedding(audiobookID uuid.UUID, transcript string) (*models.AIOutput, error) {
 	embedding, err := w.geminiService.GenerateEmbedding(transcript)
@@ -135,21 +102,32 @@ func (w *Worker) processEmbedding(audiobookID uuid.UUID, transcript string) (*mo
 	}, nil
 }
 
-// ProcessCombinedSummarizeAndTagJob processes a combined summarize and tag job
-func (w *Worker) ProcessCombinedSummarizeAndTagJob(job models.Job) error {
-	log.Printf("Processing combined summarize and tag job %s for audiobook %s", job.ID, job.AudiobookID)
+// ProcessSummarizeJob processes a summarize job (includes both summary and tags)
+func (w *Worker) ProcessSummarizeJob(job models.Job) error {
+	log.Printf("Processing summarize job %s for audiobook %s", job.ID, job.AudiobookID)
 
 	// Update job status to running
 	if err := w.dbService.UpdateJobStatus(job.ID, models.JobStatusRunning, nil); err != nil {
 		return err
 	}
 
-	// Get all chapter transcripts for the audiobook
+	// Try to get chapter transcripts first
 	transcripts, err := w.dbService.GetChapterTranscripts(job.AudiobookID)
 	if err != nil {
-		errorMsg := fmt.Sprintf("Failed to get chapter transcripts: %v", err)
-		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
-		return err
+		// If chapter transcripts fail, try to get a single transcript
+		log.Printf("Failed to get chapter transcripts, trying single transcript: %v", err)
+		singleTranscript, err := w.dbService.GetTranscript(job.AudiobookID)
+		if err != nil {
+			errorMsg := fmt.Sprintf("Failed to get any transcripts: %v", err)
+			w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
+			return err
+		}
+		// Use the single transcript
+		transcripts = []models.ChapterTranscript{
+			{
+				Content: singleTranscript,
+			},
+		}
 	}
 
 	if len(transcripts) == 0 {
@@ -210,7 +188,7 @@ func (w *Worker) ProcessCombinedSummarizeAndTagJob(job models.Job) error {
 		return err
 	}
 
-	log.Printf("Successfully processed combined summarize and tag job %s", job.ID)
+	log.Printf("Successfully processed summarize job %s", job.ID)
 	return nil
 }
 

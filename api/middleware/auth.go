@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"log"
+
 	"audio-book-ai/api/config"
 	"audio-book-ai/api/models"
 	"audio-book-ai/api/services"
@@ -13,12 +15,15 @@ func AuthMiddleware(cfg *config.Config) fiber.Handler {
 	authService := services.NewSupabaseAuthService(cfg)
 
 	return func(c *fiber.Ctx) error {
+		log.Printf("AuthMiddleware: Processing request to %s", c.Path())
+
 		// Get Authorization header
 		authHeader := c.Get("Authorization")
 
 		// Extract token from header
 		tokenString, err := authService.ExtractTokenFromHeader(authHeader)
 		if err != nil {
+			log.Printf("AuthMiddleware: Failed to extract token: %v", err)
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": err.Error(),
 			})
@@ -126,21 +131,26 @@ func GetUserFromContext(c *fiber.Ctx) *models.UserContext {
 // InternalAPIKeyMiddleware validates the internal API key for service-to-service communication
 func InternalAPIKeyMiddleware(cfg *config.Config) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		log.Printf("InternalAPIKeyMiddleware: Processing request to %s", c.Path())
+
 		// Get API key from header
 		apiKey := c.Get("X-Internal-API-Key")
 		if apiKey == "" {
+			log.Printf("InternalAPIKeyMiddleware: Missing X-Internal-API-Key header")
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Internal API key required",
+				"error": "X-Internal-API-Key header required",
 			})
 		}
 
 		// Validate API key
 		if apiKey != cfg.InternalAPIKey {
+			log.Printf("InternalAPIKeyMiddleware: Invalid API key provided")
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Invalid internal API key",
 			})
 		}
 
+		log.Printf("InternalAPIKeyMiddleware: API key validated successfully")
 		return c.Next()
 	}
 }

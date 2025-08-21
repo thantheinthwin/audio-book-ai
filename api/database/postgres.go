@@ -1024,7 +1024,32 @@ func (p *PostgresRepository) CreateChapterTranscript(ctx context.Context, transc
 }
 
 func (p *PostgresRepository) GetChapterTranscriptByChapterID(ctx context.Context, chapterID uuid.UUID) (*models.ChapterTranscript, error) {
-	return nil, ErrNotFound
+	query := `
+		SELECT id, chapter_id, content, segments, language, confidence_score, processing_time_seconds, created_at
+		FROM chapter_transcripts
+		WHERE chapter_id = $1
+	`
+
+	var transcript models.ChapterTranscript
+	err := p.pool.QueryRow(ctx, query, chapterID).Scan(
+		&transcript.ID,
+		&transcript.ChapterID,
+		&transcript.Content,
+		&transcript.Segments,
+		&transcript.Language,
+		&transcript.ConfidenceScore,
+		&transcript.ProcessingTimeSeconds,
+		&transcript.CreatedAt,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get chapter transcript: %w", err)
+	}
+
+	return &transcript, nil
 }
 
 func (p *PostgresRepository) GetChapterTranscriptsByAudioBookID(ctx context.Context, audiobookID uuid.UUID) ([]models.ChapterTranscript, error) {

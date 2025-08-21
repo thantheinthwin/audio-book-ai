@@ -25,9 +25,8 @@ type JobType string
 
 const (
 	JobTypeTranscribe JobType = "transcribe"
-	JobTypeSummarize  JobType = "summarize"
-	JobTypeTag        JobType = "tag"
 	JobTypeEmbed      JobType = "embed"
+	JobTypeSummarize  JobType = "summarize"
 )
 
 // JobStatus represents the status of a processing job

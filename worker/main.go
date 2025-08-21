@@ -39,7 +39,7 @@ func main() {
 	defer dbService.Close()
 
 	// Initialize Gemini service
-	geminiService := services.NewGeminiService(cfg.GeminiAPIKey, cfg.GeminiURL, cfg.GeminiModel)
+	geminiService := services.NewGeminiService(cfg.GeminiAPIKey, cfg.GeminiURL, cfg.GeminiModel, dbService)
 
 	// Initialize Redis consumer
 	redisConsumer, err := services.NewRedisConsumer(cfg.RedisURL, "audiobooks", &services.Config{
@@ -86,25 +86,25 @@ func main() {
 
 	// Start combined summarize and tag consumer
 	if err := redisConsumer.ConsumeJobs(ctx, "summarize", func(message services.JobMessage) error {
-		return processCombinedSummarizeAndTagJob(worker, httpClient, cfg.APIBaseURL, cfg.InternalAPIKey, message)
+		return processSummarizeJob(worker, httpClient, cfg.APIBaseURL, cfg.InternalAPIKey, message)
 	}); err != nil {
 		log.Fatalf("Error consuming summarize and tag jobs: %v", err)
 	}
 }
 
-// processCombinedSummarizeAndTagJob processes a combined summarize and tag job and updates status via HTTP
-func processCombinedSummarizeAndTagJob(worker *services.Worker, httpClient *http.Client, apiBaseURL string, internalAPIKey string, message services.JobMessage) error {
+// processSummarizeJob processes a summarize job and updates status via HTTP
+func processSummarizeJob(worker *services.Worker, httpClient *http.Client, apiBaseURL string, internalAPIKey string, message services.JobMessage) error {
 	// Convert JobMessage to Job model
 	job := models.Job{
 		ID:          message.ID,
 		AudiobookID: message.AudiobookID,
-		JobType:     "summarize_and_tag", // Combined job type
+		JobType:     "summarize", // Summarize job type
 		Status:      "running",
 		CreatedAt:   message.CreatedAt,
 	}
 
-	// Process the combined job
-	if err := worker.ProcessCombinedSummarizeAndTagJob(job); err != nil {
+	// Process the summarize job
+	if err := worker.ProcessSummarizeJob(job); err != nil {
 		// Update job status to failed
 		now := time.Now()
 		updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "failed", err.Error(), nil, &now)
@@ -142,7 +142,7 @@ func updateJobStatus(httpClient *http.Client, apiBaseURL string, internalAPIKey 
 	}
 
 	// Create HTTP request
-	url := fmt.Sprintf("%s/v1/internal/jobs/%s/status", apiBaseURL, jobID)
+	url := fmt.Sprintf("%s/api/v1/internal/jobs/%s/status", apiBaseURL, jobID)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		log.Printf("Error creating job status update request: %v", err)
