@@ -144,7 +144,7 @@ func (w *Worker) checkAndTriggerSummarizeTagJobs(audiobookID string) error {
 	log.Printf("All chapters transcribed for audiobook %s, triggering summarize and tag jobs", audiobookID)
 
 	// Call the webhook to trigger summarize and tag jobs
-	url := fmt.Sprintf("%s/v1/internal/audiobooks/%s/trigger-summarize-tag", w.apiBaseURL, audiobookID)
+	url := fmt.Sprintf("%s/api/v1/internal/audiobooks/%s/trigger-summarize-tag", w.apiBaseURL, audiobookID)
 	log.Printf("Calling webhook URL: %s", url)
 
 	req, err := http.NewRequest("POST", url, nil)
