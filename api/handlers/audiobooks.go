@@ -105,7 +105,7 @@ func (h *Handler) GetAudioBook(c *fiber.Ctx) error {
 	log.Printf("GetAudioBook: User authenticated - UserID: %s", userID)
 
 	// Get audiobook with details from database
-	audiobook, err := h.repo.GetAudioBookWithDetails(context.Background(), audiobookID)
+	audiobook, err := h.repo.GetAudioBookByID(context.Background(), audiobookID)
 	if err != nil {
 		log.Printf("GetAudioBook: Failed to fetch audiobook: %v", err)
 		return c.Status(http.StatusNotFound).JSON(fiber.Map{

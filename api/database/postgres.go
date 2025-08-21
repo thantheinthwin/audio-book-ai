@@ -579,10 +579,6 @@ func (p *PostgresRepository) GetAudioBookByID(ctx context.Context, id uuid.UUID)
 	return &audiobook, nil
 }
 
-func (p *PostgresRepository) GetAudioBookWithDetails(ctx context.Context, id uuid.UUID) (*models.AudioBookWithDetails, error) {
-	return nil, ErrNotFound
-}
-
 func (p *PostgresRepository) UpdateAudioBook(ctx context.Context, audiobook *models.AudioBook) error {
 	query := `
 		UPDATE audiobooks 
