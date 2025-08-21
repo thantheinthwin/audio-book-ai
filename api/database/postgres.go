@@ -623,7 +623,52 @@ func (p *PostgresRepository) DeleteAudioBook(ctx context.Context, id uuid.UUID) 
 }
 
 func (p *PostgresRepository) ListAudioBooks(ctx context.Context, limit, offset int, isPublic *bool) ([]models.AudioBook, int, error) {
-	return []models.AudioBook{}, 0, nil
+	query := `
+		SELECT id, title, author, summary, duration_seconds, cover_image_url, language, is_public, status, created_by, created_at, updated_at
+		FROM audiobooks
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+
+	var audiobooks []models.AudioBook
+	rows, err := p.pool.Query(ctx, query, limit, offset)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, 0, ErrNotFound
+		}
+		return nil, 0, fmt.Errorf("failed to query audiobooks: %w", err)
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var audiobook models.AudioBook
+		err := rows.Scan(
+			&audiobook.ID,
+			&audiobook.Title,
+			&audiobook.Author,
+			&audiobook.Summary,
+			&audiobook.DurationSeconds,
+			&audiobook.CoverImageURL,
+			&audiobook.Language,
+			&audiobook.IsPublic,
+			&audiobook.Status,
+			&audiobook.CreatedBy,
+			&audiobook.CreatedAt,
+			&audiobook.UpdatedAt,
+		)
+
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				return nil, 0, ErrNotFound
+			}
+			return nil, 0, fmt.Errorf("failed to scan audiobook: %w", err)
+		}
+
+		audiobooks = append(audiobooks, audiobook)
+	}
+	return audiobooks, len(audiobooks), nil
 }
 
 func (p *PostgresRepository) GetAudioBooksByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.AudioBook, int, error) {

@@ -37,11 +37,11 @@ func NewMockRepository() *MockRepository {
 func (m *MockRepository) CreateUpload(ctx context.Context, upload *models.Upload) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	upload.ID = uuid.New()
 	upload.CreatedAt = time.Now()
 	upload.UpdatedAt = time.Now()
-	
+
 	m.uploads[upload.ID] = upload
 	return nil
 }
@@ -49,7 +49,7 @@ func (m *MockRepository) CreateUpload(ctx context.Context, upload *models.Upload
 func (m *MockRepository) GetUploadByID(ctx context.Context, id uuid.UUID) (*models.Upload, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	upload, exists := m.uploads[id]
 	if !exists {
 		return nil, ErrNotFound
@@ -60,37 +60,37 @@ func (m *MockRepository) GetUploadByID(ctx context.Context, id uuid.UUID) (*mode
 func (m *MockRepository) GetUploadsByUserID(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.Upload, int, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	var uploads []models.Upload
 	for _, upload := range m.uploads {
 		if upload.UserID == userID {
 			uploads = append(uploads, *upload)
 		}
 	}
-	
+
 	total := len(uploads)
-	
+
 	// Simple pagination
 	if offset >= total {
 		return []models.Upload{}, total, nil
 	}
-	
+
 	end := offset + limit
 	if end > total {
 		end = total
 	}
-	
+
 	return uploads[offset:end], total, nil
 }
 
 func (m *MockRepository) UpdateUpload(ctx context.Context, upload *models.Upload) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if _, exists := m.uploads[upload.ID]; !exists {
 		return ErrNotFound
 	}
-	
+
 	upload.UpdatedAt = time.Now()
 	m.uploads[upload.ID] = upload
 	return nil
@@ -99,11 +99,11 @@ func (m *MockRepository) UpdateUpload(ctx context.Context, upload *models.Upload
 func (m *MockRepository) DeleteUpload(ctx context.Context, id uuid.UUID) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if _, exists := m.uploads[id]; !exists {
 		return ErrNotFound
 	}
-	
+
 	delete(m.uploads, id)
 	return nil
 }
@@ -112,10 +112,10 @@ func (m *MockRepository) DeleteUpload(ctx context.Context, id uuid.UUID) error {
 func (m *MockRepository) CreateUploadFile(ctx context.Context, uploadFile *models.UploadFile) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	uploadFile.ID = uuid.New()
 	uploadFile.CreatedAt = time.Now()
-	
+
 	m.uploadFiles[uploadFile.ID] = uploadFile
 	return nil
 }
@@ -123,7 +123,7 @@ func (m *MockRepository) CreateUploadFile(ctx context.Context, uploadFile *model
 func (m *MockRepository) GetUploadFileByID(ctx context.Context, id uuid.UUID) (*models.UploadFile, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	uploadFile, exists := m.uploadFiles[id]
 	if !exists {
 		return nil, ErrNotFound
@@ -134,7 +134,7 @@ func (m *MockRepository) GetUploadFileByID(ctx context.Context, id uuid.UUID) (*
 func (m *MockRepository) GetUploadFiles(ctx context.Context, uploadID uuid.UUID) ([]models.UploadFile, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	var files []models.UploadFile
 	for _, file := range m.uploadFiles {
 		if file.UploadID == uploadID {
@@ -147,11 +147,11 @@ func (m *MockRepository) GetUploadFiles(ctx context.Context, uploadID uuid.UUID)
 func (m *MockRepository) UpdateUploadFile(ctx context.Context, uploadFile *models.UploadFile) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if _, exists := m.uploadFiles[uploadFile.ID]; !exists {
 		return ErrNotFound
 	}
-	
+
 	m.uploadFiles[uploadFile.ID] = uploadFile
 	return nil
 }
@@ -159,11 +159,11 @@ func (m *MockRepository) UpdateUploadFile(ctx context.Context, uploadFile *model
 func (m *MockRepository) DeleteUploadFile(ctx context.Context, id uuid.UUID) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if _, exists := m.uploadFiles[id]; !exists {
 		return ErrNotFound
 	}
-	
+
 	delete(m.uploadFiles, id)
 	return nil
 }
@@ -171,7 +171,7 @@ func (m *MockRepository) DeleteUploadFile(ctx context.Context, id uuid.UUID) err
 func (m *MockRepository) DeleteUploadFilesByUploadID(ctx context.Context, uploadID uuid.UUID) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	for id, file := range m.uploadFiles {
 		if file.UploadID == uploadID {
 			delete(m.uploadFiles, id)
@@ -183,7 +183,7 @@ func (m *MockRepository) DeleteUploadFilesByUploadID(ctx context.Context, upload
 func (m *MockRepository) GetUploadedSize(ctx context.Context, uploadID uuid.UUID) (int64, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	var totalSize int64
 	for _, file := range m.uploadFiles {
 		if file.UploadID == uploadID {
@@ -197,11 +197,11 @@ func (m *MockRepository) GetUploadedSize(ctx context.Context, uploadID uuid.UUID
 func (m *MockRepository) CreateAudioBook(ctx context.Context, audiobook *models.AudioBook) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	audiobook.ID = uuid.New()
 	audiobook.CreatedAt = time.Now()
 	audiobook.UpdatedAt = time.Now()
-	
+
 	m.audiobooks[audiobook.ID] = audiobook
 	return nil
 }
@@ -209,7 +209,7 @@ func (m *MockRepository) CreateAudioBook(ctx context.Context, audiobook *models.
 func (m *MockRepository) GetAudioBookByID(ctx context.Context, id uuid.UUID) (*models.AudioBook, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	audiobook, exists := m.audiobooks[id]
 	if !exists {
 		return nil, ErrNotFound
@@ -222,7 +222,7 @@ func (m *MockRepository) GetAudioBookWithDetails(ctx context.Context, id uuid.UU
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &models.AudioBookWithDetails{
 		AudioBook: *audiobook,
 	}, nil
@@ -231,11 +231,11 @@ func (m *MockRepository) GetAudioBookWithDetails(ctx context.Context, id uuid.UU
 func (m *MockRepository) UpdateAudioBook(ctx context.Context, audiobook *models.AudioBook) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if _, exists := m.audiobooks[audiobook.ID]; !exists {
 		return ErrNotFound
 	}
-	
+
 	audiobook.UpdatedAt = time.Now()
 	m.audiobooks[audiobook.ID] = audiobook
 	return nil
@@ -244,11 +244,11 @@ func (m *MockRepository) UpdateAudioBook(ctx context.Context, audiobook *models.
 func (m *MockRepository) DeleteAudioBook(ctx context.Context, id uuid.UUID) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if _, exists := m.audiobooks[id]; !exists {
 		return ErrNotFound
 	}
-	
+
 	delete(m.audiobooks, id)
 	return nil
 }
@@ -256,62 +256,62 @@ func (m *MockRepository) DeleteAudioBook(ctx context.Context, id uuid.UUID) erro
 func (m *MockRepository) ListAudioBooks(ctx context.Context, limit, offset int, isPublic *bool) ([]models.AudioBook, int, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	var audiobooks []models.AudioBook
 	for _, audiobook := range m.audiobooks {
 		if isPublic == nil || audiobook.IsPublic == *isPublic {
 			audiobooks = append(audiobooks, *audiobook)
 		}
 	}
-	
+
 	total := len(audiobooks)
-	
+
 	if offset >= total {
 		return []models.AudioBook{}, total, nil
 	}
-	
+
 	end := offset + limit
 	if end > total {
 		end = total
 	}
-	
+
 	return audiobooks[offset:end], total, nil
 }
 
 func (m *MockRepository) GetAudioBooksByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.AudioBook, int, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	var audiobooks []models.AudioBook
 	for _, audiobook := range m.audiobooks {
 		if audiobook.CreatedBy == userID {
 			audiobooks = append(audiobooks, *audiobook)
 		}
 	}
-	
+
 	total := len(audiobooks)
-	
+
 	if offset >= total {
 		return []models.AudioBook{}, total, nil
 	}
-	
+
 	end := offset + limit
 	if end > total {
 		end = total
 	}
-	
+
 	return audiobooks[offset:end], total, nil
 }
 
 func (m *MockRepository) UpdateAudioBookStatus(ctx context.Context, id uuid.UUID, status models.AudioBookStatus) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	audiobook, exists := m.audiobooks[id]
 	if !exists {
 		return ErrNotFound
 	}
-	
+
 	audiobook.Status = status
 	audiobook.UpdatedAt = time.Now()
 	return nil
