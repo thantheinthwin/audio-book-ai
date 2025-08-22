@@ -85,77 +85,78 @@ func (w *Worker) ProcessJob(job models.Job) error {
 	return nil
 }
 
-// ProcessJobWithDBUpdates processes a job and updates status directly to database (for Run() method)
-func (w *Worker) ProcessJobWithDBUpdates(job models.Job) error {
-	log.Printf("Processing transcription job %s for audiobook %s (retry %d/%d)", job.ID, job.AudiobookID, job.RetryCount, job.MaxRetries)
+// // ProcessJobWithDBUpdates processes a job and updates status directly to database (for Run() method)
+// func (w *Worker) ProcessJobWithDBUpdates(job models.Job) error {
+// 	log.Printf("Processing transcription job %s for audiobook %s (retry %d/%d)", job.ID, job.AudiobookID, job.RetryCount, job.MaxRetries)
 
-	// Check if we've exceeded max retries
-	if job.RetryCount >= job.MaxRetries {
-		errorMsg := fmt.Sprintf("Job failed after %d retries (max: %d)", job.RetryCount, job.MaxRetries)
-		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
-		return fmt.Errorf("max retries exceeded for job %s", job.ID)
-	}
+// 	// Check if we've exceeded max retries
+// 	if job.RetryCount >= job.MaxRetries {
+// 		errorMsg := fmt.Sprintf("Job failed after %d retries (max: %d)", job.RetryCount, job.MaxRetries)
+// 		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
+// 		log.Printf("Max retries exceeded for job %s", job.ID)
+// 		return fmt.Errorf("max retries exceeded")
+// 	}
 
-	// Update job status to running
-	if err := w.dbService.UpdateJobStatus(job.ID, models.JobStatusRunning, nil); err != nil {
-		return err
-	}
+// 	// Update job status to running
+// 	if err := w.dbService.UpdateJobStatus(job.ID, models.JobStatusRunning, nil); err != nil {
+// 		return err
+// 	}
 
-	// Check if file exists (assuming local file path for now)
-	if _, err := os.Stat(job.FilePath); os.IsNotExist(err) {
-		// Increment retry count before updating status
-		if incrementErr := w.dbService.IncrementRetryCount(job.ID); incrementErr != nil {
-			log.Printf("Warning: Failed to increment retry count for job %s: %v", job.ID, incrementErr)
-		}
+// 	// Check if file exists (assuming local file path for now)
+// 	if _, err := os.Stat(job.FilePath); os.IsNotExist(err) {
+// 		// Increment retry count before updating status
+// 		if incrementErr := w.dbService.IncrementRetryCount(job.ID); incrementErr != nil {
+// 			log.Printf("Warning: Failed to increment retry count for job %s: %v", job.ID, incrementErr)
+// 		}
 
-		errorMsg := fmt.Sprintf("Audio file not found: %s", job.FilePath)
-		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
-		return fmt.Errorf("audio file not found: %s", job.FilePath)
-	}
+// 		errorMsg := fmt.Sprintf("Audio file not found: %s", job.FilePath)
+// 		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
+// 		return fmt.Errorf("audio file not found: %s", job.FilePath)
+// 	}
 
-	// Transcribe audio
-	transcript, err := w.transcribeAudio(job.FilePath)
-	if err != nil {
-		// Increment retry count before updating status
-		if incrementErr := w.dbService.IncrementRetryCount(job.ID); incrementErr != nil {
-			log.Printf("Warning: Failed to increment retry count for job %s: %v", job.ID, incrementErr)
-		}
+// 	// Transcribe audio
+// 	transcript, err := w.transcribeAudio(job.FilePath)
+// 	if err != nil {
+// 		// Increment retry count before updating status
+// 		if incrementErr := w.dbService.IncrementRetryCount(job.ID); incrementErr != nil {
+// 			log.Printf("Warning: Failed to increment retry count for job %s: %v", job.ID, incrementErr)
+// 		}
 
-		errorMsg := fmt.Sprintf("Failed to transcribe audio: %v", err)
-		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
-		return err
-	}
+// 		errorMsg := fmt.Sprintf("Failed to transcribe audio: %v", err)
+// 		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
+// 		return err
+// 	}
 
-	// Set audiobook ID, file path, and processing time
-	transcript.AudiobookID = job.AudiobookID
-	transcript.FilePath = job.FilePath
+// 	// Set audiobook ID, file path, and processing time
+// 	transcript.AudiobookID = job.AudiobookID
+// 	transcript.FilePath = job.FilePath
 
-	// Save transcript to database
-	if err := w.dbService.SaveTranscript(transcript); err != nil {
-		// Increment retry count before updating status
-		if incrementErr := w.dbService.IncrementRetryCount(job.ID); incrementErr != nil {
-			log.Printf("Warning: Failed to increment retry count for job %s: %v", job.ID, incrementErr)
-		}
+// 	// Save transcript to database
+// 	if err := w.dbService.SaveTranscript(transcript); err != nil {
+// 		// Increment retry count before updating status
+// 		if incrementErr := w.dbService.IncrementRetryCount(job.ID); incrementErr != nil {
+// 			log.Printf("Warning: Failed to increment retry count for job %s: %v", job.ID, incrementErr)
+// 		}
 
-		errorMsg := fmt.Sprintf("Failed to save transcript: %v", err)
-		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
-		return err
-	}
+// 		errorMsg := fmt.Sprintf("Failed to save transcript: %v", err)
+// 		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
+// 		return err
+// 	}
 
-	// Update job status to completed
-	if err := w.dbService.UpdateJobStatus(job.ID, models.JobStatusCompleted, nil); err != nil {
-		return err
-	}
+// 	// Update job status to completed
+// 	if err := w.dbService.UpdateJobStatus(job.ID, models.JobStatusCompleted, nil); err != nil {
+// 		return err
+// 	}
 
-	// Check if this is chapter 1 and trigger summarize/tag jobs immediately
-	if err := w.checkAndTriggerSummarizeTagJobsForChapter1(job.AudiobookID.String(), job.ChapterID); err != nil {
-		log.Printf("Warning: Failed to check/trigger summarize and tag jobs for chapter 1: %v", err)
-		// Don't fail the transcription job if this fails
-	}
+// 	// Check if this is chapter 1 and trigger summarize/tag jobs immediately
+// 	if err := w.checkAndTriggerSummarizeTagJobsForChapter1(job.AudiobookID.String(), job.ChapterID); err != nil {
+// 		log.Printf("Warning: Failed to check/trigger summarize and tag jobs for chapter 1: %v", err)
+// 		// Don't fail the transcription job if this fails
+// 	}
 
-	log.Printf("Successfully processed transcription job %s", job.ID)
-	return nil
-}
+// 	log.Printf("Successfully processed transcription job %s", job.ID)
+// 	return nil
+// }
 
 // transcribeAudio transcribes an audio file using Rev.ai
 func (w *Worker) transcribeAudio(filePath string) (*models.Transcript, error) {
@@ -242,77 +243,77 @@ func (w *Worker) checkAndTriggerSummarizeTagJobsForChapter1(audiobookID string, 
 }
 
 // checkAndTriggerSummarizeTagJobs checks if all chapters are transcribed and triggers summarize/tag jobs
-func (w *Worker) checkAndTriggerSummarizeTagJobs(audiobookID string) error {
-	// Check if all chapters have transcripts
-	allTranscribed, err := w.dbService.AreAllChaptersTranscribed(audiobookID)
-	if err != nil {
-		return fmt.Errorf("failed to check chapter transcription status: %v", err)
-	}
+// func (w *Worker) checkAndTriggerSummarizeTagJobs(audiobookID string) error {
+// 	// Check if all chapters have transcripts
+// 	allTranscribed, err := w.dbService.AreAllChaptersTranscribed(audiobookID)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to check chapter transcription status: %v", err)
+// 	}
 
-	if !allTranscribed {
-		log.Printf("Not all chapters are transcribed for audiobook %s, skipping summarize/tag trigger", audiobookID)
-		return nil
-	}
+// 	if !allTranscribed {
+// 		log.Printf("Not all chapters are transcribed for audiobook %s, skipping summarize/tag trigger", audiobookID)
+// 		return nil
+// 	}
 
-	log.Printf("All chapters transcribed for audiobook %s, triggering summarize and tag jobs", audiobookID)
+// 	log.Printf("All chapters transcribed for audiobook %s, triggering summarize and tag jobs", audiobookID)
 
-	// Call the webhook to trigger summarize and tag jobs
-	url := fmt.Sprintf("%s/api/v1/internal/audiobooks/%s/trigger-summarize-tag", w.apiBaseURL, audiobookID)
-	log.Printf("Calling webhook URL: %s", url)
+// 	// Call the webhook to trigger summarize and tag jobs
+// 	url := fmt.Sprintf("%s/api/v1/internal/audiobooks/%s/trigger-summarize-tag", w.apiBaseURL, audiobookID)
+// 	log.Printf("Calling webhook URL: %s", url)
 
-	req, err := http.NewRequest("POST", url, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create webhook request: %v", err)
-	}
+// 	req, err := http.NewRequest("POST", url, nil)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to create webhook request: %v", err)
+// 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Internal-API-Key", w.internalAPIKey)
+// 	req.Header.Set("Content-Type", "application/json")
+// 	req.Header.Set("X-Internal-API-Key", w.internalAPIKey)
 
-	resp, err := w.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to call webhook: %v", err)
-	}
-	defer resp.Body.Close()
+// 	resp, err := w.httpClient.Do(req)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to call webhook: %v", err)
+// 	}
+// 	defer resp.Body.Close()
 
-	// Read response body for better error reporting
-	body, _ := io.ReadAll(resp.Body)
+// 	// Read response body for better error reporting
+// 	body, _ := io.ReadAll(resp.Body)
 
-	if resp.StatusCode != http.StatusOK {
-		log.Printf("Webhook call failed with status: %d, response: %s", resp.StatusCode, string(body))
-		return fmt.Errorf("webhook call failed with status: %d, response: %s", resp.StatusCode, string(body))
-	}
+// 	if resp.StatusCode != http.StatusOK {
+// 		log.Printf("Webhook call failed with status: %d, response: %s", resp.StatusCode, string(body))
+// 		return fmt.Errorf("webhook call failed with status: %d, response: %s", resp.StatusCode, string(body))
+// 	}
 
-	log.Printf("Successfully triggered summarize and tag jobs for audiobook %s, response: %s", audiobookID, string(body))
-	return nil
-}
+// 	log.Printf("Successfully triggered summarize and tag jobs for audiobook %s, response: %s", audiobookID, string(body))
+// 	return nil
+// }
 
 // Run starts the main worker loop
-func (w *Worker) Run() {
-	log.Println("Starting Rev.ai Transcriber Worker")
+// func (w *Worker) Run() {
+// 	log.Println("Starting Rev.ai Transcriber Worker")
 
-	for {
-		// Get pending jobs
-		pendingJobs, err := w.dbService.GetPendingJobs(w.config.MaxConcurrentJobs)
-		if err != nil {
-			log.Printf("Error getting pending jobs: %v", err)
-			time.Sleep(30 * time.Second)
-			continue
-		}
+// 	for {
+// 		// Get pending jobs
+// 		pendingJobs, err := w.dbService.GetPendingJobs(w.config.MaxConcurrentJobs)
+// 		if err != nil {
+// 			log.Printf("Error getting pending jobs: %v", err)
+// 			time.Sleep(30 * time.Second)
+// 			continue
+// 		}
 
-		if len(pendingJobs) > 0 {
-			log.Printf("Found %d pending transcription jobs", len(pendingJobs))
+// 		if len(pendingJobs) > 0 {
+// 			log.Printf("Found %d pending transcription jobs", len(pendingJobs))
 
-			for _, job := range pendingJobs {
-				if err := w.ProcessJobWithDBUpdates(job); err != nil {
-					log.Printf("Error processing job %s: %v", job.ID, err)
-				}
-			}
-		} else {
-			// No jobs, wait a bit
-			time.Sleep(time.Duration(w.config.JobPollInterval) * time.Second)
-		}
+// 			for _, job := range pendingJobs {
+// 				if err := w.ProcessJobWithDBUpdates(job); err != nil {
+// 					log.Printf("Error processing job %s: %v", job.ID, err)
+// 				}
+// 			}
+// 		} else {
+// 			// No jobs, wait a bit
+// 			time.Sleep(time.Duration(w.config.JobPollInterval) * time.Second)
+// 		}
 
-		// Small delay between iterations
-		time.Sleep(5 * time.Second)
-	}
-}
+// 		// Small delay between iterations
+// 		time.Sleep(5 * time.Second)
+// 	}
+// }

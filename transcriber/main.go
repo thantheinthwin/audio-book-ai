@@ -85,15 +85,15 @@ func main() {
 
 	// Start consuming transcription jobs from Redis
 	log.Println("Starting transcriber service...")
-	if err := redisConsumer.ConsumeJobs(ctx, "transcribe", func(message services.JobMessage) error {
-		return processTranscriptionJob(worker, httpClient, cfg.APIBaseURL, cfg.InternalAPIKey, message)
+	if err := redisConsumer.ConsumeJobs(ctx, "transcribe", func(message services.JobMessage, currentRetryCount int) error {
+		return processTranscriptionJob(worker, httpClient, cfg.APIBaseURL, cfg.InternalAPIKey, message, currentRetryCount)
 	}); err != nil {
 		log.Fatalf("Error consuming jobs: %v", err)
 	}
 }
 
 // processTranscriptionJob processes a transcription job and updates status via HTTP
-func processTranscriptionJob(worker *services.Worker, httpClient *http.Client, apiBaseURL string, internalAPIKey string, message services.JobMessage) error {
+func processTranscriptionJob(worker *services.Worker, httpClient *http.Client, apiBaseURL string, internalAPIKey string, message services.JobMessage, currentRetryCount int) error {
 	// Convert JobMessage to Job model
 	job := models.Job{
 		ID:          message.ID,
@@ -112,28 +112,31 @@ func processTranscriptionJob(worker *services.Worker, httpClient *http.Client, a
 		return fmt.Errorf("no file path provided in job message")
 	}
 
+	// fmt.Println("currentRetryCount", currentRetryCount)
+
 	// Update job status to running
 	now := time.Now()
-	updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "running", "", &now, nil, nil)
+	updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "running", "", &now, nil, 0)
 
 	// Process the job
 	if err := worker.ProcessJob(job); err != nil {
-		// Update job status to failed (API will handle retry count increment)
+		// Update job status to failed and pass the incremented retry count
 		now := time.Now()
-		updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "failed", err.Error(), nil, &now, nil)
+		fmt.Println("incremented retryCount", currentRetryCount)
+		updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "failed", err.Error(), nil, &now, currentRetryCount)
 		return err
 	}
 
 	// Update job status to completed
 	now = time.Now()
-	updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "completed", "", nil, &now, nil)
+	updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "completed", "", nil, &now, 0)
 
 	log.Printf("Transcription job %s completed successfully for audiobook %s", message.ID, message.AudiobookID)
 	return nil
 }
 
 // updateJobStatus sends job status update to the API
-func updateJobStatus(httpClient *http.Client, apiBaseURL string, internalAPIKey string, jobID string, status string, errorMessage string, startedAt, completedAt *time.Time, retryCount *int) {
+func updateJobStatus(httpClient *http.Client, apiBaseURL string, internalAPIKey string, jobID string, status string, errorMessage string, startedAt, completedAt *time.Time, retryCount int) {
 	// Build the request payload
 	payload := map[string]interface{}{
 		"status": status,
@@ -148,9 +151,12 @@ func updateJobStatus(httpClient *http.Client, apiBaseURL string, internalAPIKey 
 	if completedAt != nil {
 		payload["completed_at"] = completedAt.Format(time.RFC3339)
 	}
-	if retryCount != nil {
-		payload["retry_count"] = *retryCount
+	if retryCount > 0 {
+		payload["retry_count"] = retryCount
 	}
+
+	fmt.Println("retryCount", retryCount)
+	fmt.Println("payload retryCount", payload["retry_count"])
 
 	// Convert payload to JSON
 	jsonData, err := json.Marshal(payload)

@@ -146,33 +146,33 @@ func (w *Worker) ProcessSummarizeJob(job models.Job) error {
 	return nil
 }
 
-// Run starts the main worker loop
-func (w *Worker) Run() {
-	log.Println("Starting Gemini AI Processing Worker")
+// // Run starts the main worker loop
+// func (w *Worker) Run() {
+// 	log.Println("Starting Gemini AI Processing Worker")
 
-	for {
-		// Get pending jobs
-		pendingJobs, err := w.dbService.GetPendingJobs(w.config.MaxConcurrentJobs)
-		if err != nil {
-			log.Printf("Error getting pending jobs: %v", err)
-			time.Sleep(30 * time.Second)
-			continue
-		}
+// 	for {
+// 		// Get pending jobs
+// 		pendingJobs, err := w.dbService.GetPendingJobs(w.config.MaxConcurrentJobs)
+// 		if err != nil {
+// 			log.Printf("Error getting pending jobs: %v", err)
+// 			time.Sleep(30 * time.Second)
+// 			continue
+// 		}
 
-		if len(pendingJobs) > 0 {
-			log.Printf("Found %d pending AI processing jobs", len(pendingJobs))
+// 		if len(pendingJobs) > 0 {
+// 			log.Printf("Found %d pending AI processing jobs", len(pendingJobs))
 
-			for _, job := range pendingJobs {
-				if err := w.ProcessJobWithDBUpdates(job); err != nil {
-					log.Printf("Error processing job %s: %v", job.ID, err)
-				}
-			}
-		} else {
-			// No jobs, wait a bit
-			time.Sleep(time.Duration(w.config.JobPollInterval) * time.Second)
-		}
+// 			for _, job := range pendingJobs {
+// 				if err := w.ProcessJobWithDBUpdates(job); err != nil {
+// 					log.Printf("Error processing job %s: %v", job.ID, err)
+// 				}
+// 			}
+// 		} else {
+// 			// No jobs, wait a bit
+// 			time.Sleep(time.Duration(w.config.JobPollInterval) * time.Second)
+// 		}
 
-		// Small delay between iterations
-		time.Sleep(5 * time.Second)
-	}
-}
+// 		// Small delay between iterations
+// 		time.Sleep(5 * time.Second)
+// 	}
+// }

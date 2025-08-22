@@ -76,7 +76,7 @@ func (r *RedisConsumer) getFailedQueueName(jobType string) string {
 }
 
 // ConsumeJobs starts consuming transcription jobs from the queue
-func (r *RedisConsumer) ConsumeJobs(ctx context.Context, jobType string, processor func(JobMessage) error) error {
+func (r *RedisConsumer) ConsumeJobs(ctx context.Context, jobType string, processor func(JobMessage, int) error) error {
 	queueName := r.getQueueName(jobType)
 	processingQueueName := r.getProcessingQueueName(jobType)
 	failedQueueName := r.getFailedQueueName(jobType)
@@ -138,7 +138,7 @@ func (r *RedisConsumer) ConsumeJobs(ctx context.Context, jobType string, process
 		})
 
 		// Process the job
-		if err := processor(message); err != nil {
+		if err := processor(message, message.RetryCount); err != nil {
 			log.Printf("Error processing transcription job %s: %v", message.ID, err)
 
 			// Handle retry logic

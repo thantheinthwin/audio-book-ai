@@ -1447,6 +1447,12 @@ func (h *Handler) UpdateJobStatus(c *fiber.Ctx) error {
 		if err := h.repo.IncrementRetryCount(context.Background(), jobID); err != nil {
 			fmt.Printf("Failed to increment retry count for job %s: %v\n", jobID, err)
 			// Continue with the update even if retry count increment fails
+		} else {
+			// Refetch the job to get the updated retry count
+			updatedJob, err := h.repo.GetProcessingJobByID(context.Background(), jobID)
+			if err == nil {
+				job = updatedJob
+			}
 		}
 	}
 
@@ -1455,6 +1461,8 @@ func (h *Handler) UpdateJobStatus(c *fiber.Ctx) error {
 	job.ErrorMessage = req.ErrorMessage
 	job.StartedAt = req.StartedAt
 	job.CompletedAt = req.CompletedAt
+
+	fmt.Println("job retry count after increment", job.RetryCount)
 
 	if err := h.repo.UpdateProcessingJob(context.Background(), job); err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{

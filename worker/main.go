@@ -85,15 +85,15 @@ func main() {
 	log.Println("Starting AI processing worker...")
 
 	// Start combined summarize and tag consumer
-	if err := redisConsumer.ConsumeJobs(ctx, "summarize", func(message services.JobMessage) error {
-		return processSummarizeJob(worker, httpClient, cfg.APIBaseURL, cfg.InternalAPIKey, message)
+	if err := redisConsumer.ConsumeJobs(ctx, "summarize", func(message services.JobMessage, currentRetryCount int) error {
+		return processSummarizeJob(worker, httpClient, cfg.APIBaseURL, cfg.InternalAPIKey, message, currentRetryCount)
 	}); err != nil {
 		log.Fatalf("Error consuming summarize and tag jobs: %v", err)
 	}
 }
 
 // processSummarizeJob processes a summarize job and updates status via HTTP
-func processSummarizeJob(worker *services.Worker, httpClient *http.Client, apiBaseURL string, internalAPIKey string, message services.JobMessage) error {
+func processSummarizeJob(worker *services.Worker, httpClient *http.Client, apiBaseURL string, internalAPIKey string, message services.JobMessage, currentRetryCount int) error {
 	// Convert JobMessage to Job model
 	job := models.Job{
 		ID:          message.ID,
@@ -107,24 +107,25 @@ func processSummarizeJob(worker *services.Worker, httpClient *http.Client, apiBa
 
 	// Update job status to running
 	now := time.Now()
-	updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "running", "", &now, nil, nil)
+	updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "running", "", &now, nil, 0)
 
 	// Process the summarize job
 	if err := worker.ProcessSummarizeJob(job); err != nil {
-		// Update job status to failed (API will handle retry count increment)
+		// Update job status to failed and pass the incremented retry count
 		now := time.Now()
-		updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "failed", err.Error(), nil, &now, nil)
+		retryCount := currentRetryCount + 1
+		updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "failed", err.Error(), nil, &now, retryCount)
 		return err
 	}
 
 	// Update job status to completed
 	now = time.Now()
-	updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "completed", "", nil, &now, nil)
+	updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "completed", "", nil, &now, 0)
 	return nil
 }
 
 // updateJobStatus sends job status update to the API
-func updateJobStatus(httpClient *http.Client, apiBaseURL string, internalAPIKey string, jobID string, status string, errorMessage string, startedAt, completedAt *time.Time, retryCount *int) {
+func updateJobStatus(httpClient *http.Client, apiBaseURL string, internalAPIKey string, jobID string, status string, errorMessage string, startedAt, completedAt *time.Time, retryCount int) {
 	// Build the request payload
 	payload := map[string]interface{}{
 		"status": status,
@@ -139,9 +140,11 @@ func updateJobStatus(httpClient *http.Client, apiBaseURL string, internalAPIKey 
 	if completedAt != nil {
 		payload["completed_at"] = completedAt.Format(time.RFC3339)
 	}
-	if retryCount != nil {
-		payload["retry_count"] = *retryCount
+	if retryCount > 0 {
+		payload["retry_count"] = retryCount
 	}
+
+	fmt.Println("retryCount", retryCount)
 
 	// Convert payload to JSON
 	jsonData, err := json.Marshal(payload)

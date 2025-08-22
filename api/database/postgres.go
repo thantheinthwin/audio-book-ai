@@ -1454,7 +1454,7 @@ func (p *PostgresRepository) UpdateProcessingJob(ctx context.Context, job *model
 func (p *PostgresRepository) IncrementRetryCount(ctx context.Context, jobID uuid.UUID) error {
 	query := `
 		UPDATE processing_jobs 
-		SET retry_count = retry_count + 1
+		SET retry_count = retry_count
 		WHERE id = $1
 	`
 
