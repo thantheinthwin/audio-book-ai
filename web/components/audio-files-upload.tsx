@@ -416,7 +416,7 @@ export default function AudioFilesUpload({
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          {field.audio_file && (
+                          {/* {field.audio_file && (
                             <Button
                               size="icon"
                               variant="ghost"
@@ -432,7 +432,7 @@ export default function AudioFilesUpload({
                             >
                               <DownloadIcon className="size-4" />
                             </Button>
-                          )}
+                          )} */}
                           <Button
                             size="icon"
                             variant="ghost"
