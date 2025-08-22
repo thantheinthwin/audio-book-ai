@@ -3,13 +3,7 @@
 import { useCart, useRemoveFromCart } from "@/hooks/use-cart";
 import { useUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Trash2, ShoppingCart, DollarSign } from "lucide-react";
 import Image from "next/image";
@@ -19,7 +13,7 @@ import { useEffect } from "react";
 
 export default function CartPage() {
   const { data: user, isLoading: userLoading } = useUser();
-  const { data: cartData, isLoading, error } = useCart();
+  const { data: cart, isLoading, error } = useCart();
   const removeFromCartMutation = useRemoveFromCart();
 
   // Check if user is a normal user (not admin)
@@ -73,9 +67,7 @@ export default function CartPage() {
     );
   }
 
-  const cart = cartData?.data;
-
-  if (!cart || cart.items.length === 0) {
+  if (!cart || cart.total_items === 0) {
     return (
       <div className="space-y-6">
         <div>

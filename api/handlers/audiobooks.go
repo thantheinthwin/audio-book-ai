@@ -266,33 +266,38 @@ func (h *Handler) AddToCart(c *fiber.Ctx) error {
 	}
 
 	// Check if audiobook exists and is public
-	audiobook, err := h.repo.GetAudioBookByID(context.Background(), req.AudiobookID)
-	if err != nil {
-		log.Printf("AddToCart: Failed to get audiobook: %v", err)
-		return c.Status(http.StatusNotFound).JSON(fiber.Map{
-			"error": "Audiobook not found",
-		})
-	}
+	// audiobook, err := h.repo.GetAudioBookByID(context.Background(), req.AudiobookID)
+	// if err != nil {
+	// 	log.Printf("AddToCart: Failed to get audiobook: %v", err)
+	// 	return c.Status(http.StatusNotFound).JSON(fiber.Map{
+	// 		"error": "Audiobook not found",
+	// 	})
+	// }
 
-	if !audiobook.IsPublic {
-		log.Printf("AddToCart: Audiobook is not public")
-		return c.Status(http.StatusForbidden).JSON(fiber.Map{
-			"error": "Cannot add private audiobook to cart",
-		})
-	}
+	// if !audiobook.IsPublic {
+	// 	log.Printf("AddToCart: Audiobook is not public")
+	// 	return c.Status(http.StatusForbidden).JSON(fiber.Map{
+	// 		"error": "Cannot add private audiobook to cart",
+	// 	})
+	// }
 
 	// Add to cart
-	if err := h.repo.AddToCart(context.Background(), userID, req.AudiobookID); err != nil {
+	cartItemID, err := h.repo.AddToCart(context.Background(), userID, req.AudiobookID)
+	if err != nil {
 		log.Printf("AddToCart: Failed to add to cart: %v", err)
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to add to cart",
 		})
 	}
 
-	log.Printf("AddToCart: Successfully added audiobook %s to cart for user %s", req.AudiobookID, userID)
+	log.Printf("AddToCart: Successfully added audiobook %s to cart for user %s with cart item ID %s", req.AudiobookID, userID, cartItemID)
 
 	return c.JSON(fiber.Map{
 		"message": "Added to cart successfully",
+		"data": fiber.Map{
+			"cart_item_id": cartItemID,
+			"audiobook_id": req.AudiobookID,
+		},
 	})
 }
 

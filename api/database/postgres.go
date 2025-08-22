@@ -1536,19 +1536,30 @@ func (p *PostgresRepository) CleanupOrphanedData(ctx context.Context) error {
 
 // Cart operations
 
-func (p *PostgresRepository) AddToCart(ctx context.Context, userID, audiobookID uuid.UUID) error {
+func (p *PostgresRepository) AddToCart(ctx context.Context, userID, audiobookID uuid.UUID) (uuid.UUID, error) {
+	// First check if item already exists in cart
+	var existingID uuid.UUID
+	checkQuery := `SELECT id FROM user_cart WHERE user_id = $1 AND audiobook_id = $2`
+	err := p.pool.QueryRow(ctx, checkQuery, userID, audiobookID).Scan(&existingID)
+	if err == nil {
+		// Item already exists, return existing ID
+		return existingID, nil
+	}
+
+	// Item doesn't exist, insert new one
+	var cartItemID uuid.UUID
 	query := `
 		INSERT INTO user_cart (id, user_id, audiobook_id, added_at)
 		VALUES (uuid_generate_v4(), $1, $2, NOW())
-		ON CONFLICT (user_id, audiobook_id) DO NOTHING
+		RETURNING id
 	`
 
-	_, err := p.pool.Exec(ctx, query, userID, audiobookID)
+	err = p.pool.QueryRow(ctx, query, userID, audiobookID).Scan(&cartItemID)
 	if err != nil {
-		return fmt.Errorf("failed to add to cart: %w", err)
+		return uuid.Nil, fmt.Errorf("failed to add to cart: %w", err)
 	}
 
-	return nil
+	return cartItemID, nil
 }
 
 func (p *PostgresRepository) RemoveFromCart(ctx context.Context, userID, audiobookID uuid.UUID) error {

@@ -1,55 +1,45 @@
 "use client";
 
-import { useState, useRef } from "react";
 import { useParams } from "next/navigation";
-import { useAudioBook, useAudioBookJobStatus } from "@/hooks/use-audiobooks";
+import { useAudioBook } from "@/hooks/use-audiobooks";
+import { useAddToCart, useIsInCart, useRemoveFromCart } from "@/hooks/use-cart";
 import { notFound } from "next/navigation";
-import {
-  Play,
-  Pause,
-  Edit,
-  Trash2,
-  Loader2,
-  CheckCircle,
-  AlertCircle,
-  FileAudio,
-  Brain,
-  Bot,
-  ShoppingCart,
-} from "lucide-react";
+import { Trash2, Loader2, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Card, CardContent } from "@/components/ui/card";
 import Image from "next/image";
 
 export default function AudioBookDetailPage() {
   const params = useParams();
+  const audiobookId = params.id as string;
 
   const {
     data: audioBookResponse,
     error: audioBookError,
     isLoading: audioBookLoading,
-  } = useAudioBook(params.id as string);
+  } = useAudioBook(audiobookId);
 
   const audioBook = audioBookResponse?.data;
 
-  console.log("audioBook", audioBook);
+  // Cart functionality
+  const { data: isInCart, isLoading: isInCartLoading } =
+    useIsInCart(audiobookId);
+  const addToCartMutation = useAddToCart();
+  const removeFromCartMutation = useRemoveFromCart();
+
+  const handleAddToCart = () => {
+    if (!audioBook) return;
+
+    addToCartMutation.mutate({
+      audiobook_id: audioBook.id,
+    });
+  };
+
+  const handleRemoveFromCart = () => {
+    if (!audioBook) return;
+
+    removeFromCartMutation.mutate(audioBook.id);
+  };
 
   if (audioBookLoading) {
     return (
@@ -80,10 +70,37 @@ export default function AudioBookDetailPage() {
                 <Edit className="h-4 w-4" />
                 Edit
               </Button> */}
-              <Button variant={"secondary"} className="w-full">
-                <ShoppingCart className="h-4 w-4" />
-                Add to cart
-              </Button>
+              {isInCart ? (
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  onClick={handleRemoveFromCart}
+                  disabled={removeFromCartMutation.isPending || isInCartLoading}
+                >
+                  {removeFromCartMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  {removeFromCartMutation.isPending
+                    ? "Removing..."
+                    : "Remove from cart"}
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  className="w-full"
+                  onClick={handleAddToCart}
+                  disabled={addToCartMutation.isPending || isInCartLoading}
+                >
+                  {addToCartMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ShoppingCart className="h-4 w-4" />
+                  )}
+                  {addToCartMutation.isPending ? "Adding..." : "Add to cart"}
+                </Button>
+              )}
             </div>
           </div>
           <div className="flex flex-col flex-1 gap-2">

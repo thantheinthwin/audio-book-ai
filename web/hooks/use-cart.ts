@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { cartAPI, type CartResponse, type AddToCartRequest } from "@/lib/api";
+import { cartAPI, type AddToCartRequest } from "@/lib/api";
 import { toast } from "sonner";
 
 // Query keys for cart
@@ -45,11 +45,11 @@ export const useAddToCart = () => {
       const response = await cartAPI.addToCart(data);
       return response;
     },
-    onSuccess: () => {
+    onSuccess: (response, variables) => {
       // Invalidate and refetch cart data
       queryClient.invalidateQueries({ queryKey: cartKeys.lists() });
       queryClient.invalidateQueries({
-        queryKey: cartKeys.check(data.audiobook_id),
+        queryKey: cartKeys.check(variables.audiobook_id),
       });
       toast.success("Added to cart successfully");
     },

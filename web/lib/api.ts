@@ -138,6 +138,11 @@ interface AddToCartRequest {
   audiobook_id: string;
 }
 
+export interface AddToCartResponse {
+  cart_item_id: string;
+  audiobook_id: string;
+}
+
 interface CartCheckResponse {
   is_in_cart: boolean;
 }
@@ -609,7 +614,7 @@ export const audiobooksAPI = {
 // Cart API functions
 export const cartAPI = {
   addToCart: (data: AddToCartRequest) =>
-    apiClient<ApiResponse>("/user/cart", {
+    apiClient<ApiResponse<AddToCartResponse>>("/user/cart", {
       method: "POST",
       data,
     }),

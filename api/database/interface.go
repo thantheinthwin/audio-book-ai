@@ -117,7 +117,7 @@ type Repository interface {
 	CleanupOrphanedData(ctx context.Context) error
 
 	// Cart operations
-	AddToCart(ctx context.Context, userID, audiobookID uuid.UUID) error
+	AddToCart(ctx context.Context, userID, audiobookID uuid.UUID) (uuid.UUID, error)
 	RemoveFromCart(ctx context.Context, userID, audiobookID uuid.UUID) error
 	GetCartItems(ctx context.Context, userID uuid.UUID) ([]models.CartItemWithDetails, error)
 	IsInCart(ctx context.Context, userID, audiobookID uuid.UUID) (bool, error)
