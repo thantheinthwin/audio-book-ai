@@ -41,6 +41,7 @@ import {
 } from "@/hooks/use-cart";
 import { redirect } from "next/navigation";
 import { useEffect } from "react";
+import { formatDuration } from "@/lib/format-duration";
 
 export default function LibraryPage() {
   const { data: user, isLoading: userLoading } = useUser();
@@ -79,13 +80,6 @@ export default function LibraryPage() {
   }
 
   const userLibrary = (libraryResponse as any)?.data || [];
-
-  const formatDuration = (seconds: number) => {
-    if (!seconds) return "N/A";
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    return `${hours}h ${minutes}m`;
-  };
 
   const EmptyState = ({
     title,

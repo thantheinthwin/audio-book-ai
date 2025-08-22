@@ -427,6 +427,58 @@ func (m *MockRepository) CleanupOrphanedData(ctx context.Context) error {
 	return nil
 }
 
+func (m *MockRepository) CreatePurchasedAudioBook(ctx context.Context, purchase *models.PurchasedAudioBook) error {
+	args := m.Called(ctx, purchase)
+	return args.Error(0)
+}
+
+func (m *MockRepository) GetCartItems(ctx context.Context, userID uuid.UUID) ([]models.CartItemWithDetails, error) {
+	args := m.Called(ctx, userID)
+	return args.Get(0).([]models.CartItemWithDetails), args.Error(1)
+}
+
+func (m *MockRepository) GetPurchasedAudioBookByID(ctx context.Context, id uuid.UUID) (*models.PurchasedAudioBook, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.PurchasedAudioBook), args.Error(1)
+}
+
+func (m *MockRepository) GetPurchasedAudioBookByUserAndAudiobook(ctx context.Context, userID, audiobookID uuid.UUID) (*models.PurchasedAudioBook, error) {
+	args := m.Called(ctx, userID, audiobookID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.PurchasedAudioBook), args.Error(1)
+}
+
+func (m *MockRepository) GetPurchasedAudioBooksByUserID(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.PurchasedAudioBookWithDetails, int, error) {
+	args := m.Called(ctx, userID, limit, offset)
+	return args.Get(0).([]models.PurchasedAudioBookWithDetails), args.Int(1), args.Error(2)
+}
+
+func (m *MockRepository) IncrementRetryCount(ctx context.Context, jobID uuid.UUID) error {
+	args := m.Called(ctx, jobID)
+	return args.Error(0)
+}
+
+func (m *MockRepository) ResetRetryCount(ctx context.Context, jobID uuid.UUID) error {
+	args := m.Called(ctx, jobID)
+	return args.Error(0)
+}
+
+// Additional helper function for creating test purchases
+func createTestPurchase() models.PurchasedAudioBook {
+	return models.PurchasedAudioBook{
+		ID:            uuid.New(),
+		UserID:        uuid.New(),
+		AudiobookID:   uuid.New(),
+		PurchasePrice: 19.99,
+		PurchasedAt:   time.Now(),
+	}
+}
+
 // Test helper functions
 func createTestHandler() (*handlers.Handler, *MockRepository) {
 	mockRepo := new(MockRepository)
