@@ -151,6 +151,8 @@ type ProcessingJob struct {
 	Status       JobStatus  `json:"status" db:"status" validate:"required"`
 	RedisJobID   *string    `json:"redis_job_id,omitempty" db:"redis_job_id"`
 	ErrorMessage *string    `json:"error_message,omitempty" db:"error_message"`
+	RetryCount   int        `json:"retry_count" db:"retry_count"`
+	MaxRetries   int        `json:"max_retries" db:"max_retries"`
 	StartedAt    *time.Time `json:"started_at,omitempty" db:"started_at"`
 	CompletedAt  *time.Time `json:"completed_at,omitempty" db:"completed_at"`
 	CreatedAt    time.Time  `json:"created_at" db:"created_at"`

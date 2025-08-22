@@ -116,32 +116,26 @@ func (w *Worker) ProcessSummarizeJob(job models.Job) error {
 		return err
 	}
 
-	// Try to get chapter transcripts first
-	transcripts, err := w.dbService.GetChapterTranscripts(job.AudiobookID)
+	// Try to get chapter 1 transcript first
+	chapter1Transcript, err := w.dbService.GetChapter1Transcript(job.AudiobookID.String())
 	if err != nil {
-		errorMsg := fmt.Sprintf("Failed to get chapter transcripts: %v", err)
+		errorMsg := fmt.Sprintf("Failed to get chapter 1 transcript: %v", err)
 		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
 		return err
 	}
 
-	if len(transcripts) == 0 {
-		errorMsg := "No transcripts found for audiobook"
+	if chapter1Transcript == nil {
+		errorMsg := "Chapter 1 transcript not found for audiobook"
 		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
-		return fmt.Errorf("no transcripts found for audiobook")
+		return fmt.Errorf("chapter 1 transcript not found for audiobook")
 	}
 
-	// Combine all transcripts
-	var combinedTranscript string
-	for i, transcript := range transcripts {
-		if i > 0 {
-			combinedTranscript += "\n\n"
-		}
-		combinedTranscript += transcript.Content
-	}
+	// Use chapter 1 transcript for summary and tags generation
+	transcriptContent := chapter1Transcript.Content
 
-	// Process combined summary and tags
+	// Process summary and tags from chapter 1
 	startTime := time.Now()
-	summaryAndTags, err := w.geminiService.GenerateSummaryAndTags(combinedTranscript)
+	summaryAndTags, err := w.geminiService.GenerateSummaryAndTags(transcriptContent)
 	if err != nil {
 		errorMsg := fmt.Sprintf("Failed to generate summary and tags: %v", err)
 		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)

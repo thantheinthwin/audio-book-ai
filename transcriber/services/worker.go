@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/google/uuid"
 	"audio-book-ai/transcriber/models"
 )
 
@@ -84,9 +85,9 @@ func (w *Worker) ProcessJob(job models.Job) error {
 		return err
 	}
 
-	// Check if all chapters are transcribed and trigger summarize/tag jobs if so
-	if err := w.checkAndTriggerSummarizeTagJobs(job.AudiobookID.String()); err != nil {
-		log.Printf("Warning: Failed to check/trigger summarize and tag jobs: %v", err)
+	// Check if this is chapter 1 and trigger summarize/tag jobs immediately
+	if err := w.checkAndTriggerSummarizeTagJobsForChapter1(job.AudiobookID.String(), job.ChapterID); err != nil {
+		log.Printf("Warning: Failed to check/trigger summarize and tag jobs for chapter 1: %v", err)
 		// Don't fail the transcription job if this fails
 	}
 
@@ -126,6 +127,56 @@ func (w *Worker) transcribeAudio(filePath string) (*models.Transcript, error) {
 	processedTranscript.ProcessingTimeSeconds = int(time.Since(startTime).Seconds())
 
 	return processedTranscript, nil
+}
+
+// checkAndTriggerSummarizeTagJobsForChapter1 checks if the current chapter is chapter 1 and triggers summarize/tag jobs immediately
+func (w *Worker) checkAndTriggerSummarizeTagJobsForChapter1(audiobookID string, chapterID *uuid.UUID) error {
+	if chapterID == nil {
+		log.Printf("Chapter ID is nil, skipping summarize/tag trigger for audiobook %s", audiobookID)
+		return nil
+	}
+
+	// Check if this is chapter 1
+	isChapter1, err := w.dbService.IsChapter1(*chapterID)
+	if err != nil {
+		return fmt.Errorf("failed to check if chapter is chapter 1: %v", err)
+	}
+
+	if !isChapter1 {
+		log.Printf("Chapter %s is not chapter 1 for audiobook %s, skipping summarize/tag trigger", *chapterID, audiobookID)
+		return nil
+	}
+
+	log.Printf("Chapter 1 transcribed for audiobook %s, triggering summarize and tag jobs immediately", audiobookID)
+
+	// Call the webhook to trigger summarize and tag jobs
+	url := fmt.Sprintf("%s/api/v1/internal/audiobooks/%s/trigger-summarize-tag", w.apiBaseURL, audiobookID)
+	log.Printf("Calling webhook URL: %s", url)
+
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create webhook request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Internal-API-Key", w.internalAPIKey)
+
+	resp, err := w.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to call webhook: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Read response body for better error reporting
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("Webhook call failed with status: %d, response: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("webhook call failed with status: %d, response: %s", resp.StatusCode, string(body))
+	}
+
+	log.Printf("Successfully triggered summarize and tag jobs for audiobook %s after chapter 1 transcription, response: %s", audiobookID, string(body))
+	return nil
 }
 
 // checkAndTriggerSummarizeTagJobs checks if all chapters are transcribed and triggers summarize/tag jobs

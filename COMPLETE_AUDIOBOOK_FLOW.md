@@ -11,8 +11,8 @@ The audiobook creation flow consists of the following steps:
 3. **Audiobook Creation** - Create audiobook record and enqueue processing jobs
 4. **Background Processing** - Process jobs using Redis queues:
    - **Transcription** - Convert audio to text using Rev.ai
-   - **Summarization** - Generate AI-powered summaries using Gemini
-   - **Tagging** - Auto-generate relevant tags using Gemini
+   - **Summarization** - Generate AI-powered summaries using Gemini (triggered after chapter 1 transcription)
+   - **Tagging** - Auto-generate relevant tags using Gemini (triggered after chapter 1 transcription)
    - **Embedding** - Create vector embeddings for search
 5. **Status Updates** - Monitor job progress and update audiobook status
 

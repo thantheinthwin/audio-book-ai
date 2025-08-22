@@ -196,3 +196,19 @@ func (d *DatabaseService) AreAllChaptersTranscribed(audiobookID string) (bool, e
 	log.Printf("Audiobook %s: %d/%d chapters transcribed", audiobookID, transcribedChapters, totalChapters)
 	return totalChapters > 0 && totalChapters == transcribedChapters, nil
 }
+
+// IsChapter1 checks if the given chapter ID corresponds to chapter 1
+func (d *DatabaseService) IsChapter1(chapterID uuid.UUID) (bool, error) {
+	query := `
+		SELECT chapter_number FROM chapters 
+		WHERE id = $1
+	`
+
+	var chapterNumber int
+	err := d.pool.QueryRow(context.Background(), query, chapterID).Scan(&chapterNumber)
+	if err != nil {
+		return false, fmt.Errorf("failed to get chapter number: %v", err)
+	}
+
+	return chapterNumber == 1, nil
+}

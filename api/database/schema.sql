@@ -107,6 +107,8 @@ CREATE TABLE IF NOT EXISTS processing_jobs (
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     redis_job_id VARCHAR(100),
     error_message TEXT,
+    retry_count INTEGER DEFAULT 0,
+    max_retries INTEGER DEFAULT 3,
     started_at TIMESTAMP WITH TIME ZONE,
     completed_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

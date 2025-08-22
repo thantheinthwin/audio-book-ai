@@ -1190,29 +1190,31 @@ func (h *Handler) TriggerSummarizeAndTagJobs(c *fiber.Ctx) error {
 		})
 	}
 
-	// Check if all chapters have been transcribed successfully
-	allTranscribed := true
-	var failedChapters []int
+	// Check if chapter 1 has been transcribed successfully
+	chapter1Transcribed := false
 
 	for _, chapter := range chapters {
-		// Check if chapter has a transcript
-		transcript, err := h.repo.GetChapterTranscriptByChapterID(context.Background(), chapter.ID)
-		if err != nil || transcript == nil {
-			log.Printf("TriggerSummarizeAndTagJobs: Chapter %d has no transcript", chapter.ChapterNumber)
-			allTranscribed = false
-			failedChapters = append(failedChapters, chapter.ChapterNumber)
+		if chapter.ChapterNumber == 1 {
+			// Check if chapter 1 has a transcript
+			transcript, err := h.repo.GetChapterTranscriptByChapterID(context.Background(), chapter.ID)
+			if err == nil && transcript != nil {
+				chapter1Transcribed = true
+				log.Printf("TriggerSummarizeAndTagJobs: Chapter 1 has transcript")
+			} else {
+				log.Printf("TriggerSummarizeAndTagJobs: Chapter 1 has no transcript")
+			}
+			break
 		}
 	}
 
-	if !allTranscribed {
-		log.Printf("TriggerSummarizeAndTagJobs: Not all chapters are transcribed. Failed chapters: %v", failedChapters)
+	if !chapter1Transcribed {
+		log.Printf("TriggerSummarizeAndTagJobs: Chapter 1 is not transcribed")
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error":           "Not all chapters are transcribed",
-			"failed_chapters": failedChapters,
+			"error": "Chapter 1 is not transcribed",
 		})
 	}
 
-	log.Printf("TriggerSummarizeAndTagJobs: All %d chapters are transcribed, proceeding with summarize and tag jobs", len(chapters))
+	log.Printf("TriggerSummarizeAndTagJobs: Chapter 1 is transcribed, proceeding with summarize and tag jobs")
 
 	// Find existing summarize job for this audiobook
 	existingJobs, err := h.repo.GetProcessingJobsByAudioBookID(context.Background(), audiobookID)

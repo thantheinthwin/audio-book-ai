@@ -402,8 +402,7 @@ export default function AudioBookDetailPage() {
                   </div>
                 ) : (
                   <div className="flex gap-1 items-center text-sm">
-                    Summary will be generated once all chapters are
-                    transcribed...
+                    Summary will be generated once chapter 1 is transcribed...
                   </div>
                 )
               ) : (
@@ -421,7 +420,7 @@ export default function AudioBookDetailPage() {
                   <p className="text-xs">{audioBook.tags?.join(", ")}</p>
                 ) : (
                   <p className="text-xs">
-                    Tags will be generated once all chapters are transcribed...
+                    Tags will be generated once chapter 1 is transcribed...
                   </p>
                 )}
               </div>
@@ -512,6 +511,19 @@ export default function AudioBookDetailPage() {
                             <p className="text-xs text-red-500 mt-1">
                               Error: {job.error_message}
                             </p>
+                          )}
+                          {/* Retry Count Display */}
+                          {job.retry_count > 0 && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <p className="text-xs text-amber-600">
+                                Retry: {job.retry_count}/{job.max_retries}
+                              </p>
+                              {job.retry_count >= job.max_retries && (
+                                <span className="text-xs text-red-500 font-medium">
+                                  (Max retries reached)
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>

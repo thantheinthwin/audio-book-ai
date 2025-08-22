@@ -1,18 +1,20 @@
--- Migration: Add duration_seconds to upload_files and remove time fields from chapters
+-- Migration: Add retry_count and max_retries to processing_jobs table
 -- Date: 2024-01-XX
+-- Description: Add retry tracking fields to processing_jobs table for better job monitoring
 
--- Step 1: Add duration_seconds column to upload_files table
-ALTER TABLE upload_files 
-ADD COLUMN duration_seconds INTEGER;
+-- Add retry_count column with default value 0
+ALTER TABLE processing_jobs 
+ADD COLUMN IF NOT EXISTS retry_count INTEGER DEFAULT 0;
 
--- Step 2: Remove time-related columns from chapters table
-ALTER TABLE chapters 
-DROP COLUMN IF EXISTS start_time_seconds,
-DROP COLUMN IF EXISTS end_time_seconds,
-DROP COLUMN IF EXISTS duration_seconds;
+-- Add max_retries column with default value 3
+ALTER TABLE processing_jobs 
+ADD COLUMN IF NOT EXISTS max_retries INTEGER DEFAULT 3;
 
--- Step 3: Add index for duration_seconds in upload_files for better query performance
-CREATE INDEX IF NOT EXISTS idx_upload_files_duration_seconds ON upload_files(duration_seconds);
+-- Update existing records to have default values
+UPDATE processing_jobs 
+SET retry_count = 0, max_retries = 3 
+WHERE retry_count IS NULL OR max_retries IS NULL;
 
--- Step 4: Add comment to document the change
-COMMENT ON COLUMN upload_files.duration_seconds IS 'Duration of the audio file in seconds. This field is populated during file upload and used for calculating total audiobook duration.';
+-- Add comments to document the new columns
+COMMENT ON COLUMN processing_jobs.retry_count IS 'Number of times this job has been retried';
+COMMENT ON COLUMN processing_jobs.max_retries IS 'Maximum number of retries allowed for this job';

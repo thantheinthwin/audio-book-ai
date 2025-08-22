@@ -1232,8 +1232,8 @@ func (p *PostgresRepository) DeleteChapterAIOutputsByAudioBookID(ctx context.Con
 
 func (p *PostgresRepository) CreateProcessingJob(ctx context.Context, job *models.ProcessingJob) error {
 	query := `
-		INSERT INTO processing_jobs (id, audiobook_id, chapter_id, job_type, status, redis_job_id, error_message, started_at, completed_at, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		INSERT INTO processing_jobs (id, audiobook_id, chapter_id, job_type, status, redis_job_id, error_message, retry_count, max_retries, started_at, completed_at, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
 
 	fmt.Printf("CreateProcessingJob: Executing insert for job ID: %s, AudiobookID: %s, JobType: %s\n",
@@ -1248,6 +1248,8 @@ func (p *PostgresRepository) CreateProcessingJob(ctx context.Context, job *model
 		job.Status,
 		job.RedisJobID,
 		job.ErrorMessage,
+		job.RetryCount,
+		job.MaxRetries,
 		job.StartedAt,
 		job.CompletedAt,
 		now,
@@ -1265,7 +1267,7 @@ func (p *PostgresRepository) CreateProcessingJob(ctx context.Context, job *model
 
 func (p *PostgresRepository) GetProcessingJobsByAudioBookID(ctx context.Context, audiobookID uuid.UUID) ([]models.ProcessingJob, error) {
 	query := `
-		SELECT id, audiobook_id, chapter_id, job_type, status, redis_job_id, error_message, started_at, completed_at, created_at
+		SELECT id, audiobook_id, chapter_id, job_type, status, redis_job_id, error_message, retry_count, max_retries, started_at, completed_at, created_at
 		FROM processing_jobs
 		WHERE audiobook_id = $1
 		ORDER BY created_at DESC
@@ -1288,6 +1290,8 @@ func (p *PostgresRepository) GetProcessingJobsByAudioBookID(ctx context.Context,
 			&job.Status,
 			&job.RedisJobID,
 			&job.ErrorMessage,
+			&job.RetryCount,
+			&job.MaxRetries,
 			&job.StartedAt,
 			&job.CompletedAt,
 			&job.CreatedAt,
@@ -1303,7 +1307,7 @@ func (p *PostgresRepository) GetProcessingJobsByAudioBookID(ctx context.Context,
 
 func (p *PostgresRepository) GetPendingJobs(ctx context.Context, jobType models.JobType, limit int) ([]models.ProcessingJob, error) {
 	query := `
-		SELECT id, audiobook_id, chapter_id, job_type, status, redis_job_id, error_message, started_at, completed_at, created_at
+		SELECT id, audiobook_id, chapter_id, job_type, status, redis_job_id, error_message, retry_count, max_retries, started_at, completed_at, created_at
 		FROM processing_jobs
 		WHERE job_type = $1 AND status = $2
 		ORDER BY created_at ASC
@@ -1327,6 +1331,8 @@ func (p *PostgresRepository) GetPendingJobs(ctx context.Context, jobType models.
 			&job.Status,
 			&job.RedisJobID,
 			&job.ErrorMessage,
+			&job.RetryCount,
+			&job.MaxRetries,
 			&job.StartedAt,
 			&job.CompletedAt,
 			&job.CreatedAt,
@@ -1342,7 +1348,7 @@ func (p *PostgresRepository) GetPendingJobs(ctx context.Context, jobType models.
 
 func (p *PostgresRepository) GetJobsByStatus(ctx context.Context, status models.JobStatus, limit int) ([]models.ProcessingJob, error) {
 	query := `
-		SELECT id, audiobook_id, chapter_id, job_type, status, redis_job_id, error_message, started_at, completed_at, created_at
+		SELECT id, audiobook_id, chapter_id, job_type, status, redis_job_id, error_message, retry_count, max_retries, started_at, completed_at, created_at
 		FROM processing_jobs
 		WHERE status = $1
 		ORDER BY created_at ASC
@@ -1366,6 +1372,8 @@ func (p *PostgresRepository) GetJobsByStatus(ctx context.Context, status models.
 			&job.Status,
 			&job.RedisJobID,
 			&job.ErrorMessage,
+			&job.RetryCount,
+			&job.MaxRetries,
 			&job.StartedAt,
 			&job.CompletedAt,
 			&job.CreatedAt,
@@ -1381,7 +1389,7 @@ func (p *PostgresRepository) GetJobsByStatus(ctx context.Context, status models.
 
 func (p *PostgresRepository) GetProcessingJobByID(ctx context.Context, id uuid.UUID) (*models.ProcessingJob, error) {
 	query := `
-		SELECT id, audiobook_id, chapter_id, job_type, status, redis_job_id, error_message, started_at, completed_at, created_at
+		SELECT id, audiobook_id, chapter_id, job_type, status, redis_job_id, error_message, retry_count, max_retries, started_at, completed_at, created_at
 		FROM processing_jobs
 		WHERE id = $1
 	`
@@ -1395,6 +1403,8 @@ func (p *PostgresRepository) GetProcessingJobByID(ctx context.Context, id uuid.U
 		&job.Status,
 		&job.RedisJobID,
 		&job.ErrorMessage,
+		&job.RetryCount,
+		&job.MaxRetries,
 		&job.StartedAt,
 		&job.CompletedAt,
 		&job.CreatedAt,
@@ -1413,7 +1423,7 @@ func (p *PostgresRepository) GetProcessingJobByID(ctx context.Context, id uuid.U
 func (p *PostgresRepository) UpdateProcessingJob(ctx context.Context, job *models.ProcessingJob) error {
 	query := `
 		UPDATE processing_jobs 
-		SET status = $3, redis_job_id = $4, error_message = $5, started_at = $6, completed_at = $7
+		SET status = $3, redis_job_id = $4, error_message = $5, retry_count = $6, max_retries = $7, started_at = $8, completed_at = $9
 		WHERE id = $1 AND audiobook_id = $2
 	`
 
@@ -1423,12 +1433,54 @@ func (p *PostgresRepository) UpdateProcessingJob(ctx context.Context, job *model
 		job.Status,
 		job.RedisJobID,
 		job.ErrorMessage,
+		job.RetryCount,
+		job.MaxRetries,
 		job.StartedAt,
 		job.CompletedAt,
 	)
 
 	if err != nil {
 		return fmt.Errorf("failed to update processing job: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
+// IncrementRetryCount increments the retry count for a processing job
+func (p *PostgresRepository) IncrementRetryCount(ctx context.Context, jobID uuid.UUID) error {
+	query := `
+		UPDATE processing_jobs 
+		SET retry_count = retry_count + 1, updated_at = NOW()
+		WHERE id = $1
+	`
+
+	result, err := p.pool.Exec(ctx, query, jobID)
+	if err != nil {
+		return fmt.Errorf("failed to increment retry count: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
+// ResetRetryCount resets the retry count for a processing job
+func (p *PostgresRepository) ResetRetryCount(ctx context.Context, jobID uuid.UUID) error {
+	query := `
+		UPDATE processing_jobs 
+		SET retry_count = 0, updated_at = NOW()
+		WHERE id = $1
+	`
+
+	result, err := p.pool.Exec(ctx, query, jobID)
+	if err != nil {
+		return fmt.Errorf("failed to reset retry count: %w", err)
 	}
 
 	if result.RowsAffected() == 0 {

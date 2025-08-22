@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -216,4 +217,45 @@ func (d *DatabaseService) GetAllTags() ([]string, error) {
 	}
 
 	return tags, nil
+}
+
+// GetChapter1Transcript gets the transcript for chapter 1 of an audiobook
+func (d *DatabaseService) GetChapter1Transcript(audiobookID string) (*models.ChapterTranscript, error) {
+	query := `
+		SELECT ct.id, ct.chapter_id, ct.audiobook_id, ct.content, ct.segments, 
+		       ct.language, ct.confidence_score, ct.processing_time_seconds, ct.created_at
+		FROM chapter_transcripts ct
+		JOIN chapters c ON ct.chapter_id = c.id
+		WHERE c.audiobook_id = $1 AND c.chapter_number = 1
+		LIMIT 1
+	`
+
+	var transcript models.ChapterTranscript
+	var segmentsJSON []byte
+
+	err := d.pool.QueryRow(context.Background(), query, audiobookID).Scan(
+		&transcript.ID,
+		&transcript.ChapterID,
+		&transcript.AudiobookID,
+		&transcript.Content,
+		&segmentsJSON,
+		&transcript.Language,
+		&transcript.ConfidenceScore,
+		&transcript.ProcessingTimeSeconds,
+		&transcript.CreatedAt,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil // No transcript found
+		}
+		return nil, fmt.Errorf("failed to get chapter 1 transcript: %v", err)
+	}
+
+	// Parse segments JSON
+	if err := json.Unmarshal(segmentsJSON, &transcript.Segments); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal segments: %v", err)
+	}
+
+	return &transcript, nil
 }

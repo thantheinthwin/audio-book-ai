@@ -94,6 +94,19 @@ interface UploadedFile {
   uploaded_at: string;
 }
 
+export interface ProcessingJob {
+  id: string;
+  job_type: string;
+  status: string;
+  created_at: string;
+  started_at?: string;
+  completed_at?: string;
+  error_message?: string;
+  chapter_id?: string;
+  retry_count: number;
+  max_retries: number;
+}
+
 interface AudioBookUpdateData {
   title?: string;
   author?: string;
@@ -625,16 +638,7 @@ export const audiobooksAPI = {
     apiClient<
       ApiResponse<{
         audiobook_id: string;
-        jobs: Array<{
-          id: string;
-          job_type: string;
-          status: string;
-          created_at: string;
-          started_at?: string;
-          completed_at?: string;
-          error_message?: string;
-          chapter_id?: string;
-        }>;
+        jobs: ProcessingJob[];
         overall_status: string;
         progress: number;
         total_jobs: number;
@@ -677,7 +681,7 @@ export const checkoutAPI = {
     const params = new URLSearchParams();
     if (limit) params.append("limit", limit.toString());
     if (offset) params.append("offset", offset.toString());
-    
+
     return apiClient<ApiResponse<PurchaseHistoryResponse>>(
       `/user/purchases?${params.toString()}`
     );

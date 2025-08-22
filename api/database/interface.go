@@ -61,6 +61,8 @@ type Repository interface {
 	UpdateProcessingJob(ctx context.Context, job *models.ProcessingJob) error
 	GetPendingJobs(ctx context.Context, jobType models.JobType, limit int) ([]models.ProcessingJob, error)
 	GetJobsByStatus(ctx context.Context, status models.JobStatus, limit int) ([]models.ProcessingJob, error)
+	IncrementRetryCount(ctx context.Context, jobID uuid.UUID) error
+	ResetRetryCount(ctx context.Context, jobID uuid.UUID) error
 
 	// Tag operations
 	CreateTag(ctx context.Context, tag *models.Tag) error
