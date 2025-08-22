@@ -208,25 +208,25 @@ async function getAuthToken(): Promise<string | null> {
       "Auth token found:",
       session.access_token.substring(0, 20) + "..."
     );
-    console.log("Full token length:", session.access_token.length);
-    console.log("Token type:", typeof session.access_token);
+    // console.log("Full token length:", session.access_token.length);
+    // console.log("Token type:", typeof session.access_token);
 
     // Also log the user info
-    console.log("User info:", {
-      id: session.user?.id,
-      email: session.user?.email,
-      role: session.user?.user_metadata?.role || "user",
-    });
+    // console.log("User info:", {
+    //   id: session.user?.id,
+    //   email: session.user?.email,
+    //   role: session.user?.user_metadata?.role || "user",
+    // });
 
     // Try to decode the JWT to see its structure
     try {
       const tokenParts = session.access_token.split(".");
       if (tokenParts.length === 3) {
-        const payload = JSON.parse(atob(tokenParts[1]));
-        console.log("JWT Token payload:", payload);
-        console.log("JWT Token issuer:", payload.iss);
-        console.log("JWT Token audience:", payload.aud);
-        console.log("JWT Token subject:", payload.sub);
+        // const payload = JSON.parse(atob(tokenParts[1]));
+        // console.log("JWT Token payload:", payload);
+        // console.log("JWT Token issuer:", payload.iss);
+        // console.log("JWT Token audience:", payload.aud);
+        // console.log("JWT Token subject:", payload.sub);
       }
     } catch (e) {
       console.log("Could not decode JWT token:", e);
@@ -255,9 +255,9 @@ const createApiClient = (): AxiosInstance => {
       const token = await getAuthToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
-        console.log("Request with auth token:", config.url);
+        // console.log("Request with auth token:", config.url);
       } else {
-        console.log("Request without auth token:", config.url);
+        // console.log("Request without auth token:", config.url);
       }
       return config;
     },
@@ -768,20 +768,20 @@ export const testAuth = async () => {
       data: { session },
     } = await supabase.auth.getSession();
 
-    console.log("Current session:", {
-      hasSession: !!session,
-      hasAccessToken: !!session?.access_token,
-      tokenLength: session?.access_token?.length || 0,
-      user: session?.user?.email,
-    });
+    // console.log("Current session:", {
+    //   hasSession: !!session,
+    //   hasAccessToken: !!session?.access_token,
+    //   tokenLength: session?.access_token?.length || 0,
+    //   user: session?.user?.email,
+    // });
 
     if (session?.access_token) {
       // Decode the JWT token to see its structure
       try {
         const tokenParts = session.access_token.split(".");
         if (tokenParts.length === 3) {
-          const payload = JSON.parse(atob(tokenParts[1]));
-          console.log("JWT Token payload:", payload);
+          // const payload = JSON.parse(atob(tokenParts[1]));
+          // console.log("JWT Token payload:", payload);
         }
       } catch (e) {
         console.log("Could not decode JWT token:", e);

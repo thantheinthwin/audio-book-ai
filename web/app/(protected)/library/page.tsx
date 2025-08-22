@@ -53,12 +53,9 @@ export default function LibraryPage() {
 
   // Check if user is a normal user (not admin)
   useEffect(() => {
-    if (!userLoading && !user) {
-      redirect("/auth/login");
-    }
-
     if (!userLoading && user) {
       const userRole = user.user_metadata?.role || "user";
+      console.log("role", userRole);
       if (userRole !== "user") {
         redirect("/");
       }

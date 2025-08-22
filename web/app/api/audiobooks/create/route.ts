@@ -89,8 +89,6 @@ export async function POST(request: NextRequest) {
       return sum + (file.file?.size || 0);
     }, 0);
 
-    console.log("api base url", API_BASE_URL);
-
     let uploadData;
     try {
       const uploadResponse = await axios.post(
