@@ -204,8 +204,8 @@ func (p *PostgresRepository) DeleteUpload(ctx context.Context, id uuid.UUID) err
 // Upload File operations
 func (p *PostgresRepository) CreateUploadFile(ctx context.Context, uploadFile *models.UploadFile) error {
 	query := `
-		INSERT INTO upload_files (id, upload_id, file_name, file_size_bytes, mime_type, file_path, chapter_number, chapter_title, status, error, retry_count, max_retries, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		INSERT INTO upload_files (id, upload_id, file_name, file_size_bytes, mime_type, file_path, chapter_number, chapter_title, duration_seconds, status, error, retry_count, max_retries, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 	`
 
 	now := time.Now()
@@ -218,6 +218,7 @@ func (p *PostgresRepository) CreateUploadFile(ctx context.Context, uploadFile *m
 		uploadFile.FilePath,
 		uploadFile.ChapterNumber,
 		uploadFile.ChapterTitle,
+		uploadFile.DurationSeconds,
 		uploadFile.Status,
 		uploadFile.Error,
 		uploadFile.RetryCount,
@@ -237,7 +238,7 @@ func (p *PostgresRepository) CreateUploadFile(ctx context.Context, uploadFile *m
 
 func (p *PostgresRepository) GetUploadFileByID(ctx context.Context, id uuid.UUID) (*models.UploadFile, error) {
 	query := `
-		SELECT id, upload_id, file_name, file_size_bytes, mime_type, file_path, chapter_number, chapter_title, status, error, retry_count, max_retries, created_at, updated_at
+		SELECT id, upload_id, file_name, file_size_bytes, mime_type, file_path, chapter_number, chapter_title, duration_seconds, status, error, retry_count, max_retries, created_at, updated_at
 		FROM upload_files
 		WHERE id = $1
 	`
@@ -252,6 +253,7 @@ func (p *PostgresRepository) GetUploadFileByID(ctx context.Context, id uuid.UUID
 		&uploadFile.FilePath,
 		&uploadFile.ChapterNumber,
 		&uploadFile.ChapterTitle,
+		&uploadFile.DurationSeconds,
 		&uploadFile.Status,
 		&uploadFile.Error,
 		&uploadFile.RetryCount,
@@ -272,7 +274,7 @@ func (p *PostgresRepository) GetUploadFileByID(ctx context.Context, id uuid.UUID
 
 func (p *PostgresRepository) GetUploadFiles(ctx context.Context, uploadID uuid.UUID) ([]models.UploadFile, error) {
 	query := `
-		SELECT id, upload_id, file_name, file_size_bytes, mime_type, file_path, chapter_number, chapter_title, status, error, retry_count, max_retries, created_at, updated_at
+		SELECT id, upload_id, file_name, file_size_bytes, mime_type, file_path, chapter_number, chapter_title, duration_seconds, status, error, retry_count, max_retries, created_at, updated_at
 		FROM upload_files
 		WHERE upload_id = $1
 		ORDER BY chapter_number NULLS LAST, created_at
@@ -299,6 +301,7 @@ func (p *PostgresRepository) GetUploadFiles(ctx context.Context, uploadID uuid.U
 			&file.FilePath,
 			&file.ChapterNumber,
 			&file.ChapterTitle,
+			&file.DurationSeconds,
 			&file.Status,
 			&file.Error,
 			&file.RetryCount,
@@ -320,7 +323,7 @@ func (p *PostgresRepository) GetUploadFiles(ctx context.Context, uploadID uuid.U
 func (p *PostgresRepository) UpdateUploadFile(ctx context.Context, uploadFile *models.UploadFile) error {
 	query := `
 		UPDATE upload_files
-		SET file_name = $2, file_size_bytes = $3, mime_type = $4, file_path = $5, chapter_number = $6, chapter_title = $7, status = $8, error = $9, retry_count = $10, max_retries = $11, updated_at = $12
+		SET file_name = $2, file_size_bytes = $3, mime_type = $4, file_path = $5, chapter_number = $6, chapter_title = $7, duration_seconds = $8, status = $9, error = $10, retry_count = $11, max_retries = $12, updated_at = $13
 		WHERE id = $1
 	`
 
@@ -332,6 +335,7 @@ func (p *PostgresRepository) UpdateUploadFile(ctx context.Context, uploadFile *m
 		uploadFile.FilePath,
 		uploadFile.ChapterNumber,
 		uploadFile.ChapterTitle,
+		uploadFile.DurationSeconds,
 		uploadFile.Status,
 		uploadFile.Error,
 		uploadFile.RetryCount,
@@ -656,6 +660,15 @@ func (p *PostgresRepository) UpdateAudioBook(ctx context.Context, audiobook *mod
 }
 
 func (p *PostgresRepository) DeleteAudioBook(ctx context.Context, id uuid.UUID) error {
+	query := `
+		DELETE FROM audiobooks WHERE id = $1
+	`
+
+	_, err := p.pool.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete audiobook: %w", err)
+	}
+
 	return nil
 }
 
@@ -837,8 +850,8 @@ func (p *PostgresRepository) CheckAndUpdateAudioBookStatus(ctx context.Context, 
 
 func (p *PostgresRepository) CreateChapter(ctx context.Context, chapter *models.Chapter) error {
 	query := `
-		INSERT INTO chapters (id, audiobook_id, upload_file_id, chapter_number, title, file_path, file_url, file_size_bytes, mime_type, start_time_seconds, end_time_seconds, duration_seconds, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		INSERT INTO chapters (id, audiobook_id, upload_file_id, chapter_number, title, file_path, file_url, file_size_bytes, mime_type, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 
 	fmt.Printf("CreateChapter: Executing insert for chapter ID: %s, AudiobookID: %s, ChapterNumber: %d\n",
@@ -855,9 +868,6 @@ func (p *PostgresRepository) CreateChapter(ctx context.Context, chapter *models.
 		chapter.FileURL,
 		chapter.FileSizeBytes,
 		chapter.MimeType,
-		chapter.StartTime,
-		chapter.EndTime,
-		chapter.DurationSeconds,
 		now,
 	)
 
@@ -873,8 +883,7 @@ func (p *PostgresRepository) CreateChapter(ctx context.Context, chapter *models.
 
 func (p *PostgresRepository) GetChapterByID(ctx context.Context, id uuid.UUID) (*models.Chapter, error) {
 	query := `
-		SELECT id, audiobook_id, upload_file_id, chapter_number, title, file_path, file_url, file_size_bytes, mime_type, 
-		       start_time_seconds, end_time_seconds, duration_seconds, created_at
+		SELECT id, audiobook_id, upload_file_id, chapter_number, title, file_path, file_url, file_size_bytes, mime_type, created_at
 		FROM chapters
 		WHERE id = $1
 	`
@@ -890,9 +899,6 @@ func (p *PostgresRepository) GetChapterByID(ctx context.Context, id uuid.UUID) (
 		&chapter.FileURL,
 		&chapter.FileSizeBytes,
 		&chapter.MimeType,
-		&chapter.StartTime,
-		&chapter.EndTime,
-		&chapter.DurationSeconds,
 		&chapter.CreatedAt,
 	)
 
@@ -918,9 +924,6 @@ func (p *PostgresRepository) GetChaptersByAudioBookID(ctx context.Context, audio
 			c.file_url, 
 			c.file_size_bytes, 
 			c.mime_type, 
-		    c.start_time_seconds, 
-			c.end_time_seconds, 
-			c.duration_seconds, 
 			c.created_at, 
 			ct.content
 		FROM chapters c
@@ -948,9 +951,6 @@ func (p *PostgresRepository) GetChaptersByAudioBookID(ctx context.Context, audio
 			&chapter.FileURL,
 			&chapter.FileSizeBytes,
 			&chapter.MimeType,
-			&chapter.StartTime,
-			&chapter.EndTime,
-			&chapter.DurationSeconds,
 			&chapter.CreatedAt,
 			&chapter.Content,
 		)
@@ -969,8 +969,7 @@ func (p *PostgresRepository) GetChaptersByAudioBookID(ctx context.Context, audio
 
 func (p *PostgresRepository) GetFirstChapterByAudioBookID(ctx context.Context, audiobookID uuid.UUID) (*models.Chapter, error) {
 	query := `
-		SELECT id, audiobook_id, upload_file_id, chapter_number, title, file_path, file_url, file_size_bytes, mime_type, 
-		       start_time_seconds, end_time_seconds, duration_seconds, created_at
+		SELECT id, audiobook_id, upload_file_id, chapter_number, title, file_path, file_url, file_size_bytes, mime_type, created_at
 		FROM chapters
 		WHERE audiobook_id = $1 AND chapter_number = 1
 	`
@@ -986,9 +985,6 @@ func (p *PostgresRepository) GetFirstChapterByAudioBookID(ctx context.Context, a
 		&chapter.FileURL,
 		&chapter.FileSizeBytes,
 		&chapter.MimeType,
-		&chapter.StartTime,
-		&chapter.EndTime,
-		&chapter.DurationSeconds,
 		&chapter.CreatedAt,
 	)
 
@@ -1006,8 +1002,7 @@ func (p *PostgresRepository) UpdateChapter(ctx context.Context, chapter *models.
 	query := `
 		UPDATE chapters 
 		SET audiobook_id = $2, upload_file_id = $3, chapter_number = $4, title = $5, file_path = $6, 
-		    file_url = $7, file_size_bytes = $8, mime_type = $9, start_time_seconds = $10, 
-		    end_time_seconds = $11, duration_seconds = $12
+		    file_url = $7, file_size_bytes = $8, mime_type = $9
 		WHERE id = $1
 	`
 
@@ -1021,9 +1016,6 @@ func (p *PostgresRepository) UpdateChapter(ctx context.Context, chapter *models.
 		chapter.FileURL,
 		chapter.FileSizeBytes,
 		chapter.MimeType,
-		chapter.StartTime,
-		chapter.EndTime,
-		chapter.DurationSeconds,
 	)
 
 	if err != nil {

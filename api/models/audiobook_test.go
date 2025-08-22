@@ -214,42 +214,6 @@ func TestChapter_IsFirstChapter(t *testing.T) {
 	}
 }
 
-func TestChapter_GetDurationFormatted(t *testing.T) {
-	tests := []struct {
-		name     string
-		seconds  *int
-		expected string
-	}{
-		{
-			name:     "nil duration",
-			seconds:  nil,
-			expected: "Unknown",
-		},
-		{
-			name:     "30 seconds",
-			seconds:  intPtr(30),
-			expected: "0m 30s",
-		},
-		{
-			name:     "90 seconds",
-			seconds:  intPtr(90),
-			expected: "1m 30s",
-		},
-		{
-			name:     "3600 seconds",
-			seconds:  intPtr(3600),
-			expected: "60m 0s",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			chapter := Chapter{DurationSeconds: tt.seconds}
-			assert.Equal(t, tt.expected, chapter.GetDurationFormatted())
-		})
-	}
-}
-
 func TestChapterTranscript_Validation(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -486,52 +450,6 @@ func TestAudioBook_GetDurationFormatted(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			audiobook := AudioBook{DurationSeconds: tt.seconds}
 			assert.Equal(t, tt.expected, audiobook.GetDurationFormatted())
-		})
-	}
-}
-
-func TestAudioBook_GetFileSizeFormatted(t *testing.T) {
-	tests := []struct {
-		name     string
-		bytes    *int64
-		expected string
-	}{
-		{
-			name:     "nil file size",
-			bytes:    nil,
-			expected: "Unknown",
-		},
-		{
-			name:     "500 bytes",
-			bytes:    int64Ptr(500),
-			expected: "500 B",
-		},
-		{
-			name:     "1024 bytes",
-			bytes:    int64Ptr(1024),
-			expected: "1.0 KB",
-		},
-		{
-			name:     "1536 bytes",
-			bytes:    int64Ptr(1536),
-			expected: "1.5 KB",
-		},
-		{
-			name:     "1048576 bytes",
-			bytes:    int64Ptr(1048576),
-			expected: "1.0 MB",
-		},
-		{
-			name:     "1073741824 bytes",
-			bytes:    int64Ptr(1073741824),
-			expected: "1.0 GB",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			audiobook := AudioBook{FileSizeBytes: tt.bytes}
-			assert.Equal(t, tt.expected, audiobook.GetFileSizeFormatted())
 		})
 	}
 }

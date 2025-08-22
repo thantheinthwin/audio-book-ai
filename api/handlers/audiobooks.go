@@ -738,16 +738,16 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 		log.Printf("CreateAudioBook: Creating single chapter with file: %s, size: %d", file.FilePath, file.FileSize)
 
 		chapter := &models.Chapter{
-			ID:              uuid.New(),
-			AudiobookID:     audiobook.ID,
-			UploadFileID:    &file.ID,
-			ChapterNumber:   1,
-			Title:           req.Title, // Use audiobook title for single file
-			FilePath:        file.FilePath,
-			FileURL:         &file.FilePath, // For now, use file path as URL
-			FileSizeBytes:   &file.FileSize,
-			MimeType:        &file.MimeType,
-			CreatedAt:       time.Now(),
+			ID:            uuid.New(),
+			AudiobookID:   audiobook.ID,
+			UploadFileID:  &file.ID,
+			ChapterNumber: 1,
+			Title:         req.Title, // Use audiobook title for single file
+			FilePath:      file.FilePath,
+			FileURL:       &file.FilePath, // For now, use file path as URL
+			FileSizeBytes: &file.FileSize,
+			MimeType:      &file.MimeType,
+			CreatedAt:     time.Now(),
 		}
 		chapters = append(chapters, chapter)
 

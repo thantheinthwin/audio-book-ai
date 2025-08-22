@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   useAudioBook,
   useAudioBookJobStatus,
   useUpdateAudioBookPrice,
+  useDeleteAudioBook,
 } from "@/hooks/use-audiobooks";
 import { notFound } from "next/navigation";
 import {
@@ -22,6 +23,7 @@ import {
   Edit,
   Check,
   X,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,7 +36,14 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -48,10 +57,12 @@ import { Separator } from "@/components/ui/separator";
 
 export default function AudioBookDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const [playingChapter, setPlayingChapter] = useState<string | null>(null);
   const [isJobStatusExpanded, setIsJobStatusExpanded] = useState(false);
   const [isEditingPrice, setIsEditingPrice] = useState(false);
   const [newPrice, setNewPrice] = useState<string>("");
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const {
@@ -63,9 +74,23 @@ export default function AudioBookDetailPage() {
     params.id as string
   );
   const updatePriceMutation = useUpdateAudioBookPrice();
+  const deleteAudioBookMutation = useDeleteAudioBook();
 
   const audioBook = audioBookResponse?.data;
   const jobStatus = jobStatusResponse?.data;
+
+  // Event delegation handler for delete button clicks
+  const handleContainerClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+
+    // Check if the clicked element is a delete button or its child
+    const deleteButton = target.closest('[data-action="delete-audiobook"]');
+
+    if (deleteButton) {
+      event.preventDefault();
+      setIsDeleteDialogOpen(true);
+    }
+  };
 
   // Handle play/pause for a chapter
   const handlePlayPause = (chapterId: string, audioUrl: string) => {
@@ -169,6 +194,24 @@ export default function AudioBookDetailPage() {
     setNewPrice("");
   };
 
+  // Function to handle audiobook deletion
+  const handleDeleteAudioBook = async () => {
+    try {
+      await deleteAudioBookMutation.mutateAsync(params.id as string);
+      setIsDeleteDialogOpen(false);
+      // Navigate to audiobooks list after successful deletion
+      router.push("/audiobooks");
+    } catch (error) {
+      console.error("Failed to delete audiobook:", error);
+      alert("Failed to delete audiobook. Please try again.");
+    }
+  };
+
+  // Function to cancel delete
+  const handleDeleteCancel = () => {
+    setIsDeleteDialogOpen(false);
+  };
+
   if (audioBookLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -228,7 +271,7 @@ export default function AudioBookDetailPage() {
   const isFailed = jobStatus?.overall_status === "failed";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" onClick={handleContainerClick}>
       <Card>
         <CardContent className="p-6 flex gap-4">
           <div className="flex flex-col gap-4">
@@ -300,8 +343,9 @@ export default function AudioBookDetailPage() {
             </div>
             <div className="flex gap-2">
               <Button
-                variant={"destructive"}
+                variant="destructive"
                 className="w-full py-6 rounded justify-between"
+                data-action="delete-audiobook"
               >
                 Delete
                 <Trash2 className="h-4 w-4" />
@@ -367,18 +411,6 @@ export default function AudioBookDetailPage() {
                   {isFailed && <AlertCircle className="h-5 w-5 text-red-500" />}
                   Processing Status
                 </CardTitle>
-                {/* <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">
-                    {isJobStatusExpanded
-                      ? "Click to collapse"
-                      : "Click to expand"}
-                  </span>
-                  {isJobStatusExpanded ? (
-                    <ChevronUp className="h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4" />
-                  )}
-                </div> */}
               </div>
               <CardDescription>
                 {isProcessing &&
@@ -526,6 +558,45 @@ export default function AudioBookDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Delete Audio Book
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &ldquo;{audioBook?.title}&rdquo;?
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={handleDeleteCancel}
+              disabled={deleteAudioBookMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteAudioBook}
+              disabled={deleteAudioBookMutation.isPending}
+            >
+              {deleteAudioBookMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

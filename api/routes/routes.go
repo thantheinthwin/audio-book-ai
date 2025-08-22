@@ -44,18 +44,9 @@ func SetupProtectedRoutes(router fiber.Router, cfg *config.Config, h *handlers.H
 	// Apply user role middleware (allows both user and admin roles)
 	router.Use(middleware.RequireUser())
 
-	// User profile
-	router.Get("/profile", handlers.GetProfile)
-	router.Put("/profile", handlers.UpdateProfile)
-	router.Delete("/profile", handlers.DeleteProfile)
-
 	// Audio books (user operations)
 	router.Get("/audiobooks", h.GetAudioBooks)
 	router.Get("/audiobooks/:id", h.GetAudioBook)
-
-	// Progress
-	router.Get("/progress/:audiobookId", handlers.GetProgress)
-	router.Put("/progress/:audiobookId", handlers.UpdateProgress)
 
 	// Cart operations
 	router.Post("/cart", h.AddToCart)

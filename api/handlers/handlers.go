@@ -164,7 +164,8 @@ func (h *Handler) UploadFile(c *fiber.Ctx) error {
 	// Parse metadata
 	chapterNumberStr := c.FormValue("chapter_number")
 	chapterTitle := c.FormValue("chapter_title")
-	
+	durationSecondsStr := c.FormValue("duration_seconds")
+
 	var chapterNumber *int
 	if chapterNumberStr != "" {
 		num, err := strconv.Atoi(chapterNumberStr)
@@ -174,6 +175,17 @@ func (h *Handler) UploadFile(c *fiber.Ctx) error {
 			})
 		}
 		chapterNumber = &num
+	}
+
+	var durationSeconds *int
+	if durationSecondsStr != "" {
+		duration, err := strconv.Atoi(durationSecondsStr)
+		if err != nil {
+			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid duration seconds",
+			})
+		}
+		durationSeconds = &duration
 	}
 
 	// Validate file size
@@ -205,16 +217,17 @@ func (h *Handler) UploadFile(c *fiber.Ctx) error {
 
 	// Create upload file record
 	uploadFile := &models.UploadFile{
-		ID:            uuid.New(),
-		UploadID:      uploadID,
-		FileName:      file.Filename,
-		FileSize:      file.Size,
-		MimeType:      file.Header.Get("Content-Type"),
-		FilePath:      fileURL, // Store the Supabase Storage URL
-		ChapterNumber: chapterNumber,
-		ChapterTitle:  &chapterTitle,
-		Status:        models.FileUploadStatusCompleted,
-		CreatedAt:     time.Now(),
+		ID:              uuid.New(),
+		UploadID:        uploadID,
+		FileName:        file.Filename,
+		FileSize:        file.Size,
+		MimeType:        file.Header.Get("Content-Type"),
+		FilePath:        fileURL, // Store the Supabase Storage URL
+		ChapterNumber:   chapterNumber,
+		ChapterTitle:    &chapterTitle,
+		DurationSeconds: durationSeconds,
+		Status:          models.FileUploadStatusCompleted,
+		CreatedAt:       time.Now(),
 	}
 
 	if err := h.repo.CreateUploadFile(context.Background(), uploadFile); err != nil {
@@ -306,6 +319,7 @@ func (h *Handler) UploadFilesBatch(c *fiber.Ctx) error {
 	files := form.File["files"]
 	chapterNumbers := form.Value["chapter_numbers"]
 	chapterTitles := form.Value["chapter_titles"]
+	durationSeconds := form.Value["duration_seconds"]
 
 	if len(files) == 0 {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
@@ -347,6 +361,14 @@ func (h *Handler) UploadFilesBatch(c *fiber.Ctx) error {
 
 			chapterTitle := chapterTitles[index]
 
+			// Parse duration seconds
+			var fileDurationSeconds *int
+			if len(durationSeconds) > index && durationSeconds[index] != "" {
+				if duration, err := strconv.Atoi(durationSeconds[index]); err == nil {
+					fileDurationSeconds = &duration
+				}
+			}
+
 			// Validate file size
 			if file.Size > 500*1024*1024 { // 500MB limit
 				resultChan <- uploadResult{
@@ -384,19 +406,20 @@ func (h *Handler) UploadFilesBatch(c *fiber.Ctx) error {
 
 			// Create upload file record
 			uploadFile := &models.UploadFile{
-				ID:            uuid.New(),
-				UploadID:      uploadID,
-				FileName:      file.Filename,
-				FileSize:      file.Size,
-				MimeType:      file.Header.Get("Content-Type"),
-				FilePath:      fileURL,
-				ChapterNumber: chapterNumber,
-				ChapterTitle:  &chapterTitle,
-				Status:        models.FileUploadStatusCompleted,
-				RetryCount:    0,
-				MaxRetries:    3,
-				CreatedAt:     time.Now(),
-				UpdatedAt:     time.Now(),
+				ID:              uuid.New(),
+				UploadID:        uploadID,
+				FileName:        file.Filename,
+				FileSize:        file.Size,
+				MimeType:        file.Header.Get("Content-Type"),
+				FilePath:        fileURL,
+				ChapterNumber:   chapterNumber,
+				ChapterTitle:    &chapterTitle,
+				DurationSeconds: fileDurationSeconds,
+				Status:          models.FileUploadStatusCompleted,
+				RetryCount:      0,
+				MaxRetries:      3,
+				CreatedAt:       time.Now(),
+				UpdatedAt:       time.Now(),
 			}
 
 			if err := h.repo.CreateUploadFile(context.Background(), uploadFile); err != nil {

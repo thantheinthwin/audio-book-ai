@@ -55,20 +55,21 @@ type Upload struct {
 
 // UploadFile represents a file being uploaded
 type UploadFile struct {
-	ID            uuid.UUID        `json:"id" db:"id"`
-	UploadID      uuid.UUID        `json:"upload_id" db:"upload_id" validate:"required"`
-	FileName      string           `json:"file_name" db:"file_name" validate:"required"`
-	FileSize      int64            `json:"file_size_bytes" db:"file_size_bytes" validate:"required"`
-	MimeType      string           `json:"mime_type" db:"mime_type" validate:"required"`
-	FilePath      string           `json:"file_path" db:"file_path" validate:"required"`
-	ChapterNumber *int             `json:"chapter_number,omitempty" db:"chapter_number"`
-	ChapterTitle  *string          `json:"chapter_title,omitempty" db:"chapter_title"`
-	Status        FileUploadStatus `json:"status" db:"status" validate:"required"`
-	Error         *string          `json:"error,omitempty" db:"error"`
-	RetryCount    int              `json:"retry_count" db:"retry_count"`
-	MaxRetries    int              `json:"max_retries" db:"max_retries"`
-	CreatedAt     time.Time        `json:"created_at" db:"created_at"`
-	UpdatedAt     time.Time        `json:"updated_at" db:"updated_at"`
+	ID              uuid.UUID        `json:"id" db:"id"`
+	UploadID        uuid.UUID        `json:"upload_id" db:"upload_id" validate:"required"`
+	FileName        string           `json:"file_name" db:"file_name" validate:"required"`
+	FileSize        int64            `json:"file_size_bytes" db:"file_size_bytes" validate:"required"`
+	MimeType        string           `json:"mime_type" db:"mime_type" validate:"required"`
+	FilePath        string           `json:"file_path" db:"file_path" validate:"required"`
+	ChapterNumber   *int             `json:"chapter_number,omitempty" db:"chapter_number"`
+	ChapterTitle    *string          `json:"chapter_title,omitempty" db:"chapter_title"`
+	DurationSeconds *int             `json:"duration_seconds,omitempty" db:"duration_seconds"`
+	Status          FileUploadStatus `json:"status" db:"status" validate:"required"`
+	Error           *string          `json:"error,omitempty" db:"error"`
+	RetryCount      int              `json:"retry_count" db:"retry_count"`
+	MaxRetries      int              `json:"max_retries" db:"max_retries"`
+	CreatedAt       time.Time        `json:"created_at" db:"created_at"`
+	UpdatedAt       time.Time        `json:"updated_at" db:"updated_at"`
 }
 
 // Request/Response models
@@ -104,16 +105,16 @@ type CreateAudioBookFromUploadRequest struct {
 
 // UploadProgressResponse represents the progress of an upload
 type UploadProgressResponse struct {
-	UploadID      uuid.UUID    `json:"upload_id"`
-	Status        UploadStatus `json:"status"`
-	TotalFiles    int          `json:"total_files"`
-	UploadedFiles int          `json:"uploaded_files"`
-	FailedFiles   int          `json:"failed_files"`
-	RetryingFiles int          `json:"retrying_files"`
-	Progress      float64      `json:"progress"` // 0.0 to 1.0
-	TotalSize     int64        `json:"total_size_bytes"`
-	UploadedSize  int64        `json:"uploaded_size_bytes"`
-	EstimatedTime *int         `json:"estimated_time_seconds,omitempty"`
+	UploadID      uuid.UUID        `json:"upload_id"`
+	Status        UploadStatus     `json:"status"`
+	TotalFiles    int              `json:"total_files"`
+	UploadedFiles int              `json:"uploaded_files"`
+	FailedFiles   int              `json:"failed_files"`
+	RetryingFiles int              `json:"retrying_files"`
+	Progress      float64          `json:"progress"` // 0.0 to 1.0
+	TotalSize     int64            `json:"total_size_bytes"`
+	UploadedSize  int64            `json:"uploaded_size_bytes"`
+	EstimatedTime *int             `json:"estimated_time_seconds,omitempty"`
 	Files         []UploadFileInfo `json:"files,omitempty"`
 }
 
@@ -156,13 +157,13 @@ type RetryFileUploadRequest struct {
 
 // BatchUploadResponse represents the response for batch file uploads
 type BatchUploadResponse struct {
-	UploadID      uuid.UUID              `json:"upload_id"`
-	TotalFiles    int                    `json:"total_files"`
-	SuccessCount  int                    `json:"success_count"`
-	FailedCount   int                    `json:"failed_count"`
-	RetryingCount int                    `json:"retrying_count"`
-	Files         []FileUploadResponse   `json:"files"`
-	Errors        []string               `json:"errors,omitempty"`
+	UploadID      uuid.UUID            `json:"upload_id"`
+	TotalFiles    int                  `json:"total_files"`
+	SuccessCount  int                  `json:"success_count"`
+	FailedCount   int                  `json:"failed_count"`
+	RetryingCount int                  `json:"retrying_count"`
+	Files         []FileUploadResponse `json:"files"`
+	Errors        []string             `json:"errors,omitempty"`
 }
 
 // Helper methods

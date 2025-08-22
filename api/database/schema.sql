@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS upload_files (
     file_path VARCHAR(500) NOT NULL,
     chapter_number INTEGER,
     chapter_title VARCHAR(255),
+    duration_seconds INTEGER,
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     error TEXT,
     retry_count INTEGER DEFAULT 0,
@@ -67,9 +68,6 @@ CREATE TABLE IF NOT EXISTS chapters (
     file_url VARCHAR(500),
     file_size_bytes BIGINT,
     mime_type VARCHAR(100),
-    start_time_seconds INTEGER,
-    end_time_seconds INTEGER,
-    duration_seconds INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(audiobook_id, chapter_number)
 );

@@ -552,18 +552,6 @@ export const audiobooksAPI = {
     >(`/admin/audiobooks/${id}/jobs`),
 };
 
-// Progress API functions
-export const progressAPI = {
-  getProgress: (audiobookId: string) =>
-    apiClient(`/user/progress/${audiobookId}`),
-
-  updateProgress: (audiobookId: string, data: any) =>
-    apiClient(`/user/progress/${audiobookId}`, {
-      method: "PUT",
-      data,
-    }),
-};
-
 // Cart API functions
 export const cartAPI = {
   addToCart: (data: AddToCartRequest) =>

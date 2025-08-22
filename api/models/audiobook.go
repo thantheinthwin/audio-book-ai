@@ -79,20 +79,17 @@ type AudioBook struct {
 
 // Chapter represents a chapter within an audio book
 type Chapter struct {
-	ID              uuid.UUID  `json:"id" db:"id"`
-	AudiobookID     uuid.UUID  `json:"audiobook_id" db:"audiobook_id" validate:"required"`
-	UploadFileID    *uuid.UUID `json:"upload_file_id,omitempty" db:"upload_file_id"`
-	ChapterNumber   int        `json:"chapter_number" db:"chapter_number" validate:"required,min=1"`
-	Title           string     `json:"title" db:"title" validate:"required,min=1,max=255"`
-	FilePath        string     `json:"file_path" db:"file_path" validate:"required"`
-	FileURL         *string    `json:"file_url,omitempty" db:"file_url"`
-	FileSizeBytes   *int64     `json:"file_size_bytes,omitempty" db:"file_size_bytes"`
-	MimeType        *string    `json:"mime_type,omitempty" db:"mime_type"`
-	StartTime       *int       `json:"start_time_seconds,omitempty" db:"start_time_seconds"`
-	EndTime         *int       `json:"end_time_seconds,omitempty" db:"end_time_seconds"`
-	DurationSeconds *int       `json:"duration_seconds,omitempty" db:"duration_seconds"`
-	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
-	Content         *string    `json:"content,omitempty" db:"content"`
+	ID            uuid.UUID  `json:"id" db:"id"`
+	AudiobookID   uuid.UUID  `json:"audiobook_id" db:"audiobook_id" validate:"required"`
+	UploadFileID  *uuid.UUID `json:"upload_file_id,omitempty" db:"upload_file_id"`
+	ChapterNumber int        `json:"chapter_number" db:"chapter_number" validate:"required,min=1"`
+	Title         string     `json:"title" db:"title" validate:"required,min=1,max=255"`
+	FilePath      string     `json:"file_path" db:"file_path" validate:"required"`
+	FileURL       *string    `json:"file_url,omitempty" db:"file_url"`
+	FileSizeBytes *int64     `json:"file_size_bytes,omitempty" db:"file_size_bytes"`
+	MimeType      *string    `json:"mime_type,omitempty" db:"mime_type"`
+	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
+	Content       *string    `json:"content,omitempty" db:"content"`
 }
 
 // Transcript represents the transcription of an audio book
@@ -287,19 +284,6 @@ func (ab *AudioBook) GetFileSizeFormatted() string {
 // IsFirstChapter returns true if this is the first chapter
 func (c *Chapter) IsFirstChapter() bool {
 	return c.ChapterNumber == 1
-}
-
-// GetDurationFormatted returns the chapter duration in a human-readable format
-func (c *Chapter) GetDurationFormatted() string {
-	if c.DurationSeconds == nil {
-		return "Unknown"
-	}
-
-	seconds := *c.DurationSeconds
-	minutes := seconds / 60
-	secs := seconds % 60
-
-	return fmt.Sprintf("%dm %ds", minutes, secs)
 }
 
 // Validate validates the audio book struct

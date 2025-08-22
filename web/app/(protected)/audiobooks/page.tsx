@@ -1,7 +1,7 @@
 "use client";
 
 import { useUser } from "@/hooks/use-auth";
-import { useAudioBooks } from "@/hooks/use-audiobooks";
+import { useAudioBooks, useDeleteAudioBook } from "@/hooks/use-audiobooks";
 import {
   Plus,
   Search,
@@ -10,6 +10,8 @@ import {
   Loader2,
   ExternalLink,
   DollarSign,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -24,8 +26,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { redirect } from "next/navigation";
-import { useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useState } from "react";
 
 export default function AudioBooksPage() {
   const { data: user, isLoading: userLoading } = useUser();
@@ -34,8 +43,38 @@ export default function AudioBooksPage() {
     isLoading: audiobooksLoading,
     error: audiobooksError,
   } = useAudioBooks();
+  const deleteAudioBookMutation = useDeleteAudioBook();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [bookToDelete, setBookToDelete] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
 
   const audioBooks = audiobooksResponse?.data || [];
+
+  // Handle delete confirmation
+  const handleDeleteClick = (book: { id: string; title: string }) => {
+    setBookToDelete(book);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!bookToDelete) return;
+
+    try {
+      await deleteAudioBookMutation.mutateAsync(bookToDelete.id);
+      setDeleteDialogOpen(false);
+      setBookToDelete(null);
+    } catch (error) {
+      console.error("Failed to delete audiobook:", error);
+      alert("Failed to delete audiobook. Please try again.");
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setBookToDelete(null);
+  };
 
   if (userLoading) {
     return (
@@ -178,11 +217,23 @@ export default function AudioBooksPage() {
                     {new Date(book.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button size="sm" variant="ghost" asChild>
-                      <Link href={`/audiobooks/${book.id}`}>
-                        <ExternalLink className="h-4 w-4" />
-                      </Link>
-                    </Button>
+                    <div className="flex items-center gap-2 justify-end">
+                      <Button size="sm" variant="ghost" asChild>
+                        <Link href={`/audiobooks/${book.id}`}>
+                          <ExternalLink className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          handleDeleteClick({ id: book.id, title: book.title })
+                        }
+                        disabled={deleteAudioBookMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -210,6 +261,45 @@ export default function AudioBooksPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Delete Audio Book
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &ldquo;{bookToDelete?.title}
+              &rdquo;? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={handleDeleteCancel}
+              disabled={deleteAudioBookMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              disabled={deleteAudioBookMutation.isPending}
+            >
+              {deleteAudioBookMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
