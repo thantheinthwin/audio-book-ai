@@ -20,6 +20,11 @@ The application uses a microservices architecture with the following components:
 - **Google Gemini API** - AI processing for summaries, tags, and embeddings
 - **Rev.ai API** - Professional audio transcription service
 
+### Storage Configuration
+
+- **Supabase Storage (S3-compatible)** - File storage for audio files and cover images
+- **PostgreSQL Database** - Primary data storage via Supabase
+
 ## 📊 System Architecture Diagram
 
 ```mermaid
@@ -117,9 +122,10 @@ graph TB
 ### Prerequisites
 
 - **Docker & Docker Compose** - For containerized deployment
-- **Supabase Account** - For authentication and database
-- **Google Gemini API Key** - For AI processing
-- **Rev.ai API Key** - For audio transcription
+- **Supabase Account** - For authentication, database, and file storage
+- **Google Gemini API Key** - For AI processing (get from [Google AI Studio](https://makersuite.google.com/app/apikey))
+- **Rev.ai API Key** - For audio transcription (get from [Rev.ai](https://www.rev.ai/))
+- **S3 Storage Credentials** - Generated from Supabase Storage settings
 
 ### System Requirements
 
@@ -153,44 +159,78 @@ graph TB
 
 3. **Configure each environment file:**
 
-   **`.common.env`** - Shared configuration:
+   **`.common.env`** - Shared configuration for all services:
 
    ```env
+   # Internal Service Authentication
    INTERNAL_API_KEY=your_secure_random_key_here
+
+   # Database Configuration
    DATABASE_URL=postgresql://username:password@host:port/database?sslmode=require
+
+   # Redis Configuration
    REDIS_URL=redis://redis:6379/0
+
+   # Job Queue Configuration
    JOBS_PREFIX=audiobooks
+
+   # API Base URL for internal service communication
+   API_BASE_URL=http://api:8080
    ```
 
    **`.api.env`** - API service configuration:
 
    ```env
+   # Supabase Configuration
    SUPABASE_URL=https://your-project-id.supabase.co
    SUPABASE_PUBLISHABLE_KEY=your_publishable_key_here
    SUPABASE_SECRET_KEY=your_secret_key_here
    SUPABASE_JWKS_URL=https://your-project-id.supabase.co/auth/v1/keys
+
+   # S3 Storage Configuration
+   SUPABASE_S3_ENDPOINT=https://your-project-id.storage.supabase.co/storage/v1/s3
+   SUPABASE_S3_REGION=ap-southeast-1
+   SUPABASE_S3_ACCESS_KEY_ID=your_s3_access_key_id
+   SUPABASE_S3_SECRET_KEY=your_s3_secret_key
    SUPABASE_STORAGE_BUCKET=audio
+
+   # JWT Configuration
+   JWT_AUDIENCE=authenticated
    ```
 
    **`.worker.env`** - AI processing worker:
 
    ```env
+   # Google Gemini AI Configuration
    GEMINI_API_KEY=your_gemini_api_key_here
    ```
 
    **`.transcriber.env`** - Audio transcription service:
 
    ```env
+   # Rev.ai Configuration
    REV_AI_API_KEY=your_rev_ai_api_key_here
    REV_AI_URL=https://api.rev.ai/speechtotext/v1
+
+   # Processing Configuration
+   MAX_CONCURRENT_JOBS=5
+   JOB_POLL_INTERVAL=5
    ```
 
    **`.web.env`** - Frontend web application:
 
    ```env
+   # Supabase Configuration (Public)
    NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=your_publishable_key_here
-   NEXT_PUBLIC_API_URL=http://localhost:8080
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLEKEY=your_publishable_key_here
+
+   # Supabase Configuration (Server-side)
+   SUPABASE_URL=https://your-project-id.supabase.co
+   SUPABASE_PUBLISHABLE_KEY=your_publishable_key_here
+
+   # API Configuration
+   API_URL=http://api:8080
+   NEXT_PUBLIC_API_URL=http://api:8080
    ```
 
 4. **Set up Supabase (one-time setup):**
@@ -198,6 +238,10 @@ graph TB
    - Create a new Supabase project
    - Run the database schema from `api/database/schema.sql`
    - Configure storage bucket named "audio"
+   - Set up S3-compatible storage credentials:
+     - Go to Storage settings in your Supabase dashboard
+     - Generate new API keys for S3 access
+     - Note down the S3 endpoint, region, access key, and secret key
    - Set up authentication providers as needed
 
 5. **Start all services:**
@@ -213,6 +257,49 @@ graph TB
    - Redis: Available on port 6379
 
 **That's it!** The system is now running with all services containerized.
+
+### Environment Variables Reference
+
+#### Common Variables (`.common.env`)
+
+- `INTERNAL_API_KEY`: Secure key for internal service-to-service communication
+- `DATABASE_URL`: PostgreSQL connection string for the main database
+- `REDIS_URL`: Redis connection URL for job queue and caching
+- `JOBS_PREFIX`: Prefix for job queue names to avoid conflicts
+- `API_BASE_URL`: Base URL for internal API communication
+
+#### API Service Variables (`.api.env`)
+
+- `SUPABASE_URL`: Your Supabase project URL
+- `SUPABASE_PUBLISHABLE_KEY`: Public key for Supabase client
+- `SUPABASE_SECRET_KEY`: Secret key for server-side Supabase operations
+- `SUPABASE_JWKS_URL`: URL for JWT key verification
+- `SUPABASE_S3_ENDPOINT`: S3-compatible storage endpoint
+- `SUPABASE_S3_REGION`: Storage region (typically ap-southeast-1)
+- `SUPABASE_S3_ACCESS_KEY_ID`: S3 access key for file operations
+- `SUPABASE_S3_SECRET_KEY`: S3 secret key for file operations
+- `SUPABASE_STORAGE_BUCKET`: Storage bucket name for audio files
+- `JWT_AUDIENCE`: JWT audience claim for token validation
+
+#### Worker Variables (`.worker.env`)
+
+- `GEMINI_API_KEY`: Google Gemini AI API key for AI processing
+
+#### Transcriber Variables (`.transcriber.env`)
+
+- `REV_AI_API_KEY`: Rev.ai API key for audio transcription
+- `REV_AI_URL`: Rev.ai API endpoint
+- `MAX_CONCURRENT_JOBS`: Maximum number of concurrent transcription jobs
+- `JOB_POLL_INTERVAL`: How often to poll for job status (in seconds)
+
+#### Web App Variables (`.web.env`)
+
+- `NEXT_PUBLIC_SUPABASE_URL`: Public Supabase URL for client-side
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLEKEY`: Public Supabase key for client-side
+- `SUPABASE_URL`: Supabase URL for server-side operations
+- `SUPABASE_PUBLISHABLE_KEY`: Supabase key for server-side operations
+- `API_URL`: Internal API URL for server-side requests
+- `NEXT_PUBLIC_API_URL`: Public API URL for client-side requests
 
 ## 🛠️ Development Workflow
 

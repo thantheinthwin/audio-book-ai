@@ -72,7 +72,7 @@ export function LoginForm({
         if (userRole === "admin") {
           router.push("/audiobooks");
         } else {
-          router.push("/");
+          router.push("/library");
         }
       } else {
         // Fallback to root route if user data is not available
