@@ -2,7 +2,6 @@
 
 import {
   AlertCircleIcon,
-  DownloadIcon,
   FileArchiveIcon,
   FileIcon,
   FileSpreadsheetIcon,
@@ -33,7 +32,7 @@ interface ChapterField {
   chapter_number: number;
   title: string;
   audio_file?: File;
-  playtime?: string;
+  playtime?: number | null; // Changed from string to number (seconds), allowing null for errors
 }
 
 interface AudioFilesUploadProps {
@@ -95,7 +94,7 @@ const formatDuration = (seconds: number): string => {
     .padStart(2, "0")}`;
 };
 
-const getAudioDuration = (file: File): Promise<string> => {
+const getAudioDuration = (file: File): Promise<number | null> => {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
     const audio = new Audio();
@@ -116,9 +115,7 @@ const getAudioDuration = (file: File): Promise<string> => {
       settled = true;
       cleanup();
       resolve(
-        seconds == null || !isFinite(seconds) || isNaN(seconds)
-          ? "--:--"
-          : formatDuration(seconds)
+        seconds == null || !isFinite(seconds) || isNaN(seconds) ? null : seconds
       );
     };
 
@@ -200,7 +197,7 @@ export default function AudioFilesUpload({
             playtime = await getAudioDuration(audioFile);
           } catch (error) {
             console.error("Error getting audio duration:", error);
-            playtime = "--:--";
+            playtime = null;
           }
         }
 
@@ -228,7 +225,7 @@ export default function AudioFilesUpload({
           playtime = await getAudioDuration(file);
         } catch (error) {
           console.error("Error getting audio duration:", error);
-          playtime = "--:--";
+          playtime = null;
         }
       }
 
@@ -411,7 +408,11 @@ export default function AudioFilesUpload({
                       </TableCell>
                       <TableCell>
                         {field.audio_file
-                          ? field.playtime || "Calculating..."
+                          ? field.playtime !== undefined
+                            ? field.playtime !== null
+                              ? formatDuration(field.playtime)
+                              : "--:--"
+                            : "Calculating..."
                           : "-"}
                       </TableCell>
                       <TableCell>
