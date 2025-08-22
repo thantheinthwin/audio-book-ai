@@ -57,6 +57,7 @@ import {
 import Image from "next/image";
 import { Separator } from "@/components/ui/separator";
 import { useUser } from "@/hooks";
+import { cn } from "@/lib/utils";
 
 export default function AudioBookDetailPage() {
   const params = useParams();
@@ -257,15 +258,15 @@ export default function AudioBookDetailPage() {
   const getJobStatusColor = (status: string) => {
     switch (status) {
       case "completed":
-        return "bg-green-100 text-green-800";
+        return "bg-green-100 text-green-800 hover:bg-green-200 hover:text-green-800";
       case "failed":
-        return "bg-red-100 text-red-800";
+        return "bg-red-100 text-red-800 hover:bg-red-200 hover:text-red-800";
       case "running":
-        return "bg-blue-100 text-blue-800";
+        return "bg-blue-100 text-blue-800 hover:bg-blue-200 hover:text-blue-800";
       case "pending":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 hover:text-yellow-800";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-gray-100 text-gray-800 hover:bg-gray-200 hover:text-gray-800";
     }
   };
 
@@ -531,7 +532,12 @@ export default function AudioBookDetailPage() {
                           )}
                         </div>
                       </div>
-                      <Badge className={getJobStatusColor(job.status)}>
+                      <Badge
+                        className={cn(
+                          getJobStatusColor(job.status),
+                          "cursor-pointer capitalize"
+                        )}
+                      >
                         {job.status}
                       </Badge>
                     </div>
