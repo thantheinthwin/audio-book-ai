@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
     const isPublic = formData.get("isPublic") === "true";
     const coverImage = formData.get("coverImage") as File | null;
     const chapters = JSON.parse(formData.get("chapters") as string);
+    const price = formData.get("price") as string;
 
     // Extract files from FormData
     const files: Array<{
@@ -177,6 +178,7 @@ export async function POST(request: NextRequest) {
     const audioBookData = {
       upload_id: uploadId,
       title,
+      price: parseFloat(price),
       author,
       language,
       is_public: isPublic,
