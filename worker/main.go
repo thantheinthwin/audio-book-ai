@@ -113,8 +113,7 @@ func processSummarizeJob(worker *services.Worker, httpClient *http.Client, apiBa
 	if err := worker.ProcessSummarizeJob(job); err != nil {
 		// Update job status to failed and pass the incremented retry count
 		now := time.Now()
-		retryCount := currentRetryCount + 1
-		updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "failed", err.Error(), nil, &now, retryCount)
+		updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "failed", err.Error(), nil, &now, currentRetryCount)
 		return err
 	}
 
