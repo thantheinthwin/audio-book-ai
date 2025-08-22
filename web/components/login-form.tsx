@@ -70,7 +70,7 @@ export function LoginForm({
 
         // Redirect based on role
         if (userRole === "admin") {
-          router.push("/dashboard");
+          router.push("/audiobooks");
         } else {
           router.push("/");
         }

@@ -91,6 +91,7 @@ type Chapter struct {
 	EndTime         *int       `json:"end_time_seconds,omitempty" db:"end_time_seconds"`
 	DurationSeconds *int       `json:"duration_seconds,omitempty" db:"duration_seconds"`
 	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
+	Content         *string    `json:"content,omitempty" db:"content"`
 }
 
 // Transcript represents the transcription of an audio book

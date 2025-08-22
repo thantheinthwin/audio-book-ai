@@ -195,10 +195,10 @@ export default function AudioBookDetailPage() {
               className="w-48 h-48 object-cover rounded-md"
             />
             <div className="flex gap-2">
-              <Button variant="outline">
+              {/* <Button variant="outline">
                 <Edit className="h-4 w-4" />
                 Edit
-              </Button>
+              </Button> */}
               <Button variant={"destructive"}>
                 <Trash2 className="h-4 w-4" />
                 Delete

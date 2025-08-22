@@ -904,10 +904,24 @@ func (p *PostgresRepository) GetChapterByID(ctx context.Context, id uuid.UUID) (
 
 func (p *PostgresRepository) GetChaptersByAudioBookID(ctx context.Context, audiobookID uuid.UUID) ([]models.Chapter, error) {
 	query := `
-		SELECT id, audiobook_id, upload_file_id, chapter_number, title, file_path, file_url, file_size_bytes, mime_type, 
-		       start_time_seconds, end_time_seconds, duration_seconds, created_at
-		FROM chapters
-		WHERE audiobook_id = $1
+		SELECT 
+			c.id, 
+			c.audiobook_id, 
+			c.upload_file_id, 
+			c.chapter_number, 
+			c.title, 
+			c.file_path, 
+			c.file_url, 
+			c.file_size_bytes, 
+			c.mime_type, 
+		    c.start_time_seconds, 
+			c.end_time_seconds, 
+			c.duration_seconds, 
+			c.created_at, 
+			ct.content
+		FROM chapters c
+		LEFT JOIN chapter_transcripts ct ON c.id = ct.chapter_id
+		WHERE c.audiobook_id = $1
 		ORDER BY chapter_number
 	`
 
@@ -934,6 +948,7 @@ func (p *PostgresRepository) GetChaptersByAudioBookID(ctx context.Context, audio
 			&chapter.EndTime,
 			&chapter.DurationSeconds,
 			&chapter.CreatedAt,
+			&chapter.Content,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan chapter: %w", err)

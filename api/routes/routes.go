@@ -27,10 +27,6 @@ func SetupRoutes(app fiber.Router, cfg *config.Config, repo database.Repository,
 	protected := app.Group("/user", middleware.AuthMiddleware(cfg))
 	SetupProtectedRoutes(protected, cfg, h)
 
-	// Public routes (no authentication required)
-	public := app.Group("/public")
-	SetupPublicRoutes(public, cfg, h)
-
 	// Admin routes (admin authentication required)
 	admin := app.Group("/admin", middleware.AuthMiddleware(cfg), middleware.RequireAdmin())
 	SetupAdminRoutes(admin, cfg, h)
@@ -91,11 +87,4 @@ func SetupInternalRoutes(router fiber.Router, cfg *config.Config, h *handlers.Ha
 
 	// Internal job status updates
 	router.Post("/jobs/:job_id/status", h.UpdateJobStatus)
-}
-
-// SetupPublicRoutes configures public routes (no authentication required)
-func SetupPublicRoutes(router fiber.Router, cfg *config.Config, h *handlers.Handler) {
-	// Public audio books
-	router.Get("/audiobooks", h.GetPublicAudioBooks)
-	router.Get("/audiobooks/:id", h.GetPublicAudioBook)
 }

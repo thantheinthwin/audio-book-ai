@@ -117,12 +117,12 @@ func (h *Handler) GetAudioBook(c *fiber.Ctx) error {
 	}
 
 	// Check if user owns this audiobook or if it's public
-	if audiobook.CreatedBy != userID && !audiobook.IsPublic {
-		log.Printf("GetAudioBook: Access denied - user does not own audiobook and it's not public")
-		return c.Status(http.StatusForbidden).JSON(fiber.Map{
-			"error": "Access denied",
-		})
-	}
+	// if audiobook.CreatedBy != userID && !audiobook.IsPublic {
+	// 	log.Printf("GetAudioBook: Access denied - user does not own audiobook and it's not public")
+	// 	return c.Status(http.StatusForbidden).JSON(fiber.Map{
+	// 		"error": "Access denied",
+	// 	})
+	// }
 
 	log.Printf("GetAudioBook: Successfully retrieved audiobook: %s", audiobook.Title)
 

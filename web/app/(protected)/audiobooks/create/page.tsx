@@ -122,7 +122,7 @@ export default function CreateAudioBookPage() {
       await createAudioBookMutation.mutateAsync(formData);
 
       console.log("Audio book created successfully");
-      router.push("/dashboard/audiobooks");
+      router.push("/audiobooks");
     } catch (error) {
       console.error("Failed to create audio book:", error);
       alert("Failed to create audio book. Please try again.");

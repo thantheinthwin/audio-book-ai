@@ -6,30 +6,14 @@ import {
   Plus,
   Search,
   Filter,
-  MoreHorizontal,
   BookOpen,
   Loader2,
-  Play,
-  Edit,
-  Trash2,
-  Eye,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -106,7 +90,7 @@ export default function AudioBooksPage() {
           </p>
         </div>
         <Button asChild>
-          <Link href="/dashboard/audiobooks/create">
+          <Link href="/audiobooks/create">
             <Plus className="h-4 w-4 mr-2" />
             Upload New Book
           </Link>
@@ -166,7 +150,7 @@ export default function AudioBooksPage() {
                 <TableHead>File Size</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Created</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -199,42 +183,10 @@ export default function AudioBooksPage() {
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
                       <Button size="sm" variant="ghost" asChild>
-                        <Link href={`/dashboard/audiobooks/${book.id}`}>
-                          <Eye className="h-4 w-4" />
+                        <Link href={`/audiobooks/${book.id}`}>
+                          <ExternalLink className="h-4 w-4" />
                         </Link>
                       </Button>
-                      <Button size="sm" variant="ghost" asChild>
-                        <Link href={`/dashboard/audiobooks/${book.id}`}>
-                          <Play className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                      {/* <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button size="sm" variant="ghost">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/dashboard/audiobooks/${book.id}`}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link
-                              href={`/dashboard/audiobooks/${book.id}/edit`}
-                            >
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu> */}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -255,7 +207,7 @@ export default function AudioBooksPage() {
               </p>
             </div>
             <Button asChild>
-              <Link href="/dashboard/audiobooks/create">
+              <Link href="/audiobooks/create">
                 <Plus className="h-4 w-4 mr-2" />
                 Upload Your First Book
               </Link>

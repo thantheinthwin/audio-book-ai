@@ -66,7 +66,7 @@ export function UpdatePasswordForm({
 
         // Redirect based on role
         if (userRole === "admin") {
-          router.push("/dashboard");
+          router.push("/audiobooks");
         } else {
           router.push("/");
         }

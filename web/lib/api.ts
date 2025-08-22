@@ -521,68 +521,6 @@ export const audiobooksAPI = {
     >(`/admin/audiobooks/${id}/jobs`),
 };
 
-// Note: AI Processing API functions are not implemented in the current backend
-// They would be added when the AI processing features are implemented
-
-// Public audio books API functions (no auth required)
-export const publicAPI = {
-  getPublicAudioBooks: () =>
-    apiClient<ApiResponse<AudioBook[]>>("/public/audiobooks"),
-
-  getPublicAudioBook: (id: string) =>
-    apiClient<ApiResponse<AudioBook>>(`/public/audiobooks/${id}`),
-};
-
-// Library API functions
-export const libraryAPI = {
-  getLibrary: () => apiClient("/library"),
-
-  addToLibrary: (audiobookId: string) =>
-    apiClient(`/library/${audiobookId}`, {
-      method: "POST",
-    }),
-
-  removeFromLibrary: (audiobookId: string) =>
-    apiClient(`/library/${audiobookId}`, {
-      method: "DELETE",
-    }),
-};
-
-// Playlists API functions
-export const playlistsAPI = {
-  getPlaylists: () => apiClient("/playlists"),
-
-  createPlaylist: (data: any) =>
-    apiClient("/playlists", {
-      method: "POST",
-      data,
-    }),
-
-  getPlaylist: (id: string) => apiClient(`/playlists/${id}`),
-
-  updatePlaylist: (id: string, data: any) =>
-    apiClient(`/playlists/${id}`, {
-      method: "PUT",
-      data,
-    }),
-
-  deletePlaylist: (id: string) =>
-    apiClient(`/playlists/${id}`, {
-      method: "DELETE",
-    }),
-
-  addToPlaylist: (id: string, audiobookId: string) =>
-    apiClient(`/playlists/${id}/items`, {
-      method: "POST",
-      data: { audiobookId },
-    }),
-
-  removeFromPlaylist: (id: string, audiobookId: string) =>
-    apiClient(`/playlists/${id}/items/${audiobookId}`, {
-      method: "DELETE",
-    }),
-};
-
 // Progress API functions
 export const progressAPI = {
   getProgress: (audiobookId: string) =>
@@ -592,28 +530,6 @@ export const progressAPI = {
     apiClient(`/user/progress/${audiobookId}`, {
       method: "PUT",
       data,
-    }),
-};
-
-// Bookmarks API functions
-export const bookmarksAPI = {
-  getBookmarks: (audiobookId: string) => apiClient(`/bookmarks/${audiobookId}`),
-
-  createBookmark: (audiobookId: string, data: any) =>
-    apiClient(`/bookmarks/${audiobookId}`, {
-      method: "POST",
-      data,
-    }),
-
-  updateBookmark: (id: string, data: any) =>
-    apiClient(`/bookmarks/${id}`, {
-      method: "PUT",
-      data,
-    }),
-
-  deleteBookmark: (id: string) =>
-    apiClient(`/bookmarks/${id}`, {
-      method: "DELETE",
     }),
 };
 
