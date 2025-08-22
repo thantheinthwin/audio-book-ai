@@ -237,22 +237,7 @@ export default function AudioBookDetailPage() {
   // Function to retry all failed jobs
   const handleRetryAllFailedJobs = async () => {
     try {
-      const result = await retryAllJobsMutation.mutateAsync(
-        params.id as string
-      );
-      console.log("Retry all jobs result:", result);
-
-      // Show success message with details
-      if (
-        result?.data?.successfully_retried &&
-        result.data.successfully_retried > 0
-      ) {
-        alert(
-          `Successfully retried ${result.data.successfully_retried} job(s)!`
-        );
-      } else {
-        alert("No failed jobs were available for retry.");
-      }
+      await retryAllJobsMutation.mutateAsync(params.id as string);
     } catch (error) {
       console.error("Failed to retry jobs:", error);
       alert("Failed to retry jobs. Please try again.");

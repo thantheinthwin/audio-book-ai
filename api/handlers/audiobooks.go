@@ -1751,7 +1751,7 @@ func (h *Handler) RetryAllFailedJobs(c *fiber.Ctx) error {
 	// Filter failed jobs that can be retried
 	var retriableJobs []models.ProcessingJob
 	for _, job := range allJobs {
-		if job.Status == models.JobStatusFailed && job.RetryCount < job.MaxRetries {
+		if job.Status == models.JobStatusFailed && job.RetryCount >= job.MaxRetries {
 			retriableJobs = append(retriableJobs, job)
 		}
 	}
@@ -1777,6 +1777,7 @@ func (h *Handler) RetryAllFailedJobs(c *fiber.Ctx) error {
 		job.ErrorMessage = nil
 		job.StartedAt = nil
 		job.CompletedAt = nil
+		job.RetryCount = 0
 
 		// Update job in database
 		if err := h.repo.UpdateProcessingJob(context.Background(), &job); err != nil {
