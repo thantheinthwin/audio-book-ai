@@ -88,6 +88,14 @@ func (w *Worker) ProcessSummarizeJob(job models.Job) error {
 		return fmt.Errorf("failed to save summary output: %v", err)
 	}
 
+	// Update audiobook with summary and tags immediately after successful processing
+	if err := w.dbService.UpdateAudioBookSummaryAndTags(job.AudiobookID, summaryAndTags.Summary, summaryAndTags.Tags); err != nil {
+		// Log the error but don't fail the job - the AI output was saved successfully
+		log.Printf("Warning: Failed to update audiobook summary and tags immediately: %v", err)
+	} else {
+		log.Printf("Successfully updated audiobook %s with summary and tags immediately after Gemini processing", job.AudiobookID)
+	}
+
 	log.Printf("Successfully processed summarize job %s", job.ID)
 	return nil
 }

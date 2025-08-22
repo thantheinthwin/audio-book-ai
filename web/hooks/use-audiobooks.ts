@@ -7,6 +7,18 @@ export function useAudioBooks() {
   return useQuery({
     queryKey: audiobookKeys.lists(),
     queryFn: () => audiobooksAPI.getAudioBooks(),
+    refetchInterval: (data) => {
+      // console.log(
+      //   "refetching",
+      //   data.state.data?.data?.some((item: any) => item.status !== "completed")
+      // );
+      if (
+        data.state.data?.data?.some((item: any) => item.status !== "completed")
+      ) {
+        return 5000;
+      }
+      return false;
+    },
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }

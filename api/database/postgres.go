@@ -806,39 +806,48 @@ func (p *PostgresRepository) CheckAndUpdateAudioBookStatus(ctx context.Context, 
 	} else if allCompleted {
 		newStatus = models.StatusCompleted
 
-		// If summary job completed, update the audiobook summary
+		// If summary job completed, check if audiobook needs summary update (as fallback)
 		if hasSummary {
-			aiOutput, err := p.GetAIOutputByType(ctx, audiobookID, models.OutputTypeSummary)
-			if err == nil && aiOutput != nil {
-				// Extract summary from JSON content
-				var summaryData map[string]interface{}
-				if err := json.Unmarshal(aiOutput.Content, &summaryData); err == nil {
-					// Extract summary string
-					summary, ok := summaryData["summary"].(string)
-					if !ok {
-						fmt.Printf("Warning: summary field is not a string in AI output for audiobook %s\n", audiobookID)
-					} else {
-						// Extract tags array and convert to []string
-						tagsInterface, ok := summaryData["tags"].([]interface{})
+			// First check if audiobook already has a summary (worker may have already updated it)
+			audiobook, err := p.GetAudioBookByID(ctx, audiobookID)
+			if err == nil && audiobook != nil && (audiobook.Summary == nil || *audiobook.Summary == "" || len(audiobook.Tags) == 0) {
+				// Only update if summary/tags are missing (as fallback mechanism)
+				aiOutput, err := p.GetAIOutputByType(ctx, audiobookID, models.OutputTypeSummary)
+				if err == nil && aiOutput != nil {
+					// Extract summary from JSON content
+					var summaryData map[string]interface{}
+					if err := json.Unmarshal(aiOutput.Content, &summaryData); err == nil {
+						// Extract summary string
+						summary, ok := summaryData["summary"].(string)
 						if !ok {
-							fmt.Printf("Warning: tags field is not an array in AI output for audiobook %s\n", audiobookID)
+							fmt.Printf("Warning: summary field is not a string in AI output for audiobook %s\n", audiobookID)
 						} else {
-							tags := make([]string, len(tagsInterface))
-							for i, tag := range tagsInterface {
-								if tagStr, ok := tag.(string); ok {
-									tags[i] = tagStr
-								} else {
-									fmt.Printf("Warning: tag at index %d is not a string in AI output for audiobook %s\n", i, audiobookID)
+							// Extract tags array and convert to []string
+							tagsInterface, ok := summaryData["tags"].([]interface{})
+							if !ok {
+								fmt.Printf("Warning: tags field is not an array in AI output for audiobook %s\n", audiobookID)
+							} else {
+								tags := make([]string, len(tagsInterface))
+								for i, tag := range tagsInterface {
+									if tagStr, ok := tag.(string); ok {
+										tags[i] = tagStr
+									} else {
+										fmt.Printf("Warning: tag at index %d is not a string in AI output for audiobook %s\n", i, audiobookID)
+									}
 								}
-							}
 
-							// Update the audiobook with summary and tags
-							if err := p.UpdateAudioBookSummaryAndTags(ctx, audiobookID, summary, tags); err != nil {
-								fmt.Printf("Error updating audiobook summary and tags for %s: %v\n", audiobookID, err)
+								// Update the audiobook with summary and tags as fallback
+								if err := p.UpdateAudioBookSummaryAndTags(ctx, audiobookID, summary, tags); err != nil {
+									fmt.Printf("Error updating audiobook summary and tags for %s: %v\n", audiobookID, err)
+								} else {
+									fmt.Printf("Updated audiobook summary and tags as fallback for %s\n", audiobookID)
+								}
 							}
 						}
 					}
 				}
+			} else {
+				fmt.Printf("Audiobook %s already has summary and tags - skipping fallback update\n", audiobookID)
 			}
 		}
 	} else {

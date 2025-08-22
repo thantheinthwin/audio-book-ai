@@ -292,3 +292,26 @@ func (d *DatabaseService) IncrementRetryCount(jobID uuid.UUID) error {
 	log.Printf("Incremented retry count for job %s", jobID)
 	return nil
 }
+
+// UpdateAudioBookSummaryAndTags updates the audiobook summary and tags directly
+func (d *DatabaseService) UpdateAudioBookSummaryAndTags(audiobookID uuid.UUID, summary string, tags []string) error {
+	query := `
+		UPDATE audiobooks 
+		SET summary = $2, tags = $3, updated_at = $4
+		WHERE id = $1
+	`
+
+	now := time.Now()
+	result, err := d.pool.Exec(context.Background(), query, audiobookID, summary, tags, now)
+
+	if err != nil {
+		return fmt.Errorf("failed to update audiobook summary and tags: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("audiobook not found or no changes made")
+	}
+
+	log.Printf("Updated audiobook %s with summary and tags", audiobookID)
+	return nil
+}
