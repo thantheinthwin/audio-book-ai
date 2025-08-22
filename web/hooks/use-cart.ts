@@ -107,7 +107,14 @@ export const useCheckout = () => {
       queryClient.invalidateQueries({ queryKey: cartKeys.lists() });
       // Invalidate purchase history
       queryClient.invalidateQueries({ queryKey: checkoutKeys.purchaseHistory() });
-      toast.success("Checkout completed successfully!");
+      
+      if (response.data) {
+        // Store checkout data in localStorage for the success page
+        localStorage.setItem("checkout_success_data", JSON.stringify(response.data));
+        
+        // Redirect to success page
+        window.location.href = `/checkout/success?order_id=${response.data.order_id}&transaction_id=${response.data.transaction_id}&total_amount=${response.data.total_amount}`;
+      }
     },
     onError: (error: any) => {
       console.error("Failed to checkout:", error);

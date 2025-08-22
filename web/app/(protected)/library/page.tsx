@@ -1,6 +1,15 @@
 "use client";
 
-import { Search, Filter, Heart, Clock, User, ExternalLink, ShoppingCart, Package } from "lucide-react";
+import {
+  Search,
+  Filter,
+  Heart,
+  Clock,
+  User,
+  ExternalLink,
+  ShoppingCart,
+  Package,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,12 +28,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
 import Image from "next/image";
 import { Loader2 } from "lucide-react";
 import { useAudioBooks } from "@/hooks";
 import { useUser } from "@/hooks/use-auth";
-import { useAddToCart, useIsInCart, useIsAudioBookPurchased } from "@/hooks/use-cart";
+import {
+  useAddToCart,
+  useIsInCart,
+  useIsAudioBookPurchased,
+} from "@/hooks/use-cart";
 import { redirect } from "next/navigation";
 import { useEffect } from "react";
 
@@ -73,62 +87,91 @@ export default function LibraryPage() {
     return `${hours}h ${minutes}m`;
   };
 
-  const formatFileSize = (bytes: number) => {
-    if (!bytes) return "N/A";
-    const mb = bytes / (1024 * 1024);
-    return `${mb.toFixed(1)} MB`;
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "completed":
-        return (
-          <Badge variant="default" className="bg-green-100 text-green-800">
-            Completed
-          </Badge>
-        );
-      case "processing":
-        return (
-          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-            Processing
-          </Badge>
-        );
-      case "failed":
-        return <Badge variant="destructive">Failed</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-
-  const AudioBooksTable = ({ books }: { books: any[] }) => (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-16">Cover</TableHead>
-          <TableHead>Title</TableHead>
-          <TableHead>Author</TableHead>
-          <TableHead>Duration</TableHead>
-          <TableHead>Price</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {books.map((book) => (
-          <AudioBookRow key={book.id} book={book} />
-        ))}
-      </TableBody>
-    </Table>
+  const EmptyState = ({
+    title,
+    description,
+    showBrowseButton = true,
+  }: {
+    title: string;
+    description: string;
+    showBrowseButton?: boolean;
+  }) => (
+    <div className="text-center py-12">
+      <div className="text-muted-foreground mb-4">
+        <Heart className="h-12 w-12 mx-auto mb-4 opacity-50" />
+        <h3 className="text-lg font-semibold mb-2">{title}</h3>
+        <p className="mb-4">{description}</p>
+      </div>
+      {showBrowseButton && (
+        <Link href="/audiobooks/create">
+          <Button>
+            <ExternalLink className="h-4 w-4 mr-2" />
+            Browse All Books
+          </Button>
+        </Link>
+      )}
+    </div>
   );
 
-  const AudioBookRow = ({ book }: { book: any }) => {
+  // Component to render books with purchase status filtering
+  const FilteredAudioBooksTable = ({
+    showPurchased,
+  }: {
+    showPurchased: boolean;
+  }) => {
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-16">Cover</TableHead>
+            <TableHead>Title</TableHead>
+            <TableHead>Author</TableHead>
+            <TableHead>Duration</TableHead>
+            <TableHead>Price</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {userLibrary.map((book: any) => (
+            <FilteredAudioBookRow
+              key={book.id}
+              book={book}
+              showPurchased={showPurchased}
+            />
+          ))}
+        </TableBody>
+      </Table>
+    );
+  };
+
+  const FilteredAudioBookRow = ({
+    book,
+    showPurchased,
+  }: {
+    book: any;
+    showPurchased: boolean;
+  }) => {
     const addToCartMutation = useAddToCart();
     const { data: isInCart } = useIsInCart(book.id);
-    const { data: isPurchased } = useIsAudioBookPurchased(book.id);
+    const { data: isPurchased, isLoading: isPurchaseLoading } =
+      useIsAudioBookPurchased(book.id);
 
     const handleAddToCart = () => {
       addToCartMutation.mutate({ audiobook_id: book.id });
     };
+
+    // Don't render if purchase status doesn't match the filter
+    if (isPurchaseLoading) {
+      return null; // Don't show while loading to avoid flickering
+    }
+
+    if (showPurchased && !isPurchased) {
+      return null;
+    }
+
+    if (!showPurchased && isPurchased) {
+      return null;
+    }
 
     return (
       <TableRow className="hover:bg-muted/50">
@@ -144,9 +187,7 @@ export default function LibraryPage() {
               />
             ) : (
               <div className="w-full h-full bg-muted flex items-center justify-center">
-                <span className="text-xs text-muted-foreground">
-                  No Image
-                </span>
+                <span className="text-xs text-muted-foreground">No Image</span>
               </div>
             )}
           </div>
@@ -167,11 +208,10 @@ export default function LibraryPage() {
           </div>
         </TableCell>
         <TableCell>
-          <div className="font-medium">${book.price?.toFixed(2) || "0.00"}</div>
-        </TableCell>
-        <TableCell>
-          <div className="flex flex-col gap-1">
-            {getStatusBadge(book.status)}
+          <div className="flex items-center gap-2">
+            <div className="font-medium">
+              ${book.price?.toFixed(2) || "0.00"}
+            </div>
             {isPurchased && (
               <Badge variant="default" className="bg-green-100 text-green-800">
                 <Package className="h-3 w-3 mr-1" />
@@ -206,7 +246,10 @@ export default function LibraryPage() {
                   </Button>
                 )}
                 {isInCart && (
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                  <Badge
+                    variant="secondary"
+                    className="bg-blue-100 text-blue-800"
+                  >
                     In Cart
                   </Badge>
                 )}
@@ -273,26 +316,25 @@ export default function LibraryPage() {
         </CardHeader>
         <CardContent>
           {userLibrary.length > 0 ? (
-            <AudioBooksTable books={userLibrary} />
+            <Tabs defaultValue="all" className="w-full">
+              <TabsList className="grid w-fit grid-cols-2">
+                <TabsTrigger value="all">All Books</TabsTrigger>
+                <TabsTrigger value="purchased">Purchased</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="all" className="mt-6">
+                <FilteredAudioBooksTable showPurchased={false} />
+              </TabsContent>
+
+              <TabsContent value="purchased" className="mt-6">
+                <FilteredAudioBooksTable showPurchased={true} />
+              </TabsContent>
+            </Tabs>
           ) : (
-            <div className="text-center py-12">
-              <div className="text-muted-foreground mb-4">
-                <Heart className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <h3 className="text-lg font-semibold mb-2">
-                  Your Library is Empty
-                </h3>
-                <p className="mb-4">
-                  Start building your audio book collection by adding books from
-                  the catalog
-                </p>
-              </div>
-              <Link href="/audiobooks/create">
-                <Button>
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Browse All Books
-                </Button>
-              </Link>
-            </div>
+            <EmptyState
+              title="Your Library is Empty"
+              description="Start building your audio book collection by adding books from the catalog"
+            />
           )}
         </CardContent>
       </Card>

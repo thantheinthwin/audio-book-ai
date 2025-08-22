@@ -16,7 +16,7 @@ import {
 import { Trash2, ShoppingCart, DollarSign, CreditCard } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export default function CartPage() {
@@ -24,6 +24,7 @@ export default function CartPage() {
   const { data: cart, isLoading, error } = useCart();
   const removeFromCartMutation = useRemoveFromCart();
   const checkoutMutation = useCheckout();
+  const router = useRouter();
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [itemToRemove, setItemToRemove] = useState<{
