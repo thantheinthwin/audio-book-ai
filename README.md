@@ -29,60 +29,51 @@ The application uses a microservices architecture with the following components:
 
 ```mermaid
 graph TB
-    %% User Interfaces
-    Web[Next.js Web App<br/>Port: 3000]
-
-    %% Core Services
-    API[Go API Service<br/>Port: 8080]
-    Worker[Go Worker<br/>AI Processing]
-    Transcriber[Go Transcriber<br/>Rev.ai Integration]
-    Redis[(Redis<br/>Job Queue<br/>Port: 6379)]
-
-    %% External Services
-    Supabase[(Supabase<br/>Auth + PostgreSQL + Storage)]
-    RevAI[Rev.ai API<br/>Audio Transcription]
-    Gemini[Google Gemini API<br/>AI Processing]
-
-    %% User Flow
+    %% User Layer
     User((User)) --> Web
     Admin((Admin)) --> Web
 
-    %% Web to API
-    Web --> API
+    %% Frontend
+    Web[Next.js Web App<br/>Port: 3000]
 
-    %% API Dependencies
+    %% Backend Services
+    API[Go API Service<br/>Port: 8080]
+    Worker[Go Worker<br/>AI Processing]
+    Transcriber[Go Transcriber<br/>Audio Transcription]
+
+    %% Infrastructure
+    Redis[(Redis<br/>Job Queue)]
+    Supabase[(Supabase<br/>Auth + DB + Storage)]
+
+    %% External APIs
+    RevAI[Rev.ai API]
+    Gemini[Google Gemini API]
+
+    %% Connections
+    Web --> API
     API --> Supabase
     API --> Redis
 
-    %% Worker Dependencies
-    Worker --> Redis
+    Redis --> Worker
+    Redis --> Transcriber
+
     Worker --> Supabase
     Worker --> Gemini
 
-    %% Transcriber Dependencies
-    Transcriber --> Redis
     Transcriber --> Supabase
     Transcriber --> RevAI
 
-    %% Job Flow
-    API -.-> |"Queue Jobs"| Redis
-    Redis -.-> |"Process Jobs"| Worker
-    Redis -.-> |"Transcribe Audio"| Transcriber
-
-    %% Data Flow
-    API -.-> |"Store Files"| Supabase
-    Worker -.-> |"AI Results"| Supabase
-    Transcriber -.-> |"Transcripts"| Supabase
-
     %% Styling
-    classDef service fill:#e1f5fe
-    classDef external fill:#fff3e0
-    classDef storage fill:#e8f5e8
-    classDef user fill:#fce4ec
+    classDef frontend fill:#e3f2fd
+    classDef backend fill:#e8f5e8
+    classDef infra fill:#fff3e0
+    classDef external fill:#fce4ec
+    classDef user fill:#f3e5f5
 
-    class API,Worker,Transcriber,Web service
+    class Web frontend
+    class API,Worker,Transcriber backend
+    class Redis,Supabase infra
     class RevAI,Gemini external
-    class Supabase,Redis storage
     class User,Admin user
 ```
 
