@@ -37,7 +37,7 @@ interface FormData {
     chapter_number: number;
     title: string;
     audio_file?: File;
-    duration_seconds: number;
+    playtime: number;
   }>;
 }
 
@@ -64,7 +64,7 @@ export default function CreateAudioBookPage() {
           id: "chapter-1",
           chapter_number: 1,
           title: "",
-          duration_seconds: 0,
+          playtime: 0,
         },
       ],
     },
@@ -88,47 +88,11 @@ export default function CreateAudioBookPage() {
     }
 
     try {
-      // Create audio book using the Next.js API route
-      const formData = new FormData();
-      formData.append("title", data.title);
-      formData.append("author", data.author);
-      formData.append("language", data.language);
-      formData.append("isPublic", data.isPublic.toString());
-      formData.append("price", data.price.toString());
-
-      if (coverImage) {
-        formData.append("coverImage", coverImage);
-      }
-
-      // Add chapters metadata
-      const chaptersMetadata = data.chapters.map((chapter) => ({
-        id: chapter.id,
-        chapter_number: chapter.chapter_number,
-        title: chapter.title,
-      }));
-      formData.append("chapters", JSON.stringify(chaptersMetadata));
-
-      // Add each file separately
-      data.chapters.forEach((chapter, index) => {
-        if (chapter.audio_file) {
-          formData.append(`file_${index}`, chapter.audio_file);
-          formData.append(
-            `file_${index}_chapter_number`,
-            chapter.chapter_number.toString()
-          );
-          formData.append(
-            `file_${index}_title`,
-            chapter.title || `Chapter ${chapter.chapter_number}`
-          );
-          formData.append(
-            `file_${index}_duration_seconds`,
-            chapter.duration_seconds.toString()
-          );
-        }
+      // Use the mutation with the new API function
+      await createAudioBookMutation.mutateAsync({
+        ...data,
+        coverImage,
       });
-
-      // Use the mutation
-      await createAudioBookMutation.mutateAsync(formData);
 
       console.log("Audio book created successfully");
       router.push("/audiobooks");

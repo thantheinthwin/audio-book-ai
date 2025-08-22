@@ -142,10 +142,7 @@ export async function POST(request: NextRequest) {
         "chapter_title",
         file.title || `Chapter ${file.chapter_number}`
       );
-      fileFormData.append(
-        "duration_seconds",
-        file.duration_seconds.toString()
-      );
+      fileFormData.append("duration_seconds", file.duration_seconds.toString());
 
       try {
         const fileUploadResponse = await axios.post(

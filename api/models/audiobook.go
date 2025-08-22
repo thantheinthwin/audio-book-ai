@@ -16,6 +16,8 @@ type AudioBookStatus string
 const (
 	StatusPending    AudioBookStatus = "pending"
 	StatusProcessing AudioBookStatus = "processing"
+	StatusTranscribing AudioBookStatus = "transcribing"
+	StatusSummarizing AudioBookStatus = "summarizing"
 	StatusCompleted  AudioBookStatus = "completed"
 	StatusFailed     AudioBookStatus = "failed"
 )

@@ -371,7 +371,7 @@ export default function AudioBookDetailPage() {
                     <p className="text-sm">Generating summary...</p>
                   </div>
                 ) : (
-                  <div className="flex gap-1 items-center">
+                  <div className="flex gap-1 items-center text-sm">
                     Summary will be generated once all chapters are
                     transcribed...
                   </div>
@@ -387,7 +387,13 @@ export default function AudioBookDetailPage() {
             <div className="flex justify-between">
               <div className="grid gap-1">
                 <h2 className="text-muted-foreground text-sm">Tags</h2>
-                <p className="text-xs">{audioBook.tags?.join(", ")}</p>
+                {jobStatus?.overall_status === "completed" ? (
+                  <p className="text-xs">{audioBook.tags?.join(", ")}</p>
+                ) : (
+                  <p className="text-xs">
+                    Tags will be generated once all chapters are transcribed...
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -437,38 +443,54 @@ export default function AudioBookDetailPage() {
               {/* Job Details */}
               <div className="space-y-3">
                 <h4 className="font-medium">Processing Jobs</h4>
-                {jobStatus.jobs?.map((job) => (
-                  <div
-                    key={job.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      {getJobStatusIcon(job.job_type)}
-                      <div>
-                        <p className="font-medium">
-                          {getJobTypeDisplayName(job.job_type)}
-                        </p>
-                        <div className="flex gap-1">
-                          <p className="text-xs text-muted-foreground">
-                            {job.started_at &&
-                              `Started: ${new Date(
-                                job.started_at
-                              ).toLocaleTimeString()}`}{" "}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {job.completed_at &&
-                              `Completed: ${new Date(
-                                job.completed_at
-                              ).toLocaleTimeString()}`}
-                          </p>
+                {jobStatus.jobs?.map((job) => {
+                  // For transcription jobs, get the chapter title
+                  let jobTitle = getJobTypeDisplayName(job.job_type);
+                  if (job.job_type === "transcribe" && job.chapter_id) {
+                    const chapter = audioBook?.chapters?.find(
+                      (ch) => ch.id === job.chapter_id
+                    );
+                    if (chapter) {
+                      jobTitle = `Transcribing - ${chapter.title}`;
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={job.id}
+                      className="flex items-center justify-between p-3 border rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        {getJobStatusIcon(job.job_type)}
+                        <div>
+                          <p className="font-medium">{jobTitle}</p>
+                          <div className="flex gap-1">
+                            <p className="text-xs text-muted-foreground">
+                              {job.started_at &&
+                                `Started: ${new Date(
+                                  job.started_at
+                                ).toLocaleTimeString()}`}{" "}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {job.completed_at &&
+                                `Completed: ${new Date(
+                                  job.completed_at
+                                ).toLocaleTimeString()}`}
+                            </p>
+                          </div>
+                          {job.error_message && (
+                            <p className="text-xs text-red-500 mt-1">
+                              Error: {job.error_message}
+                            </p>
+                          )}
                         </div>
                       </div>
+                      <Badge className={getJobStatusColor(job.status)}>
+                        {job.status}
+                      </Badge>
                     </div>
-                    <Badge className={getJobStatusColor(job.status)}>
-                      {job.status}
-                    </Badge>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Job Statistics */}

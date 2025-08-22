@@ -1122,7 +1122,28 @@ func (h *Handler) GetJobStatus(c *fiber.Ctx) error {
 	} else if completedJobs == totalJobs {
 		overallStatus = models.StatusCompleted
 	} else {
-		overallStatus = models.StatusProcessing
+		// Check what type of jobs are currently running to provide more specific status
+		hasTranscribingJobs := false
+		hasSummarizingJobs := false
+
+		for _, job := range jobs {
+			if job.Status == models.JobStatusRunning || job.Status == models.JobStatusPending {
+				if job.JobType == models.JobTypeTranscribe {
+					hasTranscribingJobs = true
+				} else if job.JobType == models.JobTypeSummarize {
+					hasSummarizingJobs = true
+				}
+			}
+		}
+
+		// Prioritize transcribing over summarizing for status display
+		if hasTranscribingJobs {
+			overallStatus = models.StatusTranscribing
+		} else if hasSummarizingJobs {
+			overallStatus = models.StatusSummarizing
+		} else {
+			overallStatus = models.StatusProcessing
+		}
 	}
 
 	// Update audiobook status if needed

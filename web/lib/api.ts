@@ -103,6 +103,22 @@ interface AudioBookUpdateData {
   cover_image_url?: string;
 }
 
+interface CreateAudioBookData {
+  title: string;
+  author: string;
+  language: string;
+  isPublic: boolean;
+  price: number;
+  coverImage?: File | null;
+  chapters: Array<{
+    id: string;
+    chapter_number: number;
+    title: string;
+    audio_file?: File;
+    playtime: number;
+  }>;
+}
+
 // Cart types
 interface CartItem {
   id: string;
@@ -493,8 +509,46 @@ export const audiobooksAPI = {
     }),
 
   // New function to create audio book using Next.js API route
-  createAudioBookWithFiles: async (formData: FormData) => {
+  createAudioBookWithFiles: async (data: CreateAudioBookData) => {
     try {
+      const formData = new FormData();
+      formData.append("title", data.title);
+      formData.append("author", data.author);
+      formData.append("language", data.language);
+      formData.append("isPublic", data.isPublic.toString());
+      formData.append("price", data.price.toString());
+
+      if (data.coverImage) {
+        formData.append("coverImage", data.coverImage);
+      }
+
+      // Add chapters metadata
+      const chaptersMetadata = data.chapters.map((chapter) => ({
+        id: chapter.id,
+        chapter_number: chapter.chapter_number,
+        title: chapter.title,
+      }));
+      formData.append("chapters", JSON.stringify(chaptersMetadata));
+
+      // Add each file separately
+      data.chapters.forEach((chapter, index) => {
+        if (chapter.audio_file) {
+          formData.append(`file_${index}`, chapter.audio_file);
+          formData.append(
+            `file_${index}_chapter_number`,
+            chapter.chapter_number.toString()
+          );
+          formData.append(
+            `file_${index}_title`,
+            chapter.title || `Chapter ${chapter.chapter_number}`
+          );
+          formData.append(
+            `file_${index}_duration_seconds`,
+            chapter.playtime.toString()
+          );
+        }
+      });
+
       const response = await fetch("/api/audiobooks/create", {
         method: "POST",
         body: formData,
@@ -657,6 +711,7 @@ export type {
   Chapter,
   ProfileUpdateData,
   AudioBookUpdateData,
+  CreateAudioBookData,
   UploadSession,
   UploadedFile,
   CartItem,
