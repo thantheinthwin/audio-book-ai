@@ -513,8 +513,8 @@ func (p *PostgresRepository) ResetUploadFileRetryCount(ctx context.Context, file
 // Stub implementations for other interface methods (to be implemented as needed)
 func (p *PostgresRepository) CreateAudioBook(ctx context.Context, audiobook *models.AudioBook) error {
 	query := `
-		INSERT INTO audiobooks (id, title, author, summary, duration_seconds, cover_image_url, language, is_public, status, created_by, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		INSERT INTO audiobooks (id, title, author, summary, duration_seconds, cover_image_url, language, is_public, price, status, created_by, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 	`
 
 	fmt.Printf("CreateAudioBook: Executing insert for audiobook ID: %s, Title: %s\n", audiobook.ID, audiobook.Title)
@@ -529,6 +529,7 @@ func (p *PostgresRepository) CreateAudioBook(ctx context.Context, audiobook *mod
 		audiobook.CoverImageURL,
 		audiobook.Language,
 		audiobook.IsPublic,
+		audiobook.Price,
 		audiobook.Status,
 		audiobook.CreatedBy,
 		now,
@@ -548,7 +549,7 @@ func (p *PostgresRepository) CreateAudioBook(ctx context.Context, audiobook *mod
 
 func (p *PostgresRepository) GetAudioBookByID(ctx context.Context, id uuid.UUID) (*models.AudioBook, error) {
 	query := `
-		SELECT id, title, author, summary, tags, duration_seconds, cover_image_url, language, is_public, status, created_by, created_at, updated_at
+		SELECT id, title, author, summary, tags, duration_seconds, cover_image_url, language, is_public, price, status, created_by, created_at, updated_at
 		FROM audiobooks
 		WHERE id = $1
 	`
@@ -564,6 +565,7 @@ func (p *PostgresRepository) GetAudioBookByID(ctx context.Context, id uuid.UUID)
 		&audiobook.CoverImageURL,
 		&audiobook.Language,
 		&audiobook.IsPublic,
+		&audiobook.Price,
 		&audiobook.Status,
 		&audiobook.CreatedBy,
 		&audiobook.CreatedAt,
@@ -622,7 +624,7 @@ func (p *PostgresRepository) UpdateAudioBook(ctx context.Context, audiobook *mod
 		UPDATE audiobooks 
 		SET title = $2, author = $3, summary = $4, duration_seconds = $5, 
 		    cover_image_url = $6, language = $7, is_public = $8, 
-		    status = $9, updated_at = $10
+		    price = $9, status = $10, updated_at = $11
 		WHERE id = $1
 	`
 
@@ -636,6 +638,7 @@ func (p *PostgresRepository) UpdateAudioBook(ctx context.Context, audiobook *mod
 		audiobook.CoverImageURL,
 		audiobook.Language,
 		audiobook.IsPublic,
+		audiobook.Price,
 		audiobook.Status,
 		now,
 	)
@@ -658,7 +661,7 @@ func (p *PostgresRepository) DeleteAudioBook(ctx context.Context, id uuid.UUID) 
 
 func (p *PostgresRepository) ListAudioBooks(ctx context.Context, limit, offset int, isPublic *bool) ([]models.AudioBook, int, error) {
 	query := `
-		SELECT id, title, author, summary, duration_seconds, cover_image_url, language, is_public, status, created_by, created_at, updated_at
+		SELECT id, title, author, summary, duration_seconds, cover_image_url, language, is_public, price, status, created_by, created_at, updated_at
 		FROM audiobooks
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
@@ -687,6 +690,7 @@ func (p *PostgresRepository) ListAudioBooks(ctx context.Context, limit, offset i
 			&audiobook.CoverImageURL,
 			&audiobook.Language,
 			&audiobook.IsPublic,
+			&audiobook.Price,
 			&audiobook.Status,
 			&audiobook.CreatedBy,
 			&audiobook.CreatedAt,
@@ -1535,5 +1539,125 @@ func (p *PostgresRepository) GetUserAudioBookStats(ctx context.Context, userID u
 }
 
 func (p *PostgresRepository) CleanupOrphanedData(ctx context.Context) error {
+	return nil
+}
+
+// Cart operations
+
+func (p *PostgresRepository) AddToCart(ctx context.Context, userID, audiobookID uuid.UUID) error {
+	query := `
+		INSERT INTO user_cart (id, user_id, audiobook_id, added_at)
+		VALUES (uuid_generate_v4(), $1, $2, NOW())
+		ON CONFLICT (user_id, audiobook_id) DO NOTHING
+	`
+
+	_, err := p.pool.Exec(ctx, query, userID, audiobookID)
+	if err != nil {
+		return fmt.Errorf("failed to add to cart: %w", err)
+	}
+
+	return nil
+}
+
+func (p *PostgresRepository) RemoveFromCart(ctx context.Context, userID, audiobookID uuid.UUID) error {
+	query := `DELETE FROM user_cart WHERE user_id = $1 AND audiobook_id = $2`
+
+	result, err := p.pool.Exec(ctx, query, userID, audiobookID)
+	if err != nil {
+		return fmt.Errorf("failed to remove from cart: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
+func (p *PostgresRepository) GetCartItems(ctx context.Context, userID uuid.UUID) ([]models.CartItemWithDetails, error) {
+	query := `
+		SELECT 
+			uc.id,
+			uc.user_id,
+			uc.audiobook_id,
+			uc.added_at,
+			ab.id,
+			ab.title,
+			ab.author,
+			ab.summary,
+			ab.tags,
+			ab.duration_seconds,
+			ab.cover_image_url,
+			ab.language,
+			ab.is_public,
+			ab.price,
+			ab.status,
+			ab.created_by,
+			ab.created_at,
+			ab.updated_at
+		FROM user_cart uc
+		JOIN audiobooks ab ON uc.audiobook_id = ab.id
+		WHERE uc.user_id = $1
+		ORDER BY uc.added_at DESC
+	`
+
+	rows, err := p.pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cart items: %w", err)
+	}
+	defer rows.Close()
+
+	var cartItems []models.CartItemWithDetails
+	for rows.Next() {
+		var item models.CartItemWithDetails
+		err := rows.Scan(
+			&item.ID,
+			&item.UserID,
+			&item.AudiobookID,
+			&item.AddedAt,
+			&item.AudioBook.ID,
+			&item.AudioBook.Title,
+			&item.AudioBook.Author,
+			&item.AudioBook.Summary,
+			&item.AudioBook.Tags,
+			&item.AudioBook.DurationSeconds,
+			&item.AudioBook.CoverImageURL,
+			&item.AudioBook.Language,
+			&item.AudioBook.IsPublic,
+			&item.AudioBook.Price,
+			&item.AudioBook.Status,
+			&item.AudioBook.CreatedBy,
+			&item.AudioBook.CreatedAt,
+			&item.AudioBook.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan cart item: %w", err)
+		}
+		cartItems = append(cartItems, item)
+	}
+
+	return cartItems, nil
+}
+
+func (p *PostgresRepository) IsInCart(ctx context.Context, userID, audiobookID uuid.UUID) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM user_cart WHERE user_id = $1 AND audiobook_id = $2)`
+
+	var exists bool
+	err := p.pool.QueryRow(ctx, query, userID, audiobookID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if in cart: %w", err)
+	}
+
+	return exists, nil
+}
+
+func (p *PostgresRepository) ClearCart(ctx context.Context, userID uuid.UUID) error {
+	query := `DELETE FROM user_cart WHERE user_id = $1`
+
+	_, err := p.pool.Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("failed to clear cart: %w", err)
+	}
+
 	return nil
 }

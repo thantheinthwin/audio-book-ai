@@ -104,3 +104,44 @@ ALTER TABLE ai_outputs ADD CONSTRAINT ai_outputs_audiobook_id_output_type_unique
 -- Add comment to document the constraint
 COMMENT ON CONSTRAINT ai_outputs_audiobook_id_output_type_unique ON ai_outputs 
     IS 'Ensures only one AI output per type per audiobook, allowing upserts in SaveAIOutput method.';
+
+-- Migration to add price column to audiobooks table
+-- Run this migration to add pricing support to existing audiobooks
+
+-- Add price column to audiobooks table
+ALTER TABLE audiobooks ADD COLUMN IF NOT EXISTS price DECIMAL(10,2) DEFAULT 0.00;
+
+-- Add comment to explain the price field
+COMMENT ON COLUMN audiobooks.price IS 'Price of the audiobook in the default currency (e.g., USD)';
+
+-- Migration to add cart table for user shopping cart functionality
+-- Run this migration to add cart support
+
+-- Add cart table
+CREATE TABLE IF NOT EXISTS user_cart (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    audiobook_id UUID NOT NULL REFERENCES audiobooks(id) ON DELETE CASCADE,
+    added_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, audiobook_id)
+);
+
+-- Add cart indexes
+CREATE INDEX IF NOT EXISTS idx_user_cart_user_id ON user_cart(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_cart_audiobook_id ON user_cart(audiobook_id);
+CREATE INDEX IF NOT EXISTS idx_user_cart_added_at ON user_cart(added_at);
+
+-- Add cart RLS policies
+ALTER TABLE user_cart ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own cart items" ON user_cart
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can add items to own cart" ON user_cart
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can remove items from own cart" ON user_cart
+    FOR DELETE USING (auth.uid() = user_id);
+
+-- Add comment to explain the cart table
+COMMENT ON TABLE user_cart IS 'Shopping cart table linking users to audiobooks they want to purchase';

@@ -207,6 +207,9 @@ func (h *Handler) UpdateAudioBook(c *fiber.Ctx) error {
 	if req.IsPublic != nil {
 		existingAudiobook.IsPublic = *req.IsPublic
 	}
+	if req.Price != nil {
+		existingAudiobook.Price = *req.Price
+	}
 	if req.CoverImageURL != nil {
 		existingAudiobook.CoverImageURL = req.CoverImageURL
 	}
@@ -223,6 +226,203 @@ func (h *Handler) UpdateAudioBook(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"data": existingAudiobook,
+	})
+}
+
+// Cart handlers
+
+// AddToCart adds an audiobook to the user's cart
+// POST /user/cart
+func (h *Handler) AddToCart(c *fiber.Ctx) error {
+	log.Printf("AddToCart: Request received from IP %s", c.IP())
+
+	// Get user ID from context
+	userCtx, ok := c.Locals("user").(*models.UserContext)
+	if !ok || userCtx == nil {
+		log.Printf("AddToCart: User not authenticated")
+		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "User not authenticated",
+		})
+	}
+
+	userID := uuid.MustParse(userCtx.ID)
+	log.Printf("AddToCart: User authenticated - UserID: %s", userID)
+
+	// Parse request body
+	var req models.AddToCartRequest
+	if err := c.BodyParser(&req); err != nil {
+		log.Printf("AddToCart: Failed to parse request body: %v", err)
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	// Validate request
+	if err := req.Validate(); err != nil {
+		log.Printf("AddToCart: Validation failed: %v", err)
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Validation failed",
+		})
+	}
+
+	// Check if audiobook exists and is public
+	audiobook, err := h.repo.GetAudioBookByID(context.Background(), req.AudiobookID)
+	if err != nil {
+		log.Printf("AddToCart: Failed to get audiobook: %v", err)
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{
+			"error": "Audiobook not found",
+		})
+	}
+
+	if !audiobook.IsPublic {
+		log.Printf("AddToCart: Audiobook is not public")
+		return c.Status(http.StatusForbidden).JSON(fiber.Map{
+			"error": "Cannot add private audiobook to cart",
+		})
+	}
+
+	// Add to cart
+	if err := h.repo.AddToCart(context.Background(), userID, req.AudiobookID); err != nil {
+		log.Printf("AddToCart: Failed to add to cart: %v", err)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to add to cart",
+		})
+	}
+
+	log.Printf("AddToCart: Successfully added audiobook %s to cart for user %s", req.AudiobookID, userID)
+
+	return c.JSON(fiber.Map{
+		"message": "Added to cart successfully",
+	})
+}
+
+// RemoveFromCart removes an audiobook from the user's cart
+// DELETE /user/cart/:audiobookId
+func (h *Handler) RemoveFromCart(c *fiber.Ctx) error {
+	log.Printf("RemoveFromCart: Request received from IP %s", c.IP())
+
+	// Get user ID from context
+	userCtx, ok := c.Locals("user").(*models.UserContext)
+	if !ok || userCtx == nil {
+		log.Printf("RemoveFromCart: User not authenticated")
+		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "User not authenticated",
+		})
+	}
+
+	userID := uuid.MustParse(userCtx.ID)
+	log.Printf("RemoveFromCart: User authenticated - UserID: %s", userID)
+
+	// Parse audiobook ID
+	audiobookID, err := uuid.Parse(c.Params("audiobookId"))
+	if err != nil {
+		log.Printf("RemoveFromCart: Invalid audiobook ID: %v", err)
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid audiobook ID",
+		})
+	}
+
+	// Remove from cart
+	if err := h.repo.RemoveFromCart(context.Background(), userID, audiobookID); err != nil {
+		log.Printf("RemoveFromCart: Failed to remove from cart: %v", err)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to remove from cart",
+		})
+	}
+
+	log.Printf("RemoveFromCart: Successfully removed audiobook %s from cart for user %s", audiobookID, userID)
+
+	return c.JSON(fiber.Map{
+		"message": "Removed from cart successfully",
+	})
+}
+
+// GetCart returns the user's cart items
+// GET /user/cart
+func (h *Handler) GetCart(c *fiber.Ctx) error {
+	log.Printf("GetCart: Request received from IP %s", c.IP())
+
+	// Get user ID from context
+	userCtx, ok := c.Locals("user").(*models.UserContext)
+	if !ok || userCtx == nil {
+		log.Printf("GetCart: User not authenticated")
+		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "User not authenticated",
+		})
+	}
+
+	userID := uuid.MustParse(userCtx.ID)
+	log.Printf("GetCart: User authenticated - UserID: %s", userID)
+
+	// Get cart items
+	cartItems, err := h.repo.GetCartItems(context.Background(), userID)
+	if err != nil {
+		log.Printf("GetCart: Failed to get cart items: %v", err)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get cart items",
+		})
+	}
+
+	// Calculate total price
+	totalPrice := 0.0
+	for _, item := range cartItems {
+		totalPrice += item.AudioBook.Price
+	}
+
+	response := models.CartResponse{
+		Items:      cartItems,
+		TotalItems: len(cartItems),
+		TotalPrice: totalPrice,
+	}
+
+	log.Printf("GetCart: Successfully retrieved %d cart items for user %s", len(cartItems), userID)
+
+	return c.JSON(fiber.Map{
+		"data": response,
+	})
+}
+
+// IsInCart checks if an audiobook is in the user's cart
+// GET /user/cart/:audiobookId/check
+func (h *Handler) IsInCart(c *fiber.Ctx) error {
+	log.Printf("IsInCart: Request received from IP %s", c.IP())
+
+	// Get user ID from context
+	userCtx, ok := c.Locals("user").(*models.UserContext)
+	if !ok || userCtx == nil {
+		log.Printf("IsInCart: User not authenticated")
+		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "User not authenticated",
+		})
+	}
+
+	userID := uuid.MustParse(userCtx.ID)
+	log.Printf("IsInCart: User authenticated - UserID: %s", userID)
+
+	// Parse audiobook ID
+	audiobookID, err := uuid.Parse(c.Params("audiobookId"))
+	if err != nil {
+		log.Printf("IsInCart: Invalid audiobook ID: %v", err)
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid audiobook ID",
+		})
+	}
+
+	// Check if in cart
+	isInCart, err := h.repo.IsInCart(context.Background(), userID, audiobookID)
+	if err != nil {
+		log.Printf("IsInCart: Failed to check if in cart: %v", err)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to check cart status",
+		})
+	}
+
+	log.Printf("IsInCart: Audiobook %s is in cart for user %s: %v", audiobookID, userID, isInCart)
+
+	return c.JSON(fiber.Map{
+		"data": fiber.Map{
+			"is_in_cart": isInCart,
+		},
 	})
 }
 
@@ -498,10 +698,16 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 		Author:    req.Author,
 		Language:  req.Language,
 		IsPublic:  req.IsPublic,
+		Price:     0.0,                     // Default price, can be updated later
 		Status:    models.StatusProcessing, // Start with processing status
 		CreatedBy: userID,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
+	}
+
+	// Set price if provided
+	if req.Price != nil {
+		audiobook.Price = *req.Price
 	}
 
 	// Set description if provided

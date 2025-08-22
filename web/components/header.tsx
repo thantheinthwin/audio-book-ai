@@ -27,7 +27,10 @@ interface NavItem {
 
 const navItems: Record<User["role"], NavItem[]> = {
   admin: [{ label: "Audio Books", href: "/audiobooks" }],
-  user: [{ label: "Library", href: "/library" }],
+  user: [
+    { label: "Library", href: "/library" },
+    { label: "Cart", href: "/cart" },
+  ],
 };
 
 interface NavigationProps {

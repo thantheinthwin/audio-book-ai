@@ -9,6 +9,7 @@ import {
   BookOpen,
   Loader2,
   ExternalLink,
+  DollarSign,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -35,19 +36,6 @@ export default function AudioBooksPage() {
   } = useAudioBooks();
 
   const audioBooks = audiobooksResponse?.data || [];
-
-  useEffect(() => {
-    if (!userLoading && !user) {
-      redirect("/auth/login");
-    }
-
-    if (!userLoading && user) {
-      const userRole = user.user_metadata?.role || "user";
-      if (userRole !== "admin") {
-        redirect("/");
-      }
-    }
-  }, [user, userLoading]);
 
   if (userLoading) {
     return (
@@ -146,11 +134,12 @@ export default function AudioBooksPage() {
               <TableRow>
                 <TableHead>Title</TableHead>
                 <TableHead>Author</TableHead>
+                <TableHead>Price</TableHead>
                 <TableHead>Duration</TableHead>
                 <TableHead>File Size</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Created</TableHead>
-                <TableHead></TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -162,6 +151,14 @@ export default function AudioBooksPage() {
                     </div>
                   </TableCell>
                   <TableCell>{book.author}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <DollarSign className="h-4 w-4" />
+                      <span className="font-semibold">
+                        {book.price?.toFixed(2) || "0.00"}
+                      </span>
+                    </div>
+                  </TableCell>
                   <TableCell>{formatDuration(book.duration_seconds)}</TableCell>
                   <TableCell>{formatFileSize(book.file_size_bytes)}</TableCell>
                   <TableCell>
@@ -181,13 +178,11 @@ export default function AudioBooksPage() {
                     {new Date(book.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button size="sm" variant="ghost" asChild>
-                        <Link href={`/audiobooks/${book.id}`}>
-                          <ExternalLink className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                    </div>
+                    <Button size="sm" variant="ghost" asChild>
+                      <Link href={`/audiobooks/${book.id}`}>
+                        <ExternalLink className="h-4 w-4" />
+                      </Link>
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

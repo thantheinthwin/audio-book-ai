@@ -31,6 +31,7 @@ interface FormData {
   author: string;
   language: string;
   isPublic: boolean;
+  price: number;
   chapters: Array<{
     id: string;
     chapter_number: number;
@@ -56,6 +57,7 @@ export default function CreateAudioBookPage() {
       author: "",
       language: "en",
       isPublic: false,
+      price: 0,
       chapters: [
         {
           id: "chapter-1",
@@ -90,6 +92,7 @@ export default function CreateAudioBookPage() {
       formData.append("author", data.author);
       formData.append("language", data.language);
       formData.append("isPublic", data.isPublic.toString());
+      formData.append("price", data.price.toString());
 
       if (coverImage) {
         formData.append("coverImage", coverImage);
@@ -208,6 +211,24 @@ export default function CreateAudioBookPage() {
                   }
                 />
                 <Label htmlFor="isPublic">Make this audio book public</Label>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="price">Price (USD) *</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  {...register("price", {
+                    required: "Price is required",
+                    min: { value: 0, message: "Price must be 0 or greater" },
+                  })}
+                  placeholder="0.00"
+                />
+                {errors.price && (
+                  <p className="text-sm text-red-500">{errors.price.message}</p>
+                )}
               </div>
             </div>
 

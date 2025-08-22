@@ -56,6 +56,12 @@ func SetupProtectedRoutes(router fiber.Router, cfg *config.Config, h *handlers.H
 	// Progress
 	router.Get("/progress/:audiobookId", handlers.GetProgress)
 	router.Put("/progress/:audiobookId", handlers.UpdateProgress)
+
+	// Cart operations
+	router.Post("/cart", h.AddToCart)
+	router.Get("/cart", h.GetCart)
+	router.Delete("/cart/:audiobookId", h.RemoveFromCart)
+	router.Get("/cart/:audiobookId/check", h.IsInCart)
 }
 
 // SetupAdminRoutes configures admin-only routes

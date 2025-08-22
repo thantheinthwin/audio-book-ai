@@ -98,6 +98,7 @@ type CreateAudioBookFromUploadRequest struct {
 	Description   *string   `json:"description,omitempty"`
 	Language      string    `json:"language" validate:"required,len=2"`
 	IsPublic      bool      `json:"is_public"`
+	Price         *float64  `json:"price,omitempty" validate:"omitempty,min=0"`
 	CoverImageURL *string   `json:"cover_image_url,omitempty"`
 }
 

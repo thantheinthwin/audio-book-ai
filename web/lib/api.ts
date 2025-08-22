@@ -36,6 +36,7 @@ interface AudioBook {
   cover_image_url?: string;
   language: string;
   is_public: boolean;
+  price: number;
   status: string;
   created_by: string;
   created_at: string;
@@ -98,7 +99,31 @@ interface AudioBookUpdateData {
   author?: string;
   language?: string;
   is_public?: boolean;
+  price?: number;
   cover_image_url?: string;
+}
+
+// Cart types
+interface CartItem {
+  id: string;
+  user_id: string;
+  audiobook_id: string;
+  added_at: string;
+  audiobook: AudioBook;
+}
+
+interface CartResponse {
+  items: CartItem[];
+  total_items: number;
+  total_price: number;
+}
+
+interface AddToCartRequest {
+  audiobook_id: string;
+}
+
+interface CartCheckResponse {
+  is_in_cart: boolean;
 }
 
 // Helper function to get the current session token
@@ -533,6 +558,27 @@ export const progressAPI = {
     }),
 };
 
+// Cart API functions
+export const cartAPI = {
+  addToCart: (data: AddToCartRequest) =>
+    apiClient<ApiResponse>("/user/cart", {
+      method: "POST",
+      data,
+    }),
+
+  removeFromCart: (audiobookId: string) =>
+    apiClient<ApiResponse>(`/user/cart/${audiobookId}`, {
+      method: "DELETE",
+    }),
+
+  getCart: () => apiClient<ApiResponse<CartResponse>>("/user/cart"),
+
+  checkIfInCart: (audiobookId: string) =>
+    apiClient<ApiResponse<CartCheckResponse>>(
+      `/user/cart/${audiobookId}/check`
+    ),
+};
+
 // Test API without authentication
 export const testApiWithoutAuth = async () => {
   try {
@@ -619,4 +665,8 @@ export type {
   AudioBookUpdateData,
   UploadSession,
   UploadedFile,
+  CartItem,
+  CartResponse,
+  AddToCartRequest,
+  CartCheckResponse,
 };

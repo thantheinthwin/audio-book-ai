@@ -23,11 +23,45 @@ import Link from "next/link";
 import Image from "next/image";
 import { Loader2 } from "lucide-react";
 import { useAudioBooks } from "@/hooks";
+import { useUser } from "@/hooks/use-auth";
+import { redirect } from "next/navigation";
+import { useEffect } from "react";
 
 export default function LibraryPage() {
+  const { data: user, isLoading: userLoading } = useUser();
+
   // Fetch library data using React Query
   // const { data: libraryResponse, isLoading, error } = useLibrary();
   const { data: libraryResponse, isLoading, error } = useAudioBooks();
+
+  // Check if user is a normal user (not admin)
+  useEffect(() => {
+    if (!userLoading && !user) {
+      redirect("/auth/login");
+    }
+
+    if (!userLoading && user) {
+      const userRole = user.user_metadata?.role || "user";
+      if (userRole !== "user") {
+        redirect("/");
+      }
+    }
+  }, [user, userLoading]);
+
+  if (userLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="h-6 w-6 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null; // Will redirect in useEffect
+  }
 
   const userLibrary = (libraryResponse as any)?.data || [];
 

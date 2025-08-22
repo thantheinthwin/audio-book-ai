@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS audiobooks (
     cover_image_url VARCHAR(500),
     language VARCHAR(2) NOT NULL,
     is_public BOOLEAN DEFAULT false,
+    price DECIMAL(10,2) DEFAULT 0.00,
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     created_by UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -325,6 +326,32 @@ COMMENT ON TABLE uploads IS 'Uploads table. When deleted, cascades to: upload_fi
 COMMENT ON TABLE chapters IS 'Chapters table. When deleted, cascades to: chapter_transcripts and chapter_ai_outputs. References both audiobook_id and upload_file_id for proper tracking and cleanup.';
 
 COMMENT ON COLUMN chapters.upload_file_id IS 'References the upload file that created this chapter. Allows tracking and cascading deletes from upload_files.';
+
+-- Cart table for user shopping cart functionality
+CREATE TABLE IF NOT EXISTS user_cart (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    audiobook_id UUID NOT NULL REFERENCES audiobooks(id) ON DELETE CASCADE,
+    added_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, audiobook_id)
+);
+
+-- Cart indexes
+CREATE INDEX IF NOT EXISTS idx_user_cart_user_id ON user_cart(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_cart_audiobook_id ON user_cart(audiobook_id);
+CREATE INDEX IF NOT EXISTS idx_user_cart_added_at ON user_cart(added_at);
+
+-- Cart RLS policies
+ALTER TABLE user_cart ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own cart items" ON user_cart
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can add items to own cart" ON user_cart
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can remove items from own cart" ON user_cart
+    FOR DELETE USING (auth.uid() = user_id);
 
 -- Insert some default tags
 INSERT INTO tags (name, category) VALUES

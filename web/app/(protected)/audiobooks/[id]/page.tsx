@@ -3,11 +3,12 @@
 import { useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import { useAudioBook, useAudioBookJobStatus } from "@/hooks/use-audiobooks";
+import { useAddToCart, useRemoveFromCart, useIsInCart } from "@/hooks/use-cart";
+import { useUser } from "@/hooks/use-auth";
 import { notFound } from "next/navigation";
 import {
   Play,
   Pause,
-  Edit,
   Trash2,
   Loader2,
   CheckCircle,
@@ -15,6 +16,9 @@ import {
   FileAudio,
   Brain,
   Bot,
+  ShoppingCart,
+  DollarSign,
+  Edit,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +40,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import Image from "next/image";
+import { Separator } from "@/components/ui/separator";
 
 export default function AudioBookDetailPage() {
   const params = useParams();
@@ -43,6 +48,7 @@ export default function AudioBookDetailPage() {
   const [isJobStatusExpanded, setIsJobStatusExpanded] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  const { data: user } = useUser();
   const {
     data: audioBookResponse,
     error: audioBookError,
@@ -54,6 +60,21 @@ export default function AudioBookDetailPage() {
 
   const audioBook = audioBookResponse?.data;
   const jobStatus = jobStatusResponse?.data;
+
+  // Cart functionality - only for normal users
+  const userRole = user?.user_metadata?.role || "user";
+  const isNormalUser = userRole === "user";
+  const { data: isInCart } = useIsInCart(params.id as string);
+  const addToCartMutation = useAddToCart();
+  const removeFromCartMutation = useRemoveFromCart();
+
+  const handleCartToggle = () => {
+    if (isInCart) {
+      removeFromCartMutation.mutate(params.id as string);
+    } else {
+      addToCartMutation.mutate({ audiobook_id: params.id as string });
+    }
+  };
 
   // Handle play/pause for a chapter
   const handlePlayPause = (chapterId: string, audioUrl: string) => {
@@ -194,14 +215,22 @@ export default function AudioBookDetailPage() {
               height={100}
               className="w-48 h-48 object-cover rounded-md"
             />
-            <div className="flex gap-2">
-              {/* <Button variant="outline">
+            <div className="flex items-center gap-1 border rounded pl-4 pr-2 py-2 bg-green-400 dark:bg-green-400/50">
+              <div className="flex items-center gap-1 flex-1">
+                <DollarSign className="h-4 w-4" />
+                <p className="font-semibold text-sm">
+                  {audioBook.price?.toFixed(2) || "0.00"}
+                </p>
+              </div>
+              <Separator orientation="vertical" className="h-8 ml-2" />
+              <Button variant={"ghost"} size={"icon"}>
                 <Edit className="h-4 w-4" />
-                Edit
-              </Button> */}
-              <Button variant={"destructive"}>
-                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button variant={"destructive"} className="w-full">
                 Delete
+                <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -237,9 +266,11 @@ export default function AudioBookDetailPage() {
                 </div>
               )}
             </div>
-            <div className="grid gap-1">
-              <h2 className="text-muted-foreground text-sm">Tags</h2>
-              <p className="text-xs">{audioBook.tags?.join(", ")}</p>
+            <div className="flex justify-between">
+              <div className="grid gap-1">
+                <h2 className="text-muted-foreground text-sm">Tags</h2>
+                <p className="text-xs">{audioBook.tags?.join(", ")}</p>
+              </div>
             </div>
           </div>
         </CardContent>

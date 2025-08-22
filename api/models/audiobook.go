@@ -70,6 +70,7 @@ type AudioBook struct {
 	CoverImageURL   *string         `json:"cover_image_url,omitempty" db:"cover_image_url"`
 	Language        string          `json:"language" db:"language" validate:"required,len=2"`
 	IsPublic        bool            `json:"is_public" db:"is_public"`
+	Price           float64         `json:"price" db:"price" validate:"min=0"`
 	Status          AudioBookStatus `json:"status" db:"status" validate:"required"`
 	CreatedBy       uuid.UUID       `json:"created_by" db:"created_by" validate:"required"`
 	CreatedAt       time.Time       `json:"created_at" db:"created_at"`
@@ -186,20 +187,22 @@ type AudioBookEmbedding struct {
 
 // CreateAudioBookRequest represents the request to create a new audio book
 type CreateAudioBookRequest struct {
-	Title         string  `json:"title" validate:"required,min=1,max=255"`
-	Author        string  `json:"author" validate:"required,min=1,max=255"`
-	Language      string  `json:"language" validate:"required,len=2"`
-	IsPublic      bool    `json:"is_public"`
-	CoverImageURL *string `json:"cover_image_url,omitempty"`
+	Title         string   `json:"title" validate:"required,min=1,max=255"`
+	Author        string   `json:"author" validate:"required,min=1,max=255"`
+	Language      string   `json:"language" validate:"required,len=2"`
+	IsPublic      bool     `json:"is_public"`
+	Price         *float64 `json:"price,omitempty" validate:"omitempty,min=0"`
+	CoverImageURL *string  `json:"cover_image_url,omitempty"`
 }
 
 // UpdateAudioBookRequest represents the request to update an audio book
 type UpdateAudioBookRequest struct {
-	Title         *string `json:"title,omitempty" validate:"omitempty,min=1,max=255"`
-	Author        *string `json:"author,omitempty" validate:"omitempty,min=1,max=255"`
-	Language      *string `json:"language,omitempty" validate:"omitempty,len=2"`
-	IsPublic      *bool   `json:"is_public,omitempty"`
-	CoverImageURL *string `json:"cover_image_url,omitempty"`
+	Title         *string  `json:"title,omitempty" validate:"omitempty,min=1,max=255"`
+	Author        *string  `json:"author,omitempty" validate:"omitempty,min=1,max=255"`
+	Language      *string  `json:"language,omitempty" validate:"omitempty,len=2"`
+	IsPublic      *bool    `json:"is_public,omitempty"`
+	Price         *float64 `json:"price,omitempty" validate:"omitempty,min=0"`
+	CoverImageURL *string  `json:"cover_image_url,omitempty"`
 }
 
 // AudioBookWithDetails represents an audio book with all related data
@@ -362,4 +365,53 @@ func (uar *UpdateAudioBookRequest) Validate() error {
 // Validate validates the search request
 func (sr *SearchRequest) Validate() error {
 	return utils.GetValidator().Struct(sr)
+}
+
+// Cart models
+
+// CartItem represents an item in a user's shopping cart
+type CartItem struct {
+	ID          uuid.UUID  `json:"id" db:"id"`
+	UserID      uuid.UUID  `json:"user_id" db:"user_id" validate:"required"`
+	AudiobookID uuid.UUID  `json:"audiobook_id" db:"audiobook_id" validate:"required"`
+	AddedAt     time.Time  `json:"added_at" db:"added_at"`
+	AudioBook   *AudioBook `json:"audiobook,omitempty" db:"audiobook"`
+}
+
+// CartItemWithDetails represents a cart item with full audiobook details
+type CartItemWithDetails struct {
+	CartItem
+	AudioBook AudioBook `json:"audiobook"`
+}
+
+// AddToCartRequest represents the request to add an audiobook to cart
+type AddToCartRequest struct {
+	AudiobookID uuid.UUID `json:"audiobook_id" validate:"required"`
+}
+
+// RemoveFromCartRequest represents the request to remove an audiobook from cart
+type RemoveFromCartRequest struct {
+	AudiobookID uuid.UUID `json:"audiobook_id" validate:"required"`
+}
+
+// CartResponse represents the response for cart operations
+type CartResponse struct {
+	Items      []CartItemWithDetails `json:"items"`
+	TotalItems int                   `json:"total_items"`
+	TotalPrice float64               `json:"total_price"`
+}
+
+// Validate validates the cart item struct
+func (ci *CartItem) Validate() error {
+	return utils.GetValidator().Struct(ci)
+}
+
+// Validate validates the add to cart request
+func (atcr *AddToCartRequest) Validate() error {
+	return utils.GetValidator().Struct(atcr)
+}
+
+// Validate validates the remove from cart request
+func (rfcr *RemoveFromCartRequest) Validate() error {
+	return utils.GetValidator().Struct(rfcr)
 }
