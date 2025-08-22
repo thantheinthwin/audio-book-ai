@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   useAudioBook,
@@ -8,6 +8,8 @@ import {
   useUpdateAudioBookPrice,
   useDeleteAudioBook,
 } from "@/hooks/use-audiobooks";
+import { useQueryClient } from "@tanstack/react-query";
+import { audiobookKeys } from "@/queryKeys";
 import { notFound } from "next/navigation";
 import {
   Play,
@@ -75,9 +77,20 @@ export default function AudioBookDetailPage() {
   );
   const updatePriceMutation = useUpdateAudioBookPrice();
   const deleteAudioBookMutation = useDeleteAudioBook();
+  const queryClient = useQueryClient();
 
   const audioBook = audioBookResponse?.data;
   const jobStatus = jobStatusResponse?.data;
+
+  // Revalidate audiobook data when job status becomes completed
+  useEffect(() => {
+    if (jobStatus?.overall_status === "completed") {
+      // Invalidate the audiobook query to refetch the latest data
+      queryClient.invalidateQueries({
+        queryKey: audiobookKeys.detail(params.id as string),
+      });
+    }
+  }, [jobStatus?.overall_status, queryClient, params.id]);
 
   // Event delegation handler for delete button clicks
   const handleContainerClick = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -520,7 +533,7 @@ export default function AudioBookDetailPage() {
       )}
 
       {/* Chapters Table */}
-      {isCompleted && audioBook && (
+      {audioBook && (
         <Card>
           <CardHeader>
             <CardTitle>Chapters</CardTitle>

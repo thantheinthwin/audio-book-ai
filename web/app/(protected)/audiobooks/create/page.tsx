@@ -73,6 +73,12 @@ export default function CreateAudioBookPage() {
   // Use React Query mutation
   const createAudioBookMutation = useCreateAudioBookWithFiles();
 
+  // Watch chapters to check for empty fields
+  const watchedChapters = watch("chapters");
+
+  // Check if any chapter has empty title or no audio file
+  const hasEmptyFields = watchedChapters.some((chapter) => !chapter.audio_file);
+
   const onSubmit = async (data: FormData) => {
     if (data.chapters.length === 0) {
       alert("Please add at least one chapter");
@@ -230,6 +236,7 @@ export default function CreateAudioBookPage() {
               register={register}
               name="chapters"
               className="w-full"
+              disableAddButton={hasEmptyFields}
             />
           </CardContent>
         </Card>

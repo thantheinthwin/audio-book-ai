@@ -43,6 +43,7 @@ interface AudioFilesUploadProps {
   register: UseFormRegister<any>;
   name: string; // Field array name
   className?: string;
+  disableAddButton?: boolean; // New prop to disable add button
 }
 
 // Type for the form data
@@ -158,6 +159,7 @@ export default function AudioFilesUpload({
   register,
   name,
   className = "",
+  disableAddButton = false,
 }: AudioFilesUploadProps) {
   const maxSize = maxSizeMB * 1024 * 1024; // Convert MB to bytes
 
@@ -323,6 +325,7 @@ export default function AudioFilesUpload({
                   size="sm"
                   onClick={addChapter}
                   type="button"
+                  disabled={disableAddButton}
                 >
                   <Plus
                     className="-ms-0.5 size-3.5 opacity-60"
