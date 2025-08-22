@@ -1,6 +1,7 @@
 .cursor/
 
 **/.env
+# **/.web.env
 **/.api.env
 **/.common.env
 **/.transcriber.env

@@ -56,16 +56,19 @@ services:
       - ./.transcriber.env
 
   # Next.js web app
-  # web:
-  #   build:
-  #     context: ..
-  #     dockerfile: web/Dockerfile
-  #   ports:
-  #     - "3000:3000"
-  #   depends_on:
-  #     - api
-  #   networks:
-  #     - audiobook-network
+  web:
+    build:
+      context: ..
+      dockerfile: web/Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    networks:
+      - audiobook-network
+    env_file:
+      - ./.common.env
+      - ./.web.env
 
 volumes:
   redisdata:
