@@ -494,24 +494,28 @@ export default function AudioBookDetailPage() {
                         <div>
                           <p className="font-medium">{jobTitle}</p>
                           <div className="flex gap-1">
-                            <p className="text-xs text-muted-foreground">
-                              {job.started_at &&
-                                `Started: ${new Date(
-                                  job.started_at
-                                ).toLocaleTimeString()}`}{" "}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {job.completed_at &&
-                                `Completed: ${new Date(
+                            {job.started_at && (
+                              <p className="text-xs text-muted-foreground">
+                                `Started: $
+                                {new Date(job.started_at).toLocaleTimeString()}`
+                              </p>
+                            )}
+                            {job.completed_at && (
+                              <p className="text-xs text-muted-foreground">
+                                `Completed:
+                                {new Date(
                                   job.completed_at
-                                ).toLocaleTimeString()}`}
-                            </p>
+                                ).toLocaleTimeString()}
+                                `
+                              </p>
+                            )}
                           </div>
-                          {job.error_message && (
-                            <p className="text-xs text-red-500 mt-1">
-                              Error: {job.error_message}
-                            </p>
-                          )}
+                          {job.error_message &&
+                            job.retry_count < job.max_retries && (
+                              <p className="text-xs text-red-500 mt-1">
+                                Error: {job.error_message}
+                              </p>
+                            )}
                           {/* Retry Count Display */}
                           {job.retry_count > 0 && (
                             <div className="flex items-center gap-1 mt-1">
