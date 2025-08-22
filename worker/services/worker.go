@@ -33,54 +33,51 @@ func NewWorker(dbService *DatabaseService, geminiService *GeminiService, config 
 
 // ProcessJob processes a single AI processing job
 func (w *Worker) ProcessJob(job models.Job) error {
-	log.Printf("Processing %s job %s for audiobook %s", job.JobType, job.ID, job.AudiobookID)
+	log.Printf("Processing %s job %s for audiobook %s (retry %d/%d)", job.JobType, job.ID, job.AudiobookID, job.RetryCount, job.MaxRetries)
+
+	// Check if we've exceeded max retries
+	if job.RetryCount >= job.MaxRetries {
+		return fmt.Errorf("max retries exceeded for job %s", job.ID)
+	}
+
+	// Process the summarize job
+	err := w.ProcessSummarizeJob(job)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Successfully processed %s job %s", job.JobType, job.ID)
+	return nil
+}
+
+// ProcessJobWithDBUpdates processes a job and updates status directly to database (for Run() method)
+func (w *Worker) ProcessJobWithDBUpdates(job models.Job) error {
+	log.Printf("Processing %s job %s for audiobook %s (retry %d/%d)", job.JobType, job.ID, job.AudiobookID, job.RetryCount, job.MaxRetries)
+
+	// Check if we've exceeded max retries
+	if job.RetryCount >= job.MaxRetries {
+		errorMsg := fmt.Sprintf("Job failed after %d retries (max: %d)", job.RetryCount, job.MaxRetries)
+		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
+		return fmt.Errorf("max retries exceeded for job %s", job.ID)
+	}
 
 	// Update job status to running
 	if err := w.dbService.UpdateJobStatus(job.ID, models.JobStatusRunning, nil); err != nil {
 		return err
 	}
 
-	// // Get transcript for the audiobook
-	// transcript, err := w.dbService.GetTranscript(job.AudiobookID)
-	// if err != nil {
-	// 	errorMsg := fmt.Sprintf("Failed to get transcript: %v", err)
-	// 	w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
-	// 	return err
-	// }
-
-	// // Process based on job type
-	// var output *models.AIOutput
-	// switch job.JobType {
-	// case models.JobTypeEmbed:
-	// 	output, err = w.processEmbedding(job.AudiobookID, transcript)
-	// case models.JobTypeSummarize:
-	// 	// For combined jobs, use the dedicated method
-	// 	return w.ProcessSummarizeJob(job)
-	// default:
-	// 	errorMsg := fmt.Sprintf("Unknown job type: %s", job.JobType)
-	// 	w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
-	// 	return fmt.Errorf("unknown job type: %s", job.JobType)
-	// }
-
-	// if err != nil {
-	// 	errorMsg := fmt.Sprintf("Failed to process %s: %v", job.JobType, err)
-	// 	w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
-	// 	return err
-	// }
-
+	// Process the summarize job
 	err := w.ProcessSummarizeJob(job)
 	if err != nil {
+		// Increment retry count before updating status
+		if incrementErr := w.dbService.IncrementRetryCount(job.ID); incrementErr != nil {
+			log.Printf("Warning: Failed to increment retry count for job %s: %v", job.ID, incrementErr)
+		}
+
 		errorMsg := fmt.Sprintf("Failed to process summarize job: %v", err)
 		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
 		return err
 	}
-
-	// // Save the output
-	// if err := w.dbService.SaveAIOutput(output); err != nil {
-	// 	errorMsg := fmt.Sprintf("Failed to save output: %v", err)
-	// 	w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
-	// 	return err
-	// }
 
 	// Update job status to completed
 	if err := w.dbService.UpdateJobStatus(job.ID, models.JobStatusCompleted, nil); err != nil {
@@ -111,22 +108,13 @@ func (w *Worker) ProcessJob(job models.Job) error {
 func (w *Worker) ProcessSummarizeJob(job models.Job) error {
 	log.Printf("Processing summarize job %s for audiobook %s", job.ID, job.AudiobookID)
 
-	// Update job status to running
-	if err := w.dbService.UpdateJobStatus(job.ID, models.JobStatusRunning, nil); err != nil {
-		return err
-	}
-
 	// Try to get chapter 1 transcript first
 	chapter1Transcript, err := w.dbService.GetChapter1Transcript(job.AudiobookID.String())
 	if err != nil {
-		errorMsg := fmt.Sprintf("Failed to get chapter 1 transcript: %v", err)
-		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
-		return err
+		return fmt.Errorf("failed to get chapter 1 transcript: %v", err)
 	}
 
 	if chapter1Transcript == nil {
-		errorMsg := "Chapter 1 transcript not found for audiobook"
-		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
 		return fmt.Errorf("chapter 1 transcript not found for audiobook")
 	}
 
@@ -137,9 +125,7 @@ func (w *Worker) ProcessSummarizeJob(job models.Job) error {
 	startTime := time.Now()
 	summaryAndTags, err := w.geminiService.GenerateSummaryAndTags(transcriptContent)
 	if err != nil {
-		errorMsg := fmt.Sprintf("Failed to generate summary and tags: %v", err)
-		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
-		return err
+		return fmt.Errorf("failed to generate summary and tags: %v", err)
 	}
 
 	// Save summary output
@@ -153,14 +139,7 @@ func (w *Worker) ProcessSummarizeJob(job models.Job) error {
 	}
 
 	if err := w.dbService.SaveAIOutput(summaryOutput); err != nil {
-		errorMsg := fmt.Sprintf("Failed to save summary output: %v", err)
-		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
-		return err
-	}
-
-	// Update job status to completed
-	if err := w.dbService.UpdateJobStatus(job.ID, models.JobStatusCompleted, nil); err != nil {
-		return err
+		return fmt.Errorf("failed to save summary output: %v", err)
 	}
 
 	log.Printf("Successfully processed summarize job %s", job.ID)
@@ -184,7 +163,7 @@ func (w *Worker) Run() {
 			log.Printf("Found %d pending AI processing jobs", len(pendingJobs))
 
 			for _, job := range pendingJobs {
-				if err := w.ProcessJob(job); err != nil {
+				if err := w.ProcessJobWithDBUpdates(job); err != nil {
 					log.Printf("Error processing job %s: %v", job.ID, err)
 				}
 			}

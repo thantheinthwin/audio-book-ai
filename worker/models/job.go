@@ -13,6 +13,8 @@ type Job struct {
 	ChapterID    *uuid.UUID `json:"chapter_id,omitempty"`
 	JobType      string     `json:"job_type"`
 	Status       string     `json:"status"`
+	RetryCount   int        `json:"retry_count"`
+	MaxRetries   int        `json:"max_retries"`
 	CreatedAt    time.Time  `json:"created_at"`
 	StartedAt    *time.Time `json:"started_at,omitempty"`
 	CompletedAt  *time.Time `json:"completed_at,omitempty"`

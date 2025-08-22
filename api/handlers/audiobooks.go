@@ -1080,6 +1080,8 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 			JobType:     models.JobTypeTranscribe,
 			Status:      models.JobStatusPending,
 			ChapterID:   &chapter.ID,
+			RetryCount:  0,
+			MaxRetries:  3,
 			CreatedAt:   time.Now(),
 		}
 
@@ -1115,6 +1117,8 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 		AudiobookID: audiobook.ID,
 		JobType:     models.JobTypeSummarize,
 		Status:      models.JobStatusIdle,
+		RetryCount:  0,
+		MaxRetries:  3,
 		CreatedAt:   time.Now(),
 	}
 
@@ -1420,6 +1424,7 @@ func (h *Handler) UpdateJobStatus(c *fiber.Ctx) error {
 		ErrorMessage *string          `json:"error_message,omitempty"`
 		StartedAt    *time.Time       `json:"started_at,omitempty"`
 		CompletedAt  *time.Time       `json:"completed_at,omitempty"`
+		RetryCount   *int             `json:"retry_count,omitempty"`
 	}
 
 	if err := c.BodyParser(&req); err != nil {
@@ -1434,6 +1439,15 @@ func (h *Handler) UpdateJobStatus(c *fiber.Ctx) error {
 		return c.Status(http.StatusNotFound).JSON(fiber.Map{
 			"error": "Job not found",
 		})
+	}
+
+	// If status is failed and retry count is provided, increment it
+	if req.Status == models.JobStatusFailed && req.RetryCount != nil {
+		// Increment retry count in database
+		if err := h.repo.IncrementRetryCount(context.Background(), jobID); err != nil {
+			fmt.Printf("Failed to increment retry count for job %s: %v\n", jobID, err)
+			// Continue with the update even if retry count increment fails
+		}
 	}
 
 	// Update job status

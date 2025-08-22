@@ -24,6 +24,8 @@ func TestProcessingJobWithChapterID(t *testing.T) {
 		ChapterID:   &chapterID,
 		JobType:     models.JobTypeTranscribe,
 		Status:      models.JobStatusPending,
+		RetryCount:  0,
+		MaxRetries:  3,
 		CreatedAt:   time.Now(),
 	}
 
@@ -47,6 +49,8 @@ func TestProcessingJobWithoutChapterID(t *testing.T) {
 		ChapterID:   nil, // No chapter_id for audiobook-level jobs
 		JobType:     models.JobTypeSummarize,
 		Status:      models.JobStatusPending,
+		RetryCount:  0,
+		MaxRetries:  3,
 		CreatedAt:   time.Now(),
 	}
 
@@ -69,6 +73,8 @@ func TestProcessingJobChapterIDOptional(t *testing.T) {
 		ChapterID:   nil,
 		JobType:     models.JobTypeTranscribe,
 		Status:      models.JobStatusPending,
+		RetryCount:  0,
+		MaxRetries:  3,
 		CreatedAt:   time.Now(),
 	}
 

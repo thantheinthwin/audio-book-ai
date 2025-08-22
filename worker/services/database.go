@@ -58,7 +58,7 @@ func (d *DatabaseService) Close() error {
 // GetPendingJobs retrieves pending AI processing jobs from database
 func (d *DatabaseService) GetPendingJobs(limit int) ([]models.Job, error) {
 	query := `
-		SELECT id, audiobook_id, chapter_id, job_type, status, created_at, started_at, completed_at, error_message
+		SELECT id, audiobook_id, chapter_id, job_type, status, retry_count, max_retries, created_at, started_at, completed_at, error_message
 		FROM processing_jobs
 		WHERE job_type IN ($1, $2)
 		AND status = $3
@@ -82,7 +82,7 @@ func (d *DatabaseService) GetPendingJobs(limit int) ([]models.Job, error) {
 		var job models.Job
 		if err := rows.Scan(
 			&job.ID, &job.AudiobookID, &job.ChapterID, &job.JobType, &job.Status,
-			&job.CreatedAt, &job.StartedAt, &job.CompletedAt, &job.ErrorMessage,
+			&job.RetryCount, &job.MaxRetries, &job.CreatedAt, &job.StartedAt, &job.CompletedAt, &job.ErrorMessage,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan job: %v", err)
 		}
@@ -258,4 +258,25 @@ func (d *DatabaseService) GetChapter1Transcript(audiobookID string) (*models.Cha
 	}
 
 	return &transcript, nil
+}
+
+// IncrementRetryCount increments the retry count for a processing job
+func (d *DatabaseService) IncrementRetryCount(jobID uuid.UUID) error {
+	query := `
+		UPDATE processing_jobs 
+		SET retry_count = retry_count + 1
+		WHERE id = $1
+	`
+
+	result, err := d.pool.Exec(context.Background(), query, jobID)
+	if err != nil {
+		return fmt.Errorf("failed to increment retry count: %v", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("job not found: %s", jobID)
+	}
+
+	log.Printf("Incremented retry count for job %s", jobID)
+	return nil
 }

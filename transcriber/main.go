@@ -100,6 +100,8 @@ func processTranscriptionJob(worker *services.Worker, httpClient *http.Client, a
 		AudiobookID: message.AudiobookID,
 		JobType:     message.JobType,
 		Status:      "running",
+		RetryCount:  message.RetryCount,
+		MaxRetries:  message.MaxRetries,
 		CreatedAt:   message.CreatedAt,
 	}
 
@@ -110,24 +112,28 @@ func processTranscriptionJob(worker *services.Worker, httpClient *http.Client, a
 		return fmt.Errorf("no file path provided in job message")
 	}
 
+	// Update job status to running
+	now := time.Now()
+	updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "running", "", &now, nil, nil)
+
 	// Process the job
 	if err := worker.ProcessJob(job); err != nil {
-		// Update job status to failed
+		// Update job status to failed (API will handle retry count increment)
 		now := time.Now()
-		updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "failed", err.Error(), nil, &now)
+		updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "failed", err.Error(), nil, &now, nil)
 		return err
 	}
 
 	// Update job status to completed
-	now := time.Now()
-	updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "completed", "", &now, &now)
+	now = time.Now()
+	updateJobStatus(httpClient, apiBaseURL, internalAPIKey, message.ID.String(), "completed", "", nil, &now, nil)
 
 	log.Printf("Transcription job %s completed successfully for audiobook %s", message.ID, message.AudiobookID)
 	return nil
 }
 
 // updateJobStatus sends job status update to the API
-func updateJobStatus(httpClient *http.Client, apiBaseURL string, internalAPIKey string, jobID string, status string, errorMessage string, startedAt, completedAt *time.Time) {
+func updateJobStatus(httpClient *http.Client, apiBaseURL string, internalAPIKey string, jobID string, status string, errorMessage string, startedAt, completedAt *time.Time, retryCount *int) {
 	// Build the request payload
 	payload := map[string]interface{}{
 		"status": status,
@@ -141,6 +147,9 @@ func updateJobStatus(httpClient *http.Client, apiBaseURL string, internalAPIKey 
 	}
 	if completedAt != nil {
 		payload["completed_at"] = completedAt.Format(time.RFC3339)
+	}
+	if retryCount != nil {
+		payload["retry_count"] = *retryCount
 	}
 
 	// Convert payload to JSON

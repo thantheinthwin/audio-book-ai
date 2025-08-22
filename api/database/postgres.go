@@ -1454,7 +1454,7 @@ func (p *PostgresRepository) UpdateProcessingJob(ctx context.Context, job *model
 func (p *PostgresRepository) IncrementRetryCount(ctx context.Context, jobID uuid.UUID) error {
 	query := `
 		UPDATE processing_jobs 
-		SET retry_count = retry_count + 1, updated_at = NOW()
+		SET retry_count = retry_count + 1
 		WHERE id = $1
 	`
 
@@ -1474,7 +1474,7 @@ func (p *PostgresRepository) IncrementRetryCount(ctx context.Context, jobID uuid
 func (p *PostgresRepository) ResetRetryCount(ctx context.Context, jobID uuid.UUID) error {
 	query := `
 		UPDATE processing_jobs 
-		SET retry_count = 0, updated_at = NOW()
+		SET retry_count = 0
 		WHERE id = $1
 	`
 

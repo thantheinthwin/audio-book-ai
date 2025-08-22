@@ -15,6 +15,8 @@ type Job struct {
 	Status       string     `json:"status"`
 	FilePath     string     `json:"file_path"`
 	Language     string     `json:"language"`
+	RetryCount   int        `json:"retry_count"`
+	MaxRetries   int        `json:"max_retries"`
 	CreatedAt    time.Time  `json:"created_at"`
 	StartedAt    *time.Time `json:"started_at,omitempty"`
 	CompletedAt  *time.Time `json:"completed_at,omitempty"`

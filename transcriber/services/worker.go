@@ -8,8 +8,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/google/uuid"
 	"audio-book-ai/transcriber/models"
+
+	"github.com/google/uuid"
 )
 
 // Worker handles the transcription job processing
@@ -47,7 +48,53 @@ func NewWorker(dbService *DatabaseService, revAIService *RevAIService, config *C
 
 // ProcessJob processes a single transcription job
 func (w *Worker) ProcessJob(job models.Job) error {
-	log.Printf("Processing transcription job %s for audiobook %s", job.ID, job.AudiobookID)
+	log.Printf("Processing transcription job %s for audiobook %s (retry %d/%d)", job.ID, job.AudiobookID, job.RetryCount, job.MaxRetries)
+
+	// Check if we've exceeded max retries
+	if job.RetryCount >= job.MaxRetries {
+		return fmt.Errorf("max retries exceeded for job %s", job.ID)
+	}
+
+	// Check if file exists (assuming local file path for now)
+	if _, err := os.Stat(job.FilePath); os.IsNotExist(err) {
+		return fmt.Errorf("audio file not found: %s", job.FilePath)
+	}
+
+	// Transcribe audio
+	transcript, err := w.transcribeAudio(job.FilePath)
+	if err != nil {
+		return fmt.Errorf("failed to transcribe audio: %v", err)
+	}
+
+	// Set audiobook ID, file path, and processing time
+	transcript.AudiobookID = job.AudiobookID
+	transcript.FilePath = job.FilePath
+
+	// Save transcript to database
+	if err := w.dbService.SaveTranscript(transcript); err != nil {
+		return fmt.Errorf("failed to save transcript: %v", err)
+	}
+
+	// Check if this is chapter 1 and trigger summarize/tag jobs immediately
+	if err := w.checkAndTriggerSummarizeTagJobsForChapter1(job.AudiobookID.String(), job.ChapterID); err != nil {
+		log.Printf("Warning: Failed to check/trigger summarize and tag jobs for chapter 1: %v", err)
+		// Don't fail the transcription job if this fails
+	}
+
+	log.Printf("Successfully processed transcription job %s", job.ID)
+	return nil
+}
+
+// ProcessJobWithDBUpdates processes a job and updates status directly to database (for Run() method)
+func (w *Worker) ProcessJobWithDBUpdates(job models.Job) error {
+	log.Printf("Processing transcription job %s for audiobook %s (retry %d/%d)", job.ID, job.AudiobookID, job.RetryCount, job.MaxRetries)
+
+	// Check if we've exceeded max retries
+	if job.RetryCount >= job.MaxRetries {
+		errorMsg := fmt.Sprintf("Job failed after %d retries (max: %d)", job.RetryCount, job.MaxRetries)
+		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
+		return fmt.Errorf("max retries exceeded for job %s", job.ID)
+	}
 
 	// Update job status to running
 	if err := w.dbService.UpdateJobStatus(job.ID, models.JobStatusRunning, nil); err != nil {
@@ -56,6 +103,11 @@ func (w *Worker) ProcessJob(job models.Job) error {
 
 	// Check if file exists (assuming local file path for now)
 	if _, err := os.Stat(job.FilePath); os.IsNotExist(err) {
+		// Increment retry count before updating status
+		if incrementErr := w.dbService.IncrementRetryCount(job.ID); incrementErr != nil {
+			log.Printf("Warning: Failed to increment retry count for job %s: %v", job.ID, incrementErr)
+		}
+
 		errorMsg := fmt.Sprintf("Audio file not found: %s", job.FilePath)
 		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
 		return fmt.Errorf("audio file not found: %s", job.FilePath)
@@ -64,6 +116,11 @@ func (w *Worker) ProcessJob(job models.Job) error {
 	// Transcribe audio
 	transcript, err := w.transcribeAudio(job.FilePath)
 	if err != nil {
+		// Increment retry count before updating status
+		if incrementErr := w.dbService.IncrementRetryCount(job.ID); incrementErr != nil {
+			log.Printf("Warning: Failed to increment retry count for job %s: %v", job.ID, incrementErr)
+		}
+
 		errorMsg := fmt.Sprintf("Failed to transcribe audio: %v", err)
 		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
 		return err
@@ -75,6 +132,11 @@ func (w *Worker) ProcessJob(job models.Job) error {
 
 	// Save transcript to database
 	if err := w.dbService.SaveTranscript(transcript); err != nil {
+		// Increment retry count before updating status
+		if incrementErr := w.dbService.IncrementRetryCount(job.ID); incrementErr != nil {
+			log.Printf("Warning: Failed to increment retry count for job %s: %v", job.ID, incrementErr)
+		}
+
 		errorMsg := fmt.Sprintf("Failed to save transcript: %v", err)
 		w.dbService.UpdateJobStatus(job.ID, models.JobStatusFailed, &errorMsg)
 		return err
@@ -241,7 +303,7 @@ func (w *Worker) Run() {
 			log.Printf("Found %d pending transcription jobs", len(pendingJobs))
 
 			for _, job := range pendingJobs {
-				if err := w.ProcessJob(job); err != nil {
+				if err := w.ProcessJobWithDBUpdates(job); err != nil {
 					log.Printf("Error processing job %s: %v", job.ID, err)
 				}
 			}
