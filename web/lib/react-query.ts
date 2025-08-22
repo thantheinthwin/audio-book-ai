@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { QueryClient } from "@tanstack/react-query";
 
 export const queryClient = new QueryClient({

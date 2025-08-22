@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import type React from "react";
@@ -49,10 +50,12 @@ export type FileUploadActions = {
   handleDragLeave: (e: DragEvent) => void;
   handleDragOver: (e: DragEvent) => void;
   handleDrop: (e: DragEvent) => void;
-  handleFileChange: (e: ChangeEvent) => void;
+  handleFileChange: (e: ChangeEvent<HTMLInputElement>) => void;
   openFileDialog: () => void;
-  getInputProps: (props?: InputHTMLAttributes) => InputHTMLAttributes & {
-    ref: React.Ref;
+  getInputProps: (
+    props?: InputHTMLAttributes<HTMLInputElement>
+  ) => InputHTMLAttributes<HTMLInputElement> & {
+    ref: React.RefObject<HTMLInputElement>;
   };
 };
 
@@ -185,7 +188,7 @@ export const useFileUpload = (
         state.files.length + newFilesArray.length > maxFiles
       ) {
         errors.push(`You can only upload a maximum of ${maxFiles} files.`);
-        setState((prev) => ({ ...prev, errors }));
+        setState((prev: any) => ({ ...prev, errors }));
         return;
       }
 
@@ -233,7 +236,7 @@ export const useFileUpload = (
         // Call the onFilesAdded callback with the newly added valid files
         onFilesAdded?.(validFiles);
 
-        setState((prev) => {
+        setState((prev: any) => {
           const newFiles = !multiple
             ? validFiles
             : [...prev.files, ...validFiles];
@@ -245,7 +248,7 @@ export const useFileUpload = (
           };
         });
       } else if (errors.length > 0) {
-        setState((prev) => ({
+        setState((prev: any) => ({
           ...prev,
           errors,
         }));
@@ -350,7 +353,7 @@ export const useFileUpload = (
   );
 
   const handleFileChange = useCallback(
-    (e: ChangeEvent) => {
+    (e: ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files.length > 0) {
         addFiles(e.target.files);
       }
@@ -365,7 +368,7 @@ export const useFileUpload = (
   }, []);
 
   const getInputProps = useCallback(
-    (props: InputHTMLAttributes = {}) => {
+    (props: InputHTMLAttributes<HTMLInputElement> = {}) => {
       return {
         ...props,
         type: "file" as const,

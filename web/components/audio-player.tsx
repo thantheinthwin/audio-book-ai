@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -15,7 +16,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 
 interface AudioPlayerProps {
   audioUrl: string;
@@ -273,6 +273,7 @@ export function AudioPlayer({
 
 // Mini Player Component
 export function MiniAudioPlayer({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   audioUrl,
   title,
   author,

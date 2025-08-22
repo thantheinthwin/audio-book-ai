@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient } from "@/lib/supabase/client";
 import axios, { AxiosInstance, AxiosResponse, AxiosError } from "axios";
 

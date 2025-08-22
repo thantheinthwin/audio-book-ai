@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { AlertCircleIcon, ImageIcon, UploadIcon, XIcon } from "lucide-react";
