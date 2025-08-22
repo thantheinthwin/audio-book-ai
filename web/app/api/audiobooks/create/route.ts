@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import axios from "axios";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+const API_BASE_URL = process.env.API_URL || "http://localhost:8080";
 
 export async function POST(request: NextRequest) {
   try {
@@ -88,6 +88,8 @@ export async function POST(request: NextRequest) {
     const totalSize = files.reduce((sum: number, file: any) => {
       return sum + (file.file?.size || 0);
     }, 0);
+
+    console.log("api base url", API_BASE_URL);
 
     let uploadData;
     try {
