@@ -56,22 +56,22 @@ func (w *Worker) ProcessJob(job models.Job) error {
 		return fmt.Errorf("max retries exceeded for job %s", job.ID)
 	}
 
-	// Handle file path - could be local path or Supabase URL
-	localFilePath, err := w.getLocalFilePath(job.FilePath)
-	if err != nil {
-		return fmt.Errorf("failed to get local file path: %v", err)
-	}
-	defer func() {
-		// Clean up temporary file if it was created
-		if localFilePath != job.FilePath {
-			if err := os.Remove(localFilePath); err != nil {
-				log.Printf("Warning: failed to cleanup temporary file %s: %v", localFilePath, err)
-			}
+	// Determine the file path to use for transcription
+	// If it's a Supabase URL, use it directly (Rev.ai can access it)
+	// If it's a local path, use the local path
+	transcriptionPath := job.FilePath
+
+	// If it's a Supabase URL, we don't need to download it locally
+	// If it's a local path, we need to verify it exists
+	if !strings.HasPrefix(job.FilePath, "https://") {
+		// It's a local path, check if it exists
+		if _, err := os.Stat(job.FilePath); os.IsNotExist(err) {
+			return fmt.Errorf("audio file not found: %s", job.FilePath)
 		}
-	}()
+	}
 
 	// Transcribe audio
-	transcript, err := w.transcribeAudio(localFilePath)
+	transcript, err := w.transcribeAudio(transcriptionPath)
 	if err != nil {
 		return fmt.Errorf("failed to transcribe audio: %v", err)
 	}
@@ -179,52 +179,4 @@ func (w *Worker) checkAndTriggerSummarizeTagJobsForChapter1(audiobookID string, 
 
 	log.Printf("Successfully triggered summarize and tag jobs for audiobook %s after chapter 1 transcription, response: %s", audiobookID, string(body))
 	return nil
-}
-
-// getLocalFilePath handles both local file paths and Supabase URLs
-func (w *Worker) getLocalFilePath(filePath string) (string, error) {
-	// Check if it's a Supabase URL
-	if strings.HasPrefix(filePath, "https://") && strings.Contains(filePath, "supabase.co/storage/v1/object/public/") {
-		return w.downloadFromSupabaseURL(filePath)
-	}
-
-	// Check if local file exists
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		return "", fmt.Errorf("audio file not found: %s", filePath)
-	}
-
-	return filePath, nil
-}
-
-// downloadFromSupabaseURL downloads a file from Supabase storage to a temporary file
-func (w *Worker) downloadFromSupabaseURL(supabaseURL string) (string, error) {
-	// Create a temporary file
-	tempFile, err := os.CreateTemp("", "audio_*")
-	if err != nil {
-		return "", fmt.Errorf("failed to create temporary file: %v", err)
-	}
-	defer tempFile.Close()
-
-	// Download the file from Supabase URL
-	resp, err := w.httpClient.Get(supabaseURL)
-	if err != nil {
-		os.Remove(tempFile.Name()) // Clean up temp file
-		return "", fmt.Errorf("failed to download file from %s: %v", supabaseURL, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		os.Remove(tempFile.Name()) // Clean up temp file
-		return "", fmt.Errorf("failed to download file: HTTP %d", resp.StatusCode)
-	}
-
-	// Copy the response body to the temporary file
-	_, err = io.Copy(tempFile, resp.Body)
-	if err != nil {
-		os.Remove(tempFile.Name()) // Clean up temp file
-		return "", fmt.Errorf("failed to write file to disk: %v", err)
-	}
-
-	log.Printf("Successfully downloaded file from %s to %s", supabaseURL, tempFile.Name())
-	return tempFile.Name(), nil
 }
