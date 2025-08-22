@@ -3,7 +3,6 @@ package test
 import (
 	"audio-book-ai/api/models"
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,47 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
-
-// Cart mock methods for MockRepository
-func (m *MockRepository) AddToCart(ctx context.Context, userID, audiobookID uuid.UUID) (uuid.UUID, error) {
-	args := m.Called(ctx, userID, audiobookID)
-	return args.Get(0).(uuid.UUID), args.Error(1)
-}
-
-func (m *MockRepository) RemoveFromCart(ctx context.Context, userID, audiobookID uuid.UUID) error {
-	args := m.Called(ctx, userID, audiobookID)
-	return args.Error(0)
-}
-
-func (m *MockRepository) GetCart(ctx context.Context, userID uuid.UUID) ([]models.AudioBook, error) {
-	args := m.Called(ctx, userID)
-	return args.Get(0).([]models.AudioBook), args.Error(1)
-}
-
-func (m *MockRepository) IsInCart(ctx context.Context, userID, audiobookID uuid.UUID) (bool, error) {
-	args := m.Called(ctx, userID, audiobookID)
-	return args.Bool(0), args.Error(1)
-}
-
-func (m *MockRepository) Checkout(ctx context.Context, userID uuid.UUID) error {
-	args := m.Called(ctx, userID)
-	return args.Error(0)
-}
-
-func (m *MockRepository) GetPurchaseHistory(ctx context.Context, userID uuid.UUID, limit, offset int) (*models.PurchaseHistoryResponse, error) {
-	args := m.Called(ctx, userID, limit, offset)
-	return args.Get(0).(*models.PurchaseHistoryResponse), args.Error(1)
-}
-
-func (m *MockRepository) IsAudioBookPurchased(ctx context.Context, userID, audiobookID uuid.UUID) (bool, error) {
-	args := m.Called(ctx, userID, audiobookID)
-	return args.Bool(0), args.Error(1)
-}
-
-func (m *MockRepository) ClearCart(ctx context.Context, userID uuid.UUID) error {
-	args := m.Called(ctx, userID)
-	return args.Error(0)
-}
 
 // TestAddToCart tests the AddToCart handler
 func TestAddToCart(t *testing.T) {

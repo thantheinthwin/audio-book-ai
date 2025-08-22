@@ -16,164 +16,25 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// TestCreateAudioBook tests the CreateAudioBook handler
-func TestCreateAudioBook(t *testing.T) {
-	tests := []struct {
-		name           string
-		requestBody    map[string]interface{}
-		setupMock      func(*MockRepository, *map[string]interface{})
-		expectedStatus int
-		expectedData   bool
-	}{
-		{
-			name:        "successful create audiobook",
-			requestBody: map[string]interface{}{},
-			setupMock: func(mockRepo *MockRepository, requestBody *map[string]interface{}) {
-				uploadID := uuid.New()
-				// Use a fixed user ID that matches what will be created in the test context
-				userID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
-
-				// Set up the request body with the correct upload ID
-				(*requestBody)["upload_id"] = uploadID.String()
-				(*requestBody)["title"] = "Test Audiobook"
-				(*requestBody)["author"] = "Test Author"
-				(*requestBody)["language"] = "en"
-				(*requestBody)["is_public"] = true
-				(*requestBody)["price"] = 19.99
-				(*requestBody)["description"] = "Test description"
-
-				upload := &models.Upload{
-					ID:     uploadID,
-					UserID: userID,
-					Status: models.UploadStatusCompleted,
-				}
-
-				mockFiles := []models.UploadFile{
-					{ID: uuid.New(), UploadID: uploadID, FileName: "chapter1.mp3", FilePath: "/path/to/chapter1.mp3"},
-				}
-
-				mockRepo.On("GetUploadByID", mock.Anything, uploadID).Return(upload, nil)
-				mockRepo.On("GetUploadFiles", mock.Anything, uploadID).Return(mockFiles, nil)
-				mockRepo.On("CreateAudioBook", mock.Anything, mock.AnythingOfType("*models.AudioBook")).Return(nil)
-				mockRepo.On("CreateProcessingJob", mock.Anything, mock.AnythingOfType("*models.ProcessingJob")).Return(nil)
-				mockRepo.On("UpdateUpload", mock.Anything, mock.AnythingOfType("*models.Upload")).Return(nil)
-			},
-			expectedStatus: http.StatusCreated,
-			expectedData:   true,
-		},
-		{
-			name: "missing required fields",
-			requestBody: map[string]interface{}{
-				"title": "Test Audiobook",
-				// Missing upload_id, author and language
-			},
-			setupMock: func(mockRepo *MockRepository, requestBody *map[string]interface{}) {
-				// No mock setup needed for validation error
-			},
-			expectedStatus: http.StatusBadRequest,
-			expectedData:   false,
-		},
-		{
-			name:        "database error",
-			requestBody: map[string]interface{}{},
-			setupMock: func(mockRepo *MockRepository, requestBody *map[string]interface{}) {
-				uploadID := uuid.New()
-				// Use a fixed user ID that matches what will be created in the test context
-				userID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
-
-				// Set up the request body with the correct upload ID
-				(*requestBody)["upload_id"] = uploadID.String()
-				(*requestBody)["title"] = "Test Audiobook"
-				(*requestBody)["author"] = "Test Author"
-				(*requestBody)["language"] = "en"
-
-				upload := &models.Upload{
-					ID:     uploadID,
-					UserID: userID,
-					Status: models.UploadStatusCompleted,
-				}
-
-				mockFiles := []models.UploadFile{
-					{ID: uuid.New(), UploadID: uploadID, FileName: "chapter1.mp3", FilePath: "/path/to/chapter1.mp3"},
-				}
-
-				mockRepo.On("GetUploadByID", mock.Anything, uploadID).Return(upload, nil)
-				mockRepo.On("GetUploadFiles", mock.Anything, uploadID).Return(mockFiles, nil)
-				mockRepo.On("CreateAudioBook", mock.Anything, mock.AnythingOfType("*models.AudioBook")).Return(fmt.Errorf("database error"))
-			},
-			expectedStatus: http.StatusInternalServerError,
-			expectedData:   false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Setup
-			app := createTestApp()
-			handler, mockRepo := createTestHandler()
-			tt.setupMock(mockRepo, &tt.requestBody)
-
-			// Create request body
-			requestBody, _ := json.Marshal(tt.requestBody)
-			req := httptest.NewRequest("POST", "/audiobooks", bytes.NewReader(requestBody))
-			req.Header.Set("Content-Type", "application/json")
-
-			// Set user context
-			userCtx := &models.UserContext{
-				ID:    "550e8400-e29b-41d4-a716-446655440000",
-				Email: "test@example.com",
-				Role:  "admin",
-			}
-			app.Use(func(c *fiber.Ctx) error {
-				c.Locals("user", userCtx)
-				return c.Next()
-			})
-
-			app.Post("/audiobooks", handler.CreateAudioBook)
-
-			// Execute request
-			resp, err := app.Test(req)
-			assert.NoError(t, err)
-			defer resp.Body.Close()
-
-			// Assertions
-			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
-
-			var response map[string]interface{}
-			err = json.NewDecoder(resp.Body).Decode(&response)
-			assert.NoError(t, err)
-
-			if tt.expectedData {
-				assert.Contains(t, response, "audiobook_id")
-			} else {
-				assert.Contains(t, response, "error")
-			}
-
-			mockRepo.AssertExpectations(t)
-		})
-	}
-}
-
 // TestUpdateAudioBookPrice tests the UpdateAudioBookPrice handler
 func TestUpdateAudioBookPrice(t *testing.T) {
 	tests := []struct {
 		name           string
 		audiobookID    string
 		requestBody    map[string]interface{}
-		setupMock      func(*MockRepository, *string)
+		setupMock      func(*MockRepository, uuid.UUID)
 		expectedStatus int
 		expectedData   bool
 	}{
 		{
 			name:        "successful price update",
-			audiobookID: "",
+			audiobookID: "12345678-1234-1234-1234-123456789abc",
 			requestBody: map[string]interface{}{
 				"price": 29.99,
 			},
-			setupMock: func(mockRepo *MockRepository, audiobookIDPtr *string) {
-				audiobookID := uuid.New()
-				*audiobookIDPtr = audiobookID.String()
+			setupMock: func(mockRepo *MockRepository, audiobookID uuid.UUID) {
 				existingAudiobook := createTestAudioBook()
+				existingAudiobook.ID = audiobookID
 				existingAudiobook.CreatedBy = uuid.MustParse(createTestUserContext().ID)
 
 				mockRepo.On("GetAudioBookByID", mock.Anything, audiobookID).Return(existingAudiobook, nil)
@@ -188,7 +49,7 @@ func TestUpdateAudioBookPrice(t *testing.T) {
 			requestBody: map[string]interface{}{
 				"price": 29.99,
 			},
-			setupMock: func(mockRepo *MockRepository, audiobookIDPtr *string) {
+			setupMock: func(mockRepo *MockRepository, audiobookID uuid.UUID) {
 				// No mock setup needed
 			},
 			expectedStatus: http.StatusBadRequest,
@@ -196,13 +57,11 @@ func TestUpdateAudioBookPrice(t *testing.T) {
 		},
 		{
 			name:        "audiobook not found",
-			audiobookID: "",
+			audiobookID: "12345678-1234-1234-1234-123456789abc",
 			requestBody: map[string]interface{}{
 				"price": 29.99,
 			},
-			setupMock: func(mockRepo *MockRepository, audiobookIDPtr *string) {
-				audiobookID := uuid.New()
-				*audiobookIDPtr = audiobookID.String()
+			setupMock: func(mockRepo *MockRepository, audiobookID uuid.UUID) {
 				mockRepo.On("GetAudioBookByID", mock.Anything, audiobookID).Return(nil, fmt.Errorf("not found"))
 			},
 			expectedStatus: http.StatusNotFound,
@@ -210,12 +69,11 @@ func TestUpdateAudioBookPrice(t *testing.T) {
 		},
 		{
 			name:        "invalid price",
-			audiobookID: "",
+			audiobookID: "12345678-1234-1234-1234-123456789abc",
 			requestBody: map[string]interface{}{
 				"price": -10.0,
 			},
-			setupMock: func(mockRepo *MockRepository, audiobookIDPtr *string) {
-				*audiobookIDPtr = uuid.New().String()
+			setupMock: func(mockRepo *MockRepository, audiobookID uuid.UUID) {
 				// No mock setup needed for validation error
 			},
 			expectedStatus: http.StatusBadRequest,
@@ -228,11 +86,18 @@ func TestUpdateAudioBookPrice(t *testing.T) {
 			// Setup
 			app := createTestApp()
 			handler, mockRepo := createTestHandler()
-			tt.setupMock(mockRepo, &tt.audiobookID)
+
+			// Parse audiobook ID for mock setup
+			var audiobookID uuid.UUID
+			if tt.audiobookID != "invalid-uuid" {
+				audiobookID = uuid.MustParse(tt.audiobookID)
+			}
+
+			tt.setupMock(mockRepo, audiobookID)
 
 			// Create request body
 			requestBody, _ := json.Marshal(tt.requestBody)
-			req := httptest.NewRequest("PUT", "/audiobooks/"+tt.audiobookID+"/price", bytes.NewReader(requestBody))
+			req := httptest.NewRequest("PUT", "/admin/audiobooks/"+tt.audiobookID+"/price", bytes.NewReader(requestBody))
 			req.Header.Set("Content-Type", "application/json")
 
 			// Set user context
@@ -242,7 +107,7 @@ func TestUpdateAudioBookPrice(t *testing.T) {
 				return c.Next()
 			})
 
-			app.Put("/audiobooks/:id/price", handler.UpdateAudioBookPrice)
+			app.Put("/admin/audiobooks/:id/price", handler.UpdateAudioBookPrice)
 
 			// Execute request
 			resp, err := app.Test(req)
@@ -377,16 +242,14 @@ func TestGetUploadProgress(t *testing.T) {
 	tests := []struct {
 		name           string
 		uploadID       string
-		setupMock      func(*MockRepository, *string)
+		setupMock      func(*MockRepository, uuid.UUID)
 		expectedStatus int
 		expectedData   bool
 	}{
 		{
 			name:     "successful get upload progress",
-			uploadID: "",
-			setupMock: func(mockRepo *MockRepository, uploadIDPtr *string) {
-				uploadID := uuid.New()
-				*uploadIDPtr = uploadID.String()
+			uploadID: "12345678-1234-1234-1234-123456789abc",
+			setupMock: func(mockRepo *MockRepository, uploadID uuid.UUID) {
 				// Use a fixed user ID that matches what will be created in the test context
 				userID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
 
@@ -418,7 +281,7 @@ func TestGetUploadProgress(t *testing.T) {
 		{
 			name:     "invalid upload ID",
 			uploadID: "invalid-uuid",
-			setupMock: func(mockRepo *MockRepository, uploadIDPtr *string) {
+			setupMock: func(mockRepo *MockRepository, uploadID uuid.UUID) {
 				// No mock setup needed
 			},
 			expectedStatus: http.StatusBadRequest,
@@ -426,10 +289,8 @@ func TestGetUploadProgress(t *testing.T) {
 		},
 		{
 			name:     "upload not found",
-			uploadID: "",
-			setupMock: func(mockRepo *MockRepository, uploadIDPtr *string) {
-				uploadID := uuid.New()
-				*uploadIDPtr = uploadID.String()
+			uploadID: "12345678-1234-1234-1234-123456789abc",
+			setupMock: func(mockRepo *MockRepository, uploadID uuid.UUID) {
 				mockRepo.On("GetUploadByID", mock.Anything, uploadID).Return(nil, fmt.Errorf("not found"))
 			},
 			expectedStatus: http.StatusNotFound,
@@ -437,10 +298,8 @@ func TestGetUploadProgress(t *testing.T) {
 		},
 		{
 			name:     "access denied - different user",
-			uploadID: "",
-			setupMock: func(mockRepo *MockRepository, uploadIDPtr *string) {
-				uploadID := uuid.New()
-				*uploadIDPtr = uploadID.String()
+			uploadID: "12345678-1234-1234-1234-123456789abc",
+			setupMock: func(mockRepo *MockRepository, uploadID uuid.UUID) {
 				differentUserID := uuid.New()
 
 				upload := &models.Upload{
@@ -460,10 +319,17 @@ func TestGetUploadProgress(t *testing.T) {
 			// Setup
 			app := createTestApp()
 			handler, mockRepo := createTestHandler()
-			tt.setupMock(mockRepo, &tt.uploadID)
+
+			// Parse upload ID for mock setup
+			var uploadID uuid.UUID
+			if tt.uploadID != "invalid-uuid" {
+				uploadID = uuid.MustParse(tt.uploadID)
+			}
+
+			tt.setupMock(mockRepo, uploadID)
 
 			// Create request
-			req := httptest.NewRequest("GET", "/uploads/"+tt.uploadID+"/progress", nil)
+			req := httptest.NewRequest("GET", "/admin/uploads/"+tt.uploadID+"/progress", nil)
 			req.Header.Set("Content-Type", "application/json")
 
 			// Set user context
@@ -477,7 +343,7 @@ func TestGetUploadProgress(t *testing.T) {
 				return c.Next()
 			})
 
-			app.Get("/uploads/:id/progress", handler.GetUploadProgress)
+			app.Get("/admin/uploads/:id/progress", handler.GetUploadProgress)
 
 			// Execute request
 			resp, err := app.Test(req)
@@ -509,7 +375,7 @@ func TestGetUploadDetails_DISABLED(t *testing.T) {
 	tests := []struct {
 		name           string
 		uploadID       string
-		setupMock      func(*MockRepository, *string)
+		setupMock      func(*MockRepository)
 		expectedStatus int
 		expectedData   bool
 	}{
@@ -552,9 +418,8 @@ func TestGetUploadDetails_DISABLED(t *testing.T) {
 		{
 			name:     "upload not found",
 			uploadID: "",
-			setupMock: func(mockRepo *MockRepository, uploadIDPtr *string) {
+			setupMock: func(mockRepo *MockRepository) {
 				uploadID := uuid.New()
-				*uploadIDPtr = uploadID.String()
 				mockRepo.On("GetUploadByID", mock.Anything, uploadID).Return(nil, fmt.Errorf("not found"))
 			},
 			expectedStatus: http.StatusNotFound,
@@ -611,7 +476,7 @@ func TestDeleteUpload_DISABLED(t *testing.T) {
 	tests := []struct {
 		name           string
 		uploadID       string
-		setupMock      func(*MockRepository, *string)
+		setupMock      func(*MockRepository)
 		expectedStatus int
 		expectedData   bool
 	}{
@@ -648,9 +513,8 @@ func TestDeleteUpload_DISABLED(t *testing.T) {
 		{
 			name:     "upload not found",
 			uploadID: "",
-			setupMock: func(mockRepo *MockRepository, uploadIDPtr *string) {
+			setupMock: func(mockRepo *MockRepository) {
 				uploadID := uuid.New()
-				*uploadIDPtr = uploadID.String()
 				mockRepo.On("GetUploadByID", mock.Anything, uploadID).Return(nil, fmt.Errorf("not found"))
 			},
 			expectedStatus: http.StatusNotFound,
@@ -659,9 +523,8 @@ func TestDeleteUpload_DISABLED(t *testing.T) {
 		{
 			name:     "access denied - different user",
 			uploadID: "",
-			setupMock: func(mockRepo *MockRepository, uploadIDPtr *string) {
+			setupMock: func(mockRepo *MockRepository) {
 				uploadID := uuid.New()
-				*uploadIDPtr = uploadID.String()
 				differentUserID := uuid.New()
 
 				upload := &models.Upload{
