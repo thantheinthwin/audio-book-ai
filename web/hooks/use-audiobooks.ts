@@ -22,11 +22,11 @@ export function useAudioBook(id: string) {
 }
 
 // Hook to get job status for an audiobook
-export function useAudioBookJobStatus(id: string) {
+export function useAudioBookJobStatus(id: string, isPublicUser: boolean) {
   return useQuery({
     queryKey: [...audiobookKeys.detail(id), "jobs"],
     queryFn: () => audiobooksAPI.getJobStatus(id),
-    enabled: !!id,
+    enabled: !!id && !isPublicUser,
     refetchInterval: (data) => {
       // If still processing, refetch every 5 seconds
       if ((data?.state?.data?.data as any)?.overall_status !== "completed") {

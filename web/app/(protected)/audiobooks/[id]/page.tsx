@@ -77,7 +77,8 @@ export default function AudioBookDetailPage() {
     isLoading: audioBookLoading,
   } = useAudioBook(params.id as string);
   const { data: jobStatusResponse } = useAudioBookJobStatus(
-    params.id as string
+    params.id as string,
+    isPublicUser
   );
   const updatePriceMutation = useUpdateAudioBookPrice();
   const deleteAudioBookMutation = useDeleteAudioBook();
