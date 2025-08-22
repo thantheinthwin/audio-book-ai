@@ -66,6 +66,7 @@ export default function AudioBookDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [playingChapter, setPlayingChapter] = useState<string | null>(null);
+  const [selectedChapter, setSelectedChapter] = useState<string | null>(null);
   const [isJobStatusExpanded, setIsJobStatusExpanded] = useState(false);
   const [isEditingPrice, setIsEditingPrice] = useState(false);
   const [newPrice, setNewPrice] = useState<string>("");
@@ -159,6 +160,7 @@ export default function AudioBookDetailPage() {
           .play()
           .then(() => {
             setPlayingChapter(chapterId);
+            setSelectedChapter(chapterId);
           })
           .catch((error) => {
             console.error("Error playing audio:", error);
@@ -610,7 +612,7 @@ export default function AudioBookDetailPage() {
         </Card>
       )}
 
-      {/* Chapters Table */}
+      {/* Chapters Table and Content */}
       {audioBook && (
         <Card>
           <CardHeader>
@@ -621,48 +623,112 @@ export default function AudioBookDetailPage() {
           </CardHeader>
           <CardContent>
             {audioBook.chapters && audioBook.chapters.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-16">No</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead className="w-32">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {audioBook.chapters.map((chapter) => (
-                    <TableRow key={chapter.id}>
-                      <TableCell className="font-medium">
-                        {chapter.chapter_number}
-                      </TableCell>
-                      <TableCell>{chapter.title}</TableCell>
-                      <TableCell>
-                        {formatDuration(chapter.duration_seconds)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          {chapter.file_url && (
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={() =>
-                                handlePlayPause(chapter.id, chapter.file_url!)
-                              }
-                            >
-                              {playingChapter === chapter.id ? (
-                                <Pause className="h-4 w-4" />
-                              ) : (
-                                <Play className="h-4 w-4" />
-                              )}
-                            </Button>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative">
+                {/* Chapters Table - Left Side */}
+                <div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-16">No</TableHead>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Duration</TableHead>
+                        <TableHead className="w-32">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {audioBook.chapters.map((chapter) => (
+                        <TableRow
+                          key={chapter.id}
+                          className={cn(
+                            selectedChapter === chapter.id && "bg-muted/50"
                           )}
+                        >
+                          <TableCell className="font-medium">
+                            {chapter.chapter_number}
+                          </TableCell>
+                          <TableCell>{chapter.title}</TableCell>
+                          <TableCell>
+                            {formatDuration(chapter.duration_seconds)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              {chapter.file_url && (
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() =>
+                                    handlePlayPause(
+                                      chapter.id,
+                                      chapter.file_url!
+                                    )
+                                  }
+                                >
+                                  {playingChapter === chapter.id ? (
+                                    <Pause className="h-4 w-4" />
+                                  ) : (
+                                    <Play className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Chapter Content - Right Side */}
+                <div className="border rounded-lg p-4 bg-muted/20 max-h-[400px] overflow-auto">
+                  {selectedChapter ? (
+                    (() => {
+                      const chapter = audioBook.chapters.find(
+                        (ch) => ch.id === selectedChapter
+                      );
+                      return chapter ? (
+                        <div className="space-y-4">
+                          <div className="border-b pb-2">
+                            <h3 className="font-semibold text-lg">
+                              {chapter.title}
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                              Chapter {chapter.chapter_number} •{" "}
+                              {formatDuration(chapter.duration_seconds)}
+                            </p>
+                          </div>
+                          <div className="prose prose-sm max-w-none dark:prose-invert">
+                            {chapter.content ? (
+                              <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                                {chapter.content}
+                              </div>
+                            ) : (
+                              <div className="text-center py-8 text-muted-foreground">
+                                <FileAudio className="h-8 w-8 mx-auto mb-2" />
+                                <p className="text-sm">
+                                  No content available for this chapter yet.
+                                </p>
+                                {jobStatus?.overall_status === "processing" && (
+                                  <p className="text-xs mt-1">
+                                    Content will be available once transcription
+                                    is complete.
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      ) : null;
+                    })()
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Play className="h-8 w-8 mx-auto mb-2" />
+                      <p className="text-sm">
+                        Click play on any chapter to view its content here
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
             ) : (
               <div className="text-center py-8">
                 <FileAudio className="h-12 w-12 mx-auto text-muted-foreground mb-4" />

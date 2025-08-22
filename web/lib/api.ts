@@ -59,6 +59,7 @@ interface Chapter {
   start_time_seconds?: number;
   end_time_seconds?: number;
   duration_seconds?: number;
+  content?: string;
   created_at: string;
 }
 
