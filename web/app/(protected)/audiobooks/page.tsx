@@ -92,13 +92,12 @@ export default function AudioBooksPage() {
   }
 
   const formatDuration = (seconds?: number) => {
-    if (!seconds) return "N/A";
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m`;
+    if (typeof seconds !== "number" || isNaN(seconds) || seconds < 0) return "--:--:--";
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `${pad(h)}:${pad(m)}:${pad(s)}`;
   };
 
   const formatFileSize = (bytes?: number) => {
