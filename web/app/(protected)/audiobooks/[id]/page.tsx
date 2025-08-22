@@ -433,7 +433,7 @@ export default function AudioBookDetailPage() {
             <div className="flex justify-between">
               <div className="grid gap-1">
                 <h2 className="text-muted-foreground text-sm">Tags</h2>
-                {jobStatus?.overall_status === "completed" ? (
+                {audioBook.tags && audioBook.tags.length > 0 ? (
                   <p className="text-xs">{audioBook.tags?.join(", ")}</p>
                 ) : (
                   <p className="text-xs">

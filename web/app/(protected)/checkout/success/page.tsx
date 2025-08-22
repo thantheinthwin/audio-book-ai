@@ -10,6 +10,8 @@ import Link from "next/link";
 import { redirect, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { useQueryClient } from "@tanstack/react-query";
+import { cartKeys } from "@/hooks/use-cart";
 
 interface CheckoutSuccessData {
   order_id: string;
@@ -40,6 +42,7 @@ interface CheckoutSuccessData {
 export default function CheckoutSuccessPage() {
   const { data: user, isLoading: userLoading } = useUser();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const [checkoutData, setCheckoutData] = useState<CheckoutSuccessData | null>(
     null
   );
@@ -70,14 +73,21 @@ export default function CheckoutSuccessPage() {
           purchased_items: [], // This would need to be passed via URL or localStorage
         };
         setCheckoutData(checkoutData);
+
+        // Invalidate cart data now that checkout is confirmed successful
+        queryClient.invalidateQueries({ queryKey: cartKeys.lists() });
       } else {
         // Try to get from localStorage (fallback)
         const storedData = localStorage.getItem("checkout_success_data");
         if (storedData) {
           try {
-            setCheckoutData(JSON.parse(storedData));
+            const parsedData = JSON.parse(storedData);
+            setCheckoutData(parsedData);
             // Clear the stored data after reading
             localStorage.removeItem("checkout_success_data");
+
+            // Invalidate cart data now that checkout is confirmed successful
+            queryClient.invalidateQueries({ queryKey: cartKeys.lists() });
           } catch (error) {
             console.error("Failed to parse checkout data:", error);
           }
@@ -85,7 +95,7 @@ export default function CheckoutSuccessPage() {
       }
       setIsLoading(false);
     }
-  }, [user, searchParams]);
+  }, [user, searchParams, queryClient]);
 
   if (userLoading || isLoading) {
     return (

@@ -89,8 +89,10 @@ import { checkoutAPI } from "@/lib/api";
 export const checkoutKeys = {
   all: ["checkout"] as const,
   purchaseHistory: () => [...checkoutKeys.all, "purchaseHistory"] as const,
-  purchaseHistoryList: (filters: string) => [...checkoutKeys.purchaseHistory(), { filters }] as const,
-  isPurchased: (audiobookId: string) => [...checkoutKeys.all, "isPurchased", audiobookId] as const,
+  purchaseHistoryList: (filters: string) =>
+    [...checkoutKeys.purchaseHistory(), { filters }] as const,
+  isPurchased: (audiobookId: string) =>
+    [...checkoutKeys.all, "isPurchased", audiobookId] as const,
 };
 
 // Hook to checkout cart items
@@ -99,19 +101,25 @@ export const useCheckout = () => {
 
   return useMutation({
     mutationFn: async (cartItemIds: string[]) => {
-      const response = await checkoutAPI.checkout({ cart_item_ids: cartItemIds });
+      const response = await checkoutAPI.checkout({
+        cart_item_ids: cartItemIds,
+      });
       return response;
     },
     onSuccess: (response) => {
-      // Invalidate and refetch cart data
-      queryClient.invalidateQueries({ queryKey: cartKeys.lists() });
-      // Invalidate purchase history
-      queryClient.invalidateQueries({ queryKey: checkoutKeys.purchaseHistory() });
-      
+      // Only invalidate purchase history here, not cart data
+      // Cart will be invalidated on the success page after confirmation
+      queryClient.invalidateQueries({
+        queryKey: checkoutKeys.purchaseHistory(),
+      });
+
       if (response.data) {
         // Store checkout data in localStorage for the success page
-        localStorage.setItem("checkout_success_data", JSON.stringify(response.data));
-        
+        localStorage.setItem(
+          "checkout_success_data",
+          JSON.stringify(response.data)
+        );
+
         // Redirect to success page
         window.location.href = `/checkout/success?order_id=${response.data.order_id}&transaction_id=${response.data.transaction_id}&total_amount=${response.data.total_amount}`;
       }
@@ -126,7 +134,9 @@ export const useCheckout = () => {
 // Hook to get purchase history
 export const usePurchaseHistory = (limit?: number, offset?: number) => {
   return useQuery({
-    queryKey: checkoutKeys.purchaseHistoryList(`limit=${limit}&offset=${offset}`),
+    queryKey: checkoutKeys.purchaseHistoryList(
+      `limit=${limit}&offset=${offset}`
+    ),
     queryFn: async () => {
       const response = await checkoutAPI.getPurchaseHistory(limit, offset);
       return response.data;
