@@ -7,6 +7,7 @@ import {
   useAudioBookJobStatus,
   useUpdateAudioBookPrice,
   useDeleteAudioBook,
+  useRetryAllFailedJobs,
 } from "@/hooks/use-audiobooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { audiobookKeys } from "@/queryKeys";
@@ -26,6 +27,7 @@ import {
   Check,
   X,
   AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -83,6 +85,7 @@ export default function AudioBookDetailPage() {
   );
   const updatePriceMutation = useUpdateAudioBookPrice();
   const deleteAudioBookMutation = useDeleteAudioBook();
+  const retryAllJobsMutation = useRetryAllFailedJobs();
   const queryClient = useQueryClient();
 
   const audioBook = audioBookResponse?.data;
@@ -229,6 +232,31 @@ export default function AudioBookDetailPage() {
   // Function to cancel delete
   const handleDeleteCancel = () => {
     setIsDeleteDialogOpen(false);
+  };
+
+  // Function to retry all failed jobs
+  const handleRetryAllFailedJobs = async () => {
+    try {
+      const result = await retryAllJobsMutation.mutateAsync(
+        params.id as string
+      );
+      console.log("Retry all jobs result:", result);
+
+      // Show success message with details
+      if (
+        result?.data?.successfully_retried &&
+        result.data.successfully_retried > 0
+      ) {
+        alert(
+          `Successfully retried ${result.data.successfully_retried} job(s)!`
+        );
+      } else {
+        alert("No failed jobs were available for retry.");
+      }
+    } catch (error) {
+      console.error("Failed to retry jobs:", error);
+      alert("Failed to retry jobs. Please try again.");
+    }
   };
 
   if (audioBookLoading) {
@@ -472,7 +500,32 @@ export default function AudioBookDetailPage() {
             <CardContent className="space-y-4 pt-4">
               {/* Job Details */}
               <div className="space-y-3">
-                <h4 className="font-medium">Processing Jobs</h4>
+                <div className="flex justify-between items-center">
+                  <h4 className="font-medium">Processing Jobs</h4>
+                  {/* Centralized retry button for all failed jobs */}
+                  {isFailed &&
+                    !isPublicUser &&
+                    jobStatus?.jobs?.some(
+                      (job) =>
+                        job.status === "failed" &&
+                        job.retry_count >= job.max_retries
+                    ) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRetryAllFailedJobs}
+                        disabled={retryAllJobsMutation.isPending}
+                        className="ml-2"
+                      >
+                        {retryAllJobsMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                        )}
+                        Retry All Failed Jobs
+                      </Button>
+                    )}
+                </div>
                 {jobStatus.jobs?.map((job) => {
                   // For transcription jobs, get the chapter title
                   let jobTitle = getJobTypeDisplayName(job.job_type);

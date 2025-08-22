@@ -22,16 +22,17 @@ export function useAudioBook(id: string) {
 }
 
 // Hook to get job status for an audiobook
-export function useAudioBookJobStatus(id: string, retry: boolean = false) {
+export function useAudioBookJobStatus(
+  id: string,
+  isPublicUser: boolean = false
+) {
   return useQuery({
     queryKey: [...audiobookKeys.detail(id), "jobs"],
     queryFn: () => audiobooksAPI.getJobStatus(id),
-    enabled: !!id && !retry,
+    enabled: !!id && !isPublicUser,
     refetchInterval: (data) => {
       // If still processing, refetch every 5 seconds
-      if (
-        (data?.state?.data?.data as any)?.overall_status !== "completed" 
-      ) {
+      if ((data?.state?.data?.data as any)?.overall_status !== "completed") {
         return 5000;
       }
       // If completed or failed, stop refetching
@@ -110,6 +111,43 @@ export function useDeleteAudioBook() {
       queryClient.removeQueries({ queryKey: audiobookKeys.detail(variables) });
       // Invalidate and refetch audiobooks list
       queryClient.invalidateQueries({ queryKey: audiobookKeys.lists() });
+    },
+  });
+}
+
+// Hook to retry a failed job
+export function useRetryJob() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      audiobookId,
+      jobId,
+    }: {
+      audiobookId: string;
+      jobId: string;
+    }) => audiobooksAPI.retryJob(audiobookId, jobId),
+    onSuccess: (data, variables) => {
+      // Invalidate job status to refetch the latest status
+      queryClient.invalidateQueries({
+        queryKey: [...audiobookKeys.detail(variables.audiobookId), "jobs"],
+      });
+    },
+  });
+}
+
+// Hook to retry all failed jobs for an audiobook
+export function useRetryAllFailedJobs() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (audiobookId: string) =>
+      audiobooksAPI.retryAllFailedJobs(audiobookId),
+    onSuccess: (data, audiobookId) => {
+      // Invalidate job status to refetch the latest status
+      queryClient.invalidateQueries({
+        queryKey: [...audiobookKeys.detail(audiobookId), "jobs"],
+      });
     },
   });
 }

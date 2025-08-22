@@ -78,6 +78,8 @@ func SetupAdminRoutes(router fiber.Router, cfg *config.Config, h *handlers.Handl
 	router.Delete("/audiobooks/:id", h.DeleteAudioBook)
 	router.Get("/audiobooks/:id/jobs", h.GetJobStatus)
 	router.Post("/audiobooks/:id/trigger-summarize-tag", h.TriggerSummarizeAndTagJobs)
+	router.Post("/audiobooks/:id/jobs/:job_id/retry", h.RetryJob)
+	router.Post("/audiobooks/:id/retry-all", h.RetryAllFailedJobs)
 
 	// Job management
 	router.Post("/jobs/:job_id/status", h.UpdateJobStatus)

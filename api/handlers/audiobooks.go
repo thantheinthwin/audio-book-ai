@@ -1565,3 +1565,277 @@ func (h *Handler) UpdateAudioBookPrice(c *fiber.Ctx) error {
 		"message": "Audiobook price updated successfully",
 	})
 }
+
+// RetryJob retries a failed processing job
+// POST /admin/audiobooks/:id/jobs/:job_id/retry
+func (h *Handler) RetryJob(c *fiber.Ctx) error {
+	log.Printf("RetryJob: Request received from IP %s", c.IP())
+
+	// Parse audiobook ID
+	audiobookID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		log.Printf("RetryJob: Invalid audiobook ID: %v", err)
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid audiobook ID",
+		})
+	}
+
+	// Parse job ID
+	jobID, err := uuid.Parse(c.Params("job_id"))
+	if err != nil {
+		log.Printf("RetryJob: Invalid job ID: %v", err)
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid job ID",
+		})
+	}
+
+	log.Printf("RetryJob: Processing retry for audiobook %s, job %s", audiobookID, jobID)
+
+	// Get user ID from context
+	userCtx, ok := c.Locals("user").(*models.UserContext)
+	if !ok || userCtx == nil {
+		log.Printf("RetryJob: User not authenticated")
+		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "User not authenticated",
+		})
+	}
+
+	// Check if user is admin
+	if userCtx.Role != models.RoleAdmin {
+		log.Printf("RetryJob: Access denied - user is not admin")
+		return c.Status(http.StatusForbidden).JSON(fiber.Map{
+			"error": "Admin access required",
+		})
+	}
+
+	// Get the job
+	job, err := h.repo.GetProcessingJobByID(context.Background(), jobID)
+	if err != nil {
+		log.Printf("RetryJob: Failed to get job: %v", err)
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{
+			"error": "Job not found",
+		})
+	}
+
+	// Verify job belongs to the audiobook
+	if job.AudiobookID != audiobookID {
+		log.Printf("RetryJob: Job does not belong to audiobook")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Job does not belong to audiobook",
+		})
+	}
+
+	// Check if job is in failed state
+	if job.Status != models.JobStatusFailed {
+		log.Printf("RetryJob: Job is not in failed state, current status: %s", job.Status)
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": fmt.Sprintf("Job is not in failed state, current status: %s", job.Status),
+		})
+	}
+
+	// Check if job has reached max retries
+	if job.RetryCount >= job.MaxRetries {
+		log.Printf("RetryJob: Job has reached max retries (%d/%d)", job.RetryCount, job.MaxRetries)
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Job has reached maximum retry attempts",
+		})
+	}
+
+	// Reset job status to pending and clear error
+	job.Status = models.JobStatusPending
+	job.ErrorMessage = nil
+	job.StartedAt = nil
+	job.CompletedAt = nil
+
+	// Update job in database
+	if err := h.repo.UpdateProcessingJob(context.Background(), job); err != nil {
+		log.Printf("RetryJob: Failed to update job status: %v", err)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to update job status",
+		})
+	}
+
+	// Re-enqueue job to Redis if Redis service is available
+	if h.redisQueue != nil {
+		if job.JobType == models.JobTypeTranscribe {
+			// For transcription jobs, we need the file path from the chapter
+			if job.ChapterID != nil {
+				chapter, err := h.repo.GetChapterByID(context.Background(), *job.ChapterID)
+				if err != nil {
+					log.Printf("RetryJob: Failed to get chapter for transcription job: %v", err)
+					return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+						"error": "Failed to get chapter information",
+					})
+				}
+
+				if err := h.redisQueue.EnqueueTranscriptionJob(context.Background(), job, chapter.FilePath); err != nil {
+					log.Printf("RetryJob: Failed to enqueue transcription job to Redis: %v", err)
+					return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+						"error": "Failed to enqueue job for retry",
+					})
+				}
+			} else {
+				log.Printf("RetryJob: Transcription job missing chapter ID")
+				return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+					"error": "Transcription job missing chapter information",
+				})
+			}
+		} else {
+			// For other job types (summarize, tag, etc.)
+			if err := h.redisQueue.EnqueueAIJob(context.Background(), job); err != nil {
+				log.Printf("RetryJob: Failed to enqueue AI job to Redis: %v", err)
+				return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+					"error": "Failed to enqueue job for retry",
+				})
+			}
+		}
+
+		log.Printf("RetryJob: Job successfully re-enqueued to Redis")
+	} else {
+		log.Printf("RetryJob: Redis queue service not available, job status updated to pending only")
+	}
+
+	log.Printf("RetryJob: Successfully initiated retry for job %s", jobID)
+
+	return c.JSON(fiber.Map{
+		"message":      "Job retry initiated successfully",
+		"job_id":       jobID,
+		"audiobook_id": audiobookID,
+		"status":       job.Status,
+		"retry_count":  job.RetryCount,
+	})
+}
+
+// RetryAllFailedJobs retries all failed processing jobs for an audiobook
+// POST /admin/audiobooks/:id/retry-all
+func (h *Handler) RetryAllFailedJobs(c *fiber.Ctx) error {
+	log.Printf("RetryAllFailedJobs: Request received from IP %s", c.IP())
+
+	// Parse audiobook ID
+	audiobookID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		log.Printf("RetryAllFailedJobs: Invalid audiobook ID: %v", err)
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid audiobook ID",
+		})
+	}
+
+	log.Printf("RetryAllFailedJobs: Processing retry for all failed jobs in audiobook %s", audiobookID)
+
+	// Get user ID from context
+	userCtx, ok := c.Locals("user").(*models.UserContext)
+	if !ok || userCtx == nil {
+		log.Printf("RetryAllFailedJobs: User not authenticated")
+		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "User not authenticated",
+		})
+	}
+
+	// Check if user is admin
+	if userCtx.Role != models.RoleAdmin {
+		log.Printf("RetryAllFailedJobs: Access denied - user is not admin")
+		return c.Status(http.StatusForbidden).JSON(fiber.Map{
+			"error": "Admin access required",
+		})
+	}
+
+	// Get all jobs for the audiobook
+	allJobs, err := h.repo.GetProcessingJobsByAudioBookID(context.Background(), audiobookID)
+	if err != nil {
+		log.Printf("RetryAllFailedJobs: Failed to get jobs: %v", err)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get processing jobs",
+		})
+	}
+
+	// Filter failed jobs that can be retried
+	var retriableJobs []models.ProcessingJob
+	for _, job := range allJobs {
+		if job.Status == models.JobStatusFailed && job.RetryCount < job.MaxRetries {
+			retriableJobs = append(retriableJobs, job)
+		}
+	}
+
+	if len(retriableJobs) == 0 {
+		log.Printf("RetryAllFailedJobs: No retriable failed jobs found")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "No failed jobs available for retry",
+		})
+	}
+
+	log.Printf("RetryAllFailedJobs: Found %d retriable failed jobs", len(retriableJobs))
+
+	var retriedJobs []string
+	var failedRetries []string
+
+	// Process each retriable job
+	for _, job := range retriableJobs {
+		log.Printf("RetryAllFailedJobs: Processing job %s (type: %s)", job.ID, job.JobType)
+
+		// Reset job status to pending and clear error
+		job.Status = models.JobStatusPending
+		job.ErrorMessage = nil
+		job.StartedAt = nil
+		job.CompletedAt = nil
+
+		// Update job in database
+		if err := h.repo.UpdateProcessingJob(context.Background(), &job); err != nil {
+			log.Printf("RetryAllFailedJobs: Failed to update job %s status: %v", job.ID, err)
+			failedRetries = append(failedRetries, job.ID.String())
+			continue
+		}
+
+		// Re-enqueue job to Redis if Redis service is available
+		if h.redisQueue != nil {
+			var enqueueErr error
+
+			if job.JobType == models.JobTypeTranscribe {
+				// For transcription jobs, we need the file path from the chapter
+				if job.ChapterID != nil {
+					chapter, err := h.repo.GetChapterByID(context.Background(), *job.ChapterID)
+					if err != nil {
+						log.Printf("RetryAllFailedJobs: Failed to get chapter for job %s: %v", job.ID, err)
+						failedRetries = append(failedRetries, job.ID.String())
+						continue
+					}
+
+					enqueueErr = h.redisQueue.EnqueueTranscriptionJob(context.Background(), &job, chapter.FilePath)
+				} else {
+					log.Printf("RetryAllFailedJobs: Transcription job %s missing chapter ID", job.ID)
+					failedRetries = append(failedRetries, job.ID.String())
+					continue
+				}
+			} else {
+				// For other job types (summarize, tag, etc.)
+				enqueueErr = h.redisQueue.EnqueueAIJob(context.Background(), &job)
+			}
+
+			if enqueueErr != nil {
+				log.Printf("RetryAllFailedJobs: Failed to enqueue job %s to Redis: %v", job.ID, enqueueErr)
+				failedRetries = append(failedRetries, job.ID.String())
+				continue
+			}
+		}
+
+		retriedJobs = append(retriedJobs, job.ID.String())
+		log.Printf("RetryAllFailedJobs: Successfully retried job %s", job.ID)
+	}
+
+	log.Printf("RetryAllFailedJobs: Completed - %d jobs retried, %d failed to retry",
+		len(retriedJobs), len(failedRetries))
+
+	response := fiber.Map{
+		"message":              "Bulk retry completed",
+		"audiobook_id":         audiobookID,
+		"total_jobs_found":     len(retriableJobs),
+		"successfully_retried": len(retriedJobs),
+		"failed_to_retry":      len(failedRetries),
+		"retried_job_ids":      retriedJobs,
+	}
+
+	if len(failedRetries) > 0 {
+		response["failed_job_ids"] = failedRetries
+	}
+
+	return c.JSON(response)
+}

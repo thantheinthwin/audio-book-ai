@@ -646,6 +646,36 @@ export const audiobooksAPI = {
         failed_jobs: number;
       }>
     >(`/admin/audiobooks/${id}/jobs`),
+
+  // Retry a failed job
+  retryJob: (audiobookId: string, jobId: string) =>
+    apiClient<
+      ApiResponse<{
+        message: string;
+        job_id: string;
+        audiobook_id: string;
+        status: string;
+        retry_count: number;
+      }>
+    >(`/admin/audiobooks/${audiobookId}/jobs/${jobId}/retry`, {
+      method: "POST",
+    }),
+
+  // Retry all failed jobs for an audiobook
+  retryAllFailedJobs: (audiobookId: string) =>
+    apiClient<
+      ApiResponse<{
+        message: string;
+        audiobook_id: string;
+        total_jobs_found: number;
+        successfully_retried: number;
+        failed_to_retry: number;
+        retried_job_ids: string[];
+        failed_job_ids?: string[];
+      }>
+    >(`/admin/audiobooks/${audiobookId}/retry-all`, {
+      method: "POST",
+    }),
 };
 
 // Cart API functions
