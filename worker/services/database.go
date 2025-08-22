@@ -180,13 +180,23 @@ func (d *DatabaseService) GetChapterTranscripts(audiobookID uuid.UUID) ([]models
 	var transcripts []models.ChapterTranscript
 	for rows.Next() {
 		var transcript models.ChapterTranscript
+		var segmentsJSON []byte
+
 		if err := rows.Scan(
 			&transcript.ID, &transcript.ChapterID, &transcript.AudiobookID, &transcript.Content,
-			&transcript.Segments, &transcript.Language, &transcript.ConfidenceScore,
+			&segmentsJSON, &transcript.Language, &transcript.ConfidenceScore,
 			&transcript.ProcessingTimeSeconds, &transcript.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan chapter transcript: %v", err)
 		}
+
+		// Parse segments JSON into the proper slice of Segment structs
+		if segmentsJSON != nil {
+			if err := json.Unmarshal(segmentsJSON, &transcript.Segments); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal segments for transcript %s: %v", transcript.ID, err)
+			}
+		}
+
 		transcripts = append(transcripts, transcript)
 	}
 
@@ -252,9 +262,11 @@ func (d *DatabaseService) GetChapter1Transcript(audiobookID string) (*models.Cha
 		return nil, fmt.Errorf("failed to get chapter 1 transcript: %v", err)
 	}
 
-	// Parse segments JSON
-	if err := json.Unmarshal(segmentsJSON, &transcript.Segments); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal segments: %v", err)
+	// Parse segments JSON into the proper slice of Segment structs
+	if segmentsJSON != nil {
+		if err := json.Unmarshal(segmentsJSON, &transcript.Segments); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal segments: %v", err)
+		}
 	}
 
 	return &transcript, nil

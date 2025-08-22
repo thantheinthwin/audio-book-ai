@@ -8,13 +8,13 @@ import (
 
 // AIOutput represents an AI processing output
 type AIOutput struct {
-	ID          uuid.UUID `json:"id"`
-	AudiobookID uuid.UUID `json:"audiobook_id"`
-	OutputType  string    `json:"output_type"`
-	Content     any       `json:"content"`
-	ModelUsed   string    `json:"model_used"`
-	CreatedAt   time.Time `json:"created_at"`
-	ProcessingTimeSeconds int `json:"processing_time_seconds"`
+	ID                    uuid.UUID `json:"id"`
+	AudiobookID           uuid.UUID `json:"audiobook_id"`
+	OutputType            string    `json:"output_type"`
+	Content               any       `json:"content"`
+	ModelUsed             string    `json:"model_used"`
+	CreatedAt             time.Time `json:"created_at"`
+	ProcessingTimeSeconds int       `json:"processing_time_seconds"`
 }
 
 // OutputType represents the possible output types
@@ -72,13 +72,22 @@ type GeminiSafetyRating struct {
 	Probability string `json:"probability"`
 }
 
+// Segment represents a transcript segment
+type Segment struct {
+	Start      float64 `json:"start"`
+	End        float64 `json:"end"`
+	Text       string  `json:"text"`
+	Confidence float64 `json:"confidence"`
+	Speaker    int     `json:"speaker"`
+}
+
 // ChapterTranscript represents a chapter transcript for processing
 type ChapterTranscript struct {
 	ID                    uuid.UUID `json:"id"`
 	ChapterID             uuid.UUID `json:"chapter_id"`
 	AudiobookID           uuid.UUID `json:"audiobook_id"`
 	Content               string    `json:"content"`
-	Segments              []byte    `json:"segments,omitempty"`
+	Segments              []Segment `json:"segments,omitempty"`
 	Language              *string   `json:"language,omitempty"`
 	ConfidenceScore       *float64  `json:"confidence_score,omitempty"`
 	ProcessingTimeSeconds *int      `json:"processing_time_seconds,omitempty"`

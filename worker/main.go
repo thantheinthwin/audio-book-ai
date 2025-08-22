@@ -144,8 +144,6 @@ func updateJobStatus(httpClient *http.Client, apiBaseURL string, internalAPIKey 
 		payload["retry_count"] = retryCount
 	}
 
-	fmt.Println("retryCount", retryCount)
-
 	// Convert payload to JSON
 	jsonData, err := json.Marshal(payload)
 	if err != nil {
