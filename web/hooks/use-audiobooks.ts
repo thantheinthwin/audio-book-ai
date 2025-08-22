@@ -81,6 +81,22 @@ export function useUpdateAudioBook() {
   });
 }
 
+// Hook to update audiobook price (admin only)
+export function useUpdateAudioBookPrice() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, price }: { id: string; price: number }) =>
+      audiobooksAPI.updateAudioBookPrice(id, price),
+    onSuccess: (data, variables) => {
+      // Update the specific audiobook in cache
+      queryClient.setQueryData(audiobookKeys.detail(variables.id), data);
+      // Invalidate and refetch audiobooks list
+      queryClient.invalidateQueries({ queryKey: audiobookKeys.lists() });
+    },
+  });
+}
+
 // Hook to delete an audiobook
 export function useDeleteAudioBook() {
   const queryClient = useQueryClient();

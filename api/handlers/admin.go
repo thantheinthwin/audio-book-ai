@@ -10,7 +10,7 @@ import (
 func GetUsers(c *fiber.Ctx) error {
 	// TODO: Implement user listing logic
 	// This would typically query the database for all users
-	
+
 	users := []models.User{
 		// Placeholder data
 		{
@@ -30,7 +30,7 @@ func GetUsers(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"users": users,
+		"users":   users,
 		"message": "Users retrieved successfully",
 	})
 }
@@ -38,10 +38,10 @@ func GetUsers(c *fiber.Ctx) error {
 // GetUser returns a specific user by ID (admin only)
 func GetUser(c *fiber.Ctx) error {
 	userID := c.Params("id")
-	
+
 	// TODO: Implement user retrieval logic
 	// This would typically query the database for the specific user
-	
+
 	user := &models.User{
 		ID:         userID,
 		Email:      "user@example.com",
@@ -59,10 +59,10 @@ func GetUser(c *fiber.Ctx) error {
 // UpdateUser updates a specific user (admin only)
 func UpdateUser(c *fiber.Ctx) error {
 	userID := c.Params("id")
-	
+
 	// TODO: Implement user update logic
 	// This would typically update the user in the database
-	
+
 	return c.JSON(fiber.Map{
 		"message": "User updated successfully",
 		"user_id": userID,
@@ -72,10 +72,10 @@ func UpdateUser(c *fiber.Ctx) error {
 // DeleteUser deletes a specific user (admin only)
 func DeleteUser(c *fiber.Ctx) error {
 	userID := c.Params("id")
-	
+
 	// TODO: Implement user deletion logic
 	// This would typically delete the user from the database
-	
+
 	return c.JSON(fiber.Map{
 		"message": "User deleted successfully",
 		"user_id": userID,

@@ -37,6 +37,7 @@ interface FormData {
     chapter_number: number;
     title: string;
     audio_file?: File;
+    duration_seconds: number;
   }>;
 }
 
@@ -63,6 +64,7 @@ export default function CreateAudioBookPage() {
           id: "chapter-1",
           chapter_number: 1,
           title: "",
+          duration_seconds: 0,
         },
       ],
     },
@@ -117,6 +119,10 @@ export default function CreateAudioBookPage() {
           formData.append(
             `file_${index}_title`,
             chapter.title || `Chapter ${chapter.chapter_number}`
+          );
+          formData.append(
+            `file_${index}_duration_seconds`,
+            chapter.duration_seconds.toString()
           );
         }
       });

@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
       file: File;
       chapter_number: number;
       title: string;
+      duration_seconds: number;
     }> = [];
 
     // Find all files in the FormData
@@ -45,11 +46,15 @@ export async function POST(request: NextRequest) {
           formData.get(`file_${index}_chapter_number`) as string
         );
         const chapterTitle = formData.get(`file_${index}_title`) as string;
+        const durationSeconds = parseInt(
+          formData.get(`file_${index}_duration_seconds`) as string
+        );
 
         files.push({
           file: value,
           chapter_number: chapterNumber,
           title: chapterTitle,
+          duration_seconds: durationSeconds,
         });
       }
     }

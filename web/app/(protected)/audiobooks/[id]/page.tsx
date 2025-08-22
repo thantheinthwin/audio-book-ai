@@ -2,7 +2,11 @@
 
 import { useState, useRef } from "react";
 import { useParams } from "next/navigation";
-import { useAudioBook, useAudioBookJobStatus } from "@/hooks/use-audiobooks";
+import {
+  useAudioBook,
+  useAudioBookJobStatus,
+  useUpdateAudioBookPrice,
+} from "@/hooks/use-audiobooks";
 import { notFound } from "next/navigation";
 import {
   Play,
@@ -16,6 +20,8 @@ import {
   Bot,
   DollarSign,
   Edit,
+  Check,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +33,7 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 
 import {
   Table,
@@ -43,6 +50,8 @@ export default function AudioBookDetailPage() {
   const params = useParams();
   const [playingChapter, setPlayingChapter] = useState<string | null>(null);
   const [isJobStatusExpanded, setIsJobStatusExpanded] = useState(false);
+  const [isEditingPrice, setIsEditingPrice] = useState(false);
+  const [newPrice, setNewPrice] = useState<string>("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const {
@@ -53,6 +62,7 @@ export default function AudioBookDetailPage() {
   const { data: jobStatusResponse } = useAudioBookJobStatus(
     params.id as string
   );
+  const updatePriceMutation = useUpdateAudioBookPrice();
 
   const audioBook = audioBookResponse?.data;
   const jobStatus = jobStatusResponse?.data;
@@ -126,6 +136,39 @@ export default function AudioBookDetailPage() {
     setPlayingChapter(null);
   };
 
+  // Function to handle price editing
+  const handleEditPrice = () => {
+    setIsEditingPrice(true);
+    setNewPrice(audioBook?.price?.toString() || "0");
+  };
+
+  // Function to save price
+  const handleSavePrice = async () => {
+    const price = parseFloat(newPrice);
+    if (isNaN(price) || price < 0) {
+      alert("Please enter a valid price");
+      return;
+    }
+
+    try {
+      await updatePriceMutation.mutateAsync({
+        id: params.id as string,
+        price: price,
+      });
+      setIsEditingPrice(false);
+      setNewPrice("");
+    } catch (error) {
+      console.error("Failed to update price:", error);
+      alert("Failed to update price. Please try again.");
+    }
+  };
+
+  // Function to cancel price editing
+  const handleCancelPriceEdit = () => {
+    setIsEditingPrice(false);
+    setNewPrice("");
+  };
+
   if (audioBookLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -197,16 +240,63 @@ export default function AudioBookDetailPage() {
               className="w-48 h-48 object-cover rounded-md"
             />
             <div className="flex items-center gap-1 border rounded pl-2 pr-2 py-2 bg-green-400 dark:bg-green-400/50">
-              <div className="flex items-center gap-1 flex-1">
-                <DollarSign className="h-4 w-4" />
-                <p className="font-semibold text-sm">
-                  {audioBook.price?.toFixed(2) || "0.00"}
-                </p>
-              </div>
-              <Separator orientation="vertical" className="h-8 ml-2" />
-              <Button variant={"ghost"} size={"icon"}>
-                <Edit className="h-4 w-4" />
-              </Button>
+              {isEditingPrice ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <DollarSign className="h-4 w-4" />
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={newPrice}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setNewPrice(e.target.value)
+                    }
+                    className="w-20 h-8 text-sm"
+                    placeholder="0.00"
+                  />
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleSavePrice}
+                      disabled={updatePriceMutation.isPending}
+                      className="h-6 w-6"
+                    >
+                      {updatePriceMutation.isPending ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Check className="h-3 w-3" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleCancelPriceEdit}
+                      disabled={updatePriceMutation.isPending}
+                      className="h-6 w-6"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1 flex-1">
+                    <DollarSign className="h-4 w-4" />
+                    <p className="font-semibold text-sm">
+                      {audioBook.price?.toFixed(2) || "0.00"}
+                    </p>
+                  </div>
+                  <Separator orientation="vertical" className="h-8 ml-2" />
+                  <Button
+                    variant={"ghost"}
+                    size={"icon"}
+                    onClick={handleEditPrice}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
             </div>
             <div className="flex gap-2">
               <Button

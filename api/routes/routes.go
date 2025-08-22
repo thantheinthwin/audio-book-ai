@@ -78,6 +78,7 @@ func SetupAdminRoutes(router fiber.Router, cfg *config.Config, h *handlers.Handl
 	// Audio books (admin operations)
 	router.Post("/audiobooks", h.CreateAudioBook)
 	router.Put("/audiobooks/:id", h.UpdateAudioBook)
+	router.Put("/audiobooks/:id/price", h.UpdateAudioBookPrice)
 	router.Delete("/audiobooks/:id", h.DeleteAudioBook)
 	router.Get("/audiobooks/:id/jobs", h.GetJobStatus)
 	router.Post("/audiobooks/:id/trigger-summarize-tag", h.TriggerSummarizeAndTagJobs)

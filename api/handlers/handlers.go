@@ -164,7 +164,7 @@ func (h *Handler) UploadFile(c *fiber.Ctx) error {
 	// Parse metadata
 	chapterNumberStr := c.FormValue("chapter_number")
 	chapterTitle := c.FormValue("chapter_title")
-
+	
 	var chapterNumber *int
 	if chapterNumberStr != "" {
 		num, err := strconv.Atoi(chapterNumberStr)

@@ -738,16 +738,16 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 		log.Printf("CreateAudioBook: Creating single chapter with file: %s, size: %d", file.FilePath, file.FileSize)
 
 		chapter := &models.Chapter{
-			ID:            uuid.New(),
-			AudiobookID:   audiobook.ID,
-			UploadFileID:  &file.ID,
-			ChapterNumber: 1,
-			Title:         req.Title, // Use audiobook title for single file
-			FilePath:      file.FilePath,
-			FileURL:       &file.FilePath, // For now, use file path as URL
-			FileSizeBytes: &file.FileSize,
-			MimeType:      &file.MimeType,
-			CreatedAt:     time.Now(),
+			ID:              uuid.New(),
+			AudiobookID:     audiobook.ID,
+			UploadFileID:    &file.ID,
+			ChapterNumber:   1,
+			Title:           req.Title, // Use audiobook title for single file
+			FilePath:        file.FilePath,
+			FileURL:         &file.FilePath, // For now, use file path as URL
+			FileSizeBytes:   &file.FileSize,
+			MimeType:        &file.MimeType,
+			CreatedAt:       time.Now(),
 		}
 		chapters = append(chapters, chapter)
 
@@ -1196,5 +1196,88 @@ func (h *Handler) UpdateJobStatus(c *fiber.Ctx) error {
 		"job_id":  jobID,
 		"status":  req.Status,
 		"message": "Job status updated successfully",
+	})
+}
+
+// UpdateAudioBookPrice updates the price of an audiobook (admin only)
+// PUT /admin/audiobooks/:id/price
+func (h *Handler) UpdateAudioBookPrice(c *fiber.Ctx) error {
+	log.Printf("UpdateAudioBookPrice: Request received from IP %s", c.IP())
+	log.Printf("UpdateAudioBookPrice: User agent: %s", c.Get("User-Agent"))
+
+	// Parse audiobook ID
+	audiobookID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		log.Printf("UpdateAudioBookPrice: Invalid audiobook ID: %v", err)
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid audiobook ID",
+		})
+	}
+
+	log.Printf("UpdateAudioBookPrice: Updating price for audiobook with ID: %s", audiobookID)
+
+	// Get user ID from context
+	userCtx, ok := c.Locals("user").(*models.UserContext)
+	if !ok || userCtx == nil {
+		log.Printf("UpdateAudioBookPrice: User not authenticated")
+		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "User not authenticated",
+		})
+	}
+
+	// Check if user is admin
+	if userCtx.Role != models.RoleAdmin {
+		log.Printf("UpdateAudioBookPrice: Access denied - user is not admin")
+		return c.Status(http.StatusForbidden).JSON(fiber.Map{
+			"error": "Admin access required",
+		})
+	}
+
+	// Parse request body
+	var req struct {
+		Price float64 `json:"price" validate:"required,min=0"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		log.Printf("UpdateAudioBookPrice: Failed to parse request body: %v", err)
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	// Validate price
+	if req.Price < 0 {
+		log.Printf("UpdateAudioBookPrice: Invalid price: %f", req.Price)
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Price must be non-negative",
+		})
+	}
+
+	// Get existing audiobook
+	existingAudiobook, err := h.repo.GetAudioBookByID(context.Background(), audiobookID)
+	if err != nil {
+		log.Printf("UpdateAudioBookPrice: Failed to fetch audiobook: %v", err)
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{
+			"error": "Audiobook not found",
+		})
+	}
+
+	// Update price
+	existingAudiobook.Price = req.Price
+	existingAudiobook.UpdatedAt = time.Now()
+
+	// Update in database
+	if err := h.repo.UpdateAudioBook(context.Background(), existingAudiobook); err != nil {
+		log.Printf("UpdateAudioBookPrice: Failed to update audiobook price: %v", err)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to update audiobook price",
+		})
+	}
+
+	log.Printf("UpdateAudioBookPrice: Successfully updated price for audiobook: %s to $%.2f", existingAudiobook.Title, req.Price)
+
+	return c.JSON(fiber.Map{
+		"data":    existingAudiobook,
+		"message": "Audiobook price updated successfully",
 	})
 }

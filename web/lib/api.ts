@@ -517,6 +517,12 @@ export const audiobooksAPI = {
       data,
     }),
 
+  updateAudioBookPrice: (id: string, price: number) =>
+    apiClient<ApiResponse<AudioBook>>(`/admin/audiobooks/${id}/price`, {
+      method: "PUT",
+      data: { price },
+    }),
+
   deleteAudioBook: (id: string) =>
     apiClient<ApiResponse>(`/admin/audiobooks/${id}`, {
       method: "DELETE",
