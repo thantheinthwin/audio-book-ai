@@ -29,8 +29,5 @@ WORKDIR /root/
 # Copy the binary from builder stage
 COPY --from=builder /app/main .
 
-# Copy .env file from the worker directory
-COPY worker/.env .env
-
 # Run the binary
 CMD ["./main"]

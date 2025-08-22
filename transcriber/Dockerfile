@@ -35,9 +35,6 @@ WORKDIR /app
 # Copy the binary from builder stage
 COPY --from=builder /app/main .
 
-# Copy .env file if it exists
-COPY transcriber/.env* ./
-
 # Change ownership to app user
 RUN chown -R appuser:appgroup /app
 

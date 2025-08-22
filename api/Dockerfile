@@ -35,9 +35,6 @@ WORKDIR /app
 # Copy binary from builder stage
 COPY --from=builder /app/main .
 
-# Copy .env file from the api directory
-COPY api/.env .env
-
 # Change ownership to non-root user
 RUN chown -R appuser:appgroup /app
 
