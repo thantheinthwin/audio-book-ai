@@ -22,6 +22,7 @@ type RedisConsumer struct {
 type JobMessage struct {
 	ID          uuid.UUID              `json:"id"`
 	AudiobookID uuid.UUID              `json:"audiobook_id"`
+	ChapterID   *uuid.UUID             `json:"chapter_id,omitempty"`
 	JobType     string                 `json:"job_type"`
 	FilePath    *string                `json:"file_path,omitempty"`
 	CreatedAt   time.Time              `json:"created_at"`

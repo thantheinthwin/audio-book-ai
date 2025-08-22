@@ -32,7 +32,10 @@ export function useAudioBookJobStatus(
     enabled: !!id && !isPublicUser,
     refetchInterval: (data) => {
       // If still processing, refetch every 5 seconds
-      if ((data?.state?.data?.data as any)?.overall_status !== "completed") {
+      if (
+        (data?.state?.data?.data as any)?.overall_status !== "completed" &&
+        (data?.state?.data?.data as any)?.overall_status !== "failed"
+      ) {
         return 5000;
       }
       // If completed or failed, stop refetching

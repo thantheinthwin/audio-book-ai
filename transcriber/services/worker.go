@@ -75,6 +75,8 @@ func (w *Worker) ProcessJob(job models.Job) error {
 		return fmt.Errorf("failed to save transcript: %v", err)
 	}
 
+	fmt.Printf("Checking if chapter %s is chapter 1\n", job.ChapterID)
+
 	// Check if this is chapter 1 and trigger summarize/tag jobs immediately
 	if err := w.checkAndTriggerSummarizeTagJobsForChapter1(job.AudiobookID.String(), job.ChapterID); err != nil {
 		log.Printf("Warning: Failed to check/trigger summarize and tag jobs for chapter 1: %v", err)

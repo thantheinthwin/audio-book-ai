@@ -98,6 +98,7 @@ func processTranscriptionJob(worker *services.Worker, httpClient *http.Client, a
 	job := models.Job{
 		ID:          message.ID,
 		AudiobookID: message.AudiobookID,
+		ChapterID:   message.ChapterID,
 		JobType:     message.JobType,
 		Status:      "running",
 		RetryCount:  message.RetryCount,
@@ -154,9 +155,6 @@ func updateJobStatus(httpClient *http.Client, apiBaseURL string, internalAPIKey 
 	if retryCount > 0 {
 		payload["retry_count"] = retryCount
 	}
-
-	fmt.Println("retryCount", retryCount)
-	fmt.Println("payload retryCount", payload["retry_count"])
 
 	// Convert payload to JSON
 	jsonData, err := json.Marshal(payload)

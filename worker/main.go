@@ -98,6 +98,7 @@ func processSummarizeJob(worker *services.Worker, httpClient *http.Client, apiBa
 	job := models.Job{
 		ID:          message.ID,
 		AudiobookID: message.AudiobookID,
+		ChapterID:   message.ChapterID,
 		JobType:     "summarize", // Summarize job type
 		Status:      "running",
 		RetryCount:  message.RetryCount,
