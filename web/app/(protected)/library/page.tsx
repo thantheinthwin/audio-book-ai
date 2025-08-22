@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Filter, Heart, Clock, User, ExternalLink } from "lucide-react";
+import { Search, Filter, Heart, Clock, User, ExternalLink, ShoppingCart, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -24,6 +24,7 @@ import Image from "next/image";
 import { Loader2 } from "lucide-react";
 import { useAudioBooks } from "@/hooks";
 import { useUser } from "@/hooks/use-auth";
+import { useAddToCart, useIsInCart, useIsAudioBookPurchased } from "@/hooks/use-cart";
 import { redirect } from "next/navigation";
 import { useEffect } from "react";
 
@@ -107,62 +108,115 @@ export default function LibraryPage() {
           <TableHead>Title</TableHead>
           <TableHead>Author</TableHead>
           <TableHead>Duration</TableHead>
-          <TableHead>Size</TableHead>
+          <TableHead>Price</TableHead>
           <TableHead>Status</TableHead>
-          <TableHead></TableHead>
+          <TableHead>Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {books.map((book) => (
-          <TableRow key={book.id} className="hover:bg-muted/50">
-            <TableCell>
-              <div className="w-12 h-12 rounded-md overflow-hidden">
-                {book.cover_image_url || book.cover_image ? (
-                  <Image
-                    src={book.cover_image_url || book.cover_image}
-                    alt={book.title}
-                    width={48}
-                    height={48}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-muted flex items-center justify-center">
-                    <span className="text-xs text-muted-foreground">
-                      No Image
-                    </span>
-                  </div>
-                )}
-              </div>
-            </TableCell>
-            <TableCell>
-              <div className="font-medium">{book.title}</div>
-            </TableCell>
-            <TableCell>
-              <div className="flex items-center gap-1">
-                <User className="h-3 w-3 text-muted-foreground" />
-                {book.author}
-              </div>
-            </TableCell>
-            <TableCell>
-              <div className="flex items-center gap-1">
-                <Clock className="h-3 w-3 text-muted-foreground" />
-                {formatDuration(book.duration_seconds || book.duration)}
-              </div>
-            </TableCell>
-            <TableCell>{formatFileSize(book.file_size_bytes)}</TableCell>
-            <TableCell>{getStatusBadge(book.status)}</TableCell>
-            <TableCell>
-              <Link href={`/library/${book.id}`}>
-                <Button variant="outline" size="sm">
-                  <ExternalLink className="h-4 w-4" />
-                </Button>
-              </Link>
-            </TableCell>
-          </TableRow>
+          <AudioBookRow key={book.id} book={book} />
         ))}
       </TableBody>
     </Table>
   );
+
+  const AudioBookRow = ({ book }: { book: any }) => {
+    const addToCartMutation = useAddToCart();
+    const { data: isInCart } = useIsInCart(book.id);
+    const { data: isPurchased } = useIsAudioBookPurchased(book.id);
+
+    const handleAddToCart = () => {
+      addToCartMutation.mutate({ audiobook_id: book.id });
+    };
+
+    return (
+      <TableRow className="hover:bg-muted/50">
+        <TableCell>
+          <div className="w-12 h-12 rounded-md overflow-hidden">
+            {book.cover_image_url || book.cover_image ? (
+              <Image
+                src={book.cover_image_url || book.cover_image}
+                alt={book.title}
+                width={48}
+                height={48}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-muted flex items-center justify-center">
+                <span className="text-xs text-muted-foreground">
+                  No Image
+                </span>
+              </div>
+            )}
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="font-medium">{book.title}</div>
+        </TableCell>
+        <TableCell>
+          <div className="flex items-center gap-1">
+            <User className="h-3 w-3 text-muted-foreground" />
+            {book.author}
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="flex items-center gap-1">
+            <Clock className="h-3 w-3 text-muted-foreground" />
+            {formatDuration(book.duration_seconds || book.duration)}
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="font-medium">${book.price?.toFixed(2) || "0.00"}</div>
+        </TableCell>
+        <TableCell>
+          <div className="flex flex-col gap-1">
+            {getStatusBadge(book.status)}
+            {isPurchased && (
+              <Badge variant="default" className="bg-green-100 text-green-800">
+                <Package className="h-3 w-3 mr-1" />
+                Purchased
+              </Badge>
+            )}
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="flex gap-2">
+            {isPurchased ? (
+              <Link href={`/audiobooks/${book.id}`}>
+                <Button variant="outline" size="sm">
+                  Listen
+                </Button>
+              </Link>
+            ) : (
+              <>
+                <Link href={`/library/${book.id}`}>
+                  <Button variant="outline" size="sm">
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </Link>
+                {!isInCart && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddToCart}
+                    disabled={addToCartMutation.isPending}
+                  >
+                    <ShoppingCart className="h-4 w-4" />
+                  </Button>
+                )}
+                {isInCart && (
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                    In Cart
+                  </Badge>
+                )}
+              </>
+            )}
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  };
 
   if (isLoading) {
     return (

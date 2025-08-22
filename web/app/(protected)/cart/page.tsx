@@ -1,20 +1,35 @@
 "use client";
 
-import { useCart, useRemoveFromCart } from "@/hooks/use-cart";
+import { useCart, useRemoveFromCart, useCheckout } from "@/hooks/use-cart";
 import { useUser } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, ShoppingCart, DollarSign } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Trash2, ShoppingCart, DollarSign, CreditCard } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export default function CartPage() {
   const { data: user, isLoading: userLoading } = useUser();
   const { data: cart, isLoading, error } = useCart();
   const removeFromCartMutation = useRemoveFromCart();
+  const checkoutMutation = useCheckout();
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [itemToRemove, setItemToRemove] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
 
   // Check if user is a normal user (not admin)
   useEffect(() => {
@@ -44,6 +59,71 @@ export default function CartPage() {
   if (!user) {
     return null; // Will redirect in useEffect
   }
+
+  const handleCheckout = () => {
+    if (selectedItems.length === 0) {
+      // If no items selected, checkout all items
+      const allItemIds = cart?.items.map((item) => item.id) || [];
+      checkoutMutation.mutate(allItemIds);
+    } else {
+      checkoutMutation.mutate(selectedItems);
+    }
+  };
+
+  const handleItemSelect = (itemId: string) => {
+    setSelectedItems((prev) =>
+      prev.includes(itemId)
+        ? prev.filter((id) => id !== itemId)
+        : [...prev, itemId]
+    );
+  };
+
+  const isAllSelected =
+    cart?.items &&
+    cart.items.length > 0 &&
+    selectedItems.length === cart.items.length;
+  const isSomeSelected = selectedItems.length > 0;
+
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedItems([]);
+    } else {
+      const allItemIds = cart?.items?.map((item) => item.id) || [];
+      setSelectedItems(allItemIds);
+    }
+  };
+
+  // Event delegation for remove buttons
+  const handleRemoveClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    const removeButton = target.closest("[data-remove-item]") as HTMLElement;
+
+    if (removeButton) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const itemId = removeButton.dataset.removeItem;
+      const itemTitle = removeButton.dataset.itemTitle;
+
+      if (itemId && itemTitle) {
+        setItemToRemove({ id: itemId, title: itemTitle });
+        setShowConfirmDialog(true);
+      }
+    }
+  };
+
+  const handleConfirmRemove = () => {
+    if (itemToRemove) {
+      removeFromCartMutation.mutate(itemToRemove.id);
+      setShowConfirmDialog(false);
+      setItemToRemove(null);
+    }
+  };
+
+  const handleCancelRemove = () => {
+    setShowConfirmDialog(false);
+    setItemToRemove(null);
+  };
 
   if (isLoading) {
     return (
@@ -103,11 +183,19 @@ export default function CartPage() {
 
       <div className="grid gap-6">
         {/* Cart Items */}
-        <div className="space-y-4">
+        <div className="space-y-4" onClick={handleRemoveClick}>
           {cart.items.map((item) => (
             <Card key={item.id}>
               <CardContent className="p-6">
                 <div className="flex gap-4">
+                  <div className="flex items-start pt-1">
+                    <input
+                      type="checkbox"
+                      checked={selectedItems.includes(item.id)}
+                      onChange={() => handleItemSelect(item.id)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </div>
                   <div className="flex-shrink-0">
                     <Image
                       src={
@@ -153,10 +241,9 @@ export default function CartPage() {
                         <Button
                           variant="outline"
                           size="icon"
-                          onClick={() =>
-                            removeFromCartMutation.mutate(item.audiobook_id)
-                          }
                           disabled={removeFromCartMutation.isPending}
+                          data-remove-item={item.audiobook_id}
+                          data-item-title={item.audiobook.title}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -175,6 +262,17 @@ export default function CartPage() {
             <CardTitle>Order Summary</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={isAllSelected}
+                onChange={handleSelectAll}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <label className="text-sm font-medium">
+                Select All ({cart.total_items} items)
+              </label>
+            </div>
             <div className="flex justify-between">
               <span>Subtotal ({cart.total_items} items)</span>
               <span className="font-semibold">
@@ -187,12 +285,47 @@ export default function CartPage() {
                 <span>${cart.total_price.toFixed(2)}</span>
               </div>
             </div>
-            <Button className="w-full" size="lg">
-              Proceed to Checkout
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={handleCheckout}
+              disabled={checkoutMutation.isPending || cart.total_items === 0}
+            >
+              {checkoutMutation.isPending ? (
+                "Processing..."
+              ) : (
+                <>
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  {isSomeSelected
+                    ? `Checkout Selected (${selectedItems.length})`
+                    : "Checkout All Items"}
+                </>
+              )}
             </Button>
           </CardContent>
         </Card>
       </div>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Removal</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove &quot;{itemToRemove?.title}&quot;?
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancelRemove}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmRemove}>
+              Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

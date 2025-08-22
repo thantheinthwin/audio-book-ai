@@ -401,3 +401,54 @@ func (atcr *AddToCartRequest) Validate() error {
 func (rfcr *RemoveFromCartRequest) Validate() error {
 	return utils.GetValidator().Struct(rfcr)
 }
+
+// Purchased Audiobook models
+
+// PurchasedAudioBook represents a purchased audiobook record
+type PurchasedAudioBook struct {
+	ID            uuid.UUID  `json:"id" db:"id"`
+	UserID        uuid.UUID  `json:"user_id" db:"user_id" validate:"required"`
+	AudiobookID   uuid.UUID  `json:"audiobook_id" db:"audiobook_id" validate:"required"`
+	PurchasePrice float64    `json:"purchase_price" db:"purchase_price" validate:"required,min=0"`
+	PurchasedAt   time.Time  `json:"purchased_at" db:"purchased_at"`
+	TransactionID *string    `json:"transaction_id,omitempty" db:"transaction_id"`
+	PaymentStatus string     `json:"payment_status" db:"payment_status" validate:"required"`
+	AudioBook     *AudioBook `json:"audiobook,omitempty" db:"audiobook"`
+}
+
+// PurchasedAudioBookWithDetails represents a purchased audiobook with full details
+type PurchasedAudioBookWithDetails struct {
+	PurchasedAudioBook
+	AudioBook AudioBook `json:"audiobook"`
+}
+
+// CheckoutRequest represents the request to checkout cart items
+type CheckoutRequest struct {
+	CartItemIDs []uuid.UUID `json:"cart_item_ids" validate:"required,min=1"`
+}
+
+// CheckoutResponse represents the response for checkout operations
+type CheckoutResponse struct {
+	OrderID              string                        `json:"order_id"`
+	PurchasedItems       []PurchasedAudioBookWithDetails `json:"purchased_items"`
+	TotalAmount          float64                       `json:"total_amount"`
+	TransactionID        string                        `json:"transaction_id"`
+	CheckoutCompletedAt  time.Time                     `json:"checkout_completed_at"`
+}
+
+// PurchaseHistoryResponse represents the response for purchase history
+type PurchaseHistoryResponse struct {
+	Purchases   []PurchasedAudioBookWithDetails `json:"purchases"`
+	TotalItems  int                             `json:"total_items"`
+	TotalSpent  float64                         `json:"total_spent"`
+}
+
+// Validate validates the purchased audiobook struct
+func (pab *PurchasedAudioBook) Validate() error {
+	return utils.GetValidator().Struct(pab)
+}
+
+// Validate validates the checkout request
+func (cr *CheckoutRequest) Validate() error {
+	return utils.GetValidator().Struct(cr)
+}

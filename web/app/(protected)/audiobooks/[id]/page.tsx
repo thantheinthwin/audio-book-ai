@@ -56,6 +56,7 @@ import {
 } from "@/components/ui/table";
 import Image from "next/image";
 import { Separator } from "@/components/ui/separator";
+import { useUser } from "@/hooks";
 
 export default function AudioBookDetailPage() {
   const params = useParams();
@@ -66,6 +67,9 @@ export default function AudioBookDetailPage() {
   const [newPrice, setNewPrice] = useState<string>("");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { data: user } = useUser();
+
+  const isPublicUser = user?.user_metadata?.role !== "admin";
 
   const {
     data: audioBookResponse,
@@ -295,75 +299,87 @@ export default function AudioBookDetailPage() {
               height={100}
               className="w-48 h-48 object-cover rounded-md"
             />
-            <div className="flex items-center gap-1 border rounded pl-2 pr-2 py-2 bg-green-400 dark:bg-green-400/50">
-              {isEditingPrice ? (
-                <div className="flex items-center gap-2 flex-1">
-                  <DollarSign className="h-4 w-4" />
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={newPrice}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setNewPrice(e.target.value)
-                    }
-                    className="w-20 h-8 text-sm"
-                    placeholder="0.00"
-                  />
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleSavePrice}
-                      disabled={updatePriceMutation.isPending}
-                      className="h-6 w-6"
-                    >
-                      {updatePriceMutation.isPending ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Check className="h-3 w-3" />
-                      )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleCancelPriceEdit}
-                      disabled={updatePriceMutation.isPending}
-                      className="h-6 w-6"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
+            {!isPublicUser ? (
+              <>
+                {" "}
+                <div className="flex items-center gap-1 border rounded pl-2 pr-2 py-2 bg-green-400 dark:bg-green-400/50">
+                  {isEditingPrice ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <DollarSign className="h-4 w-4" />
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={newPrice}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                          setNewPrice(e.target.value)
+                        }
+                        className="w-20 h-8 text-sm"
+                        placeholder="0.00"
+                      />
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleSavePrice}
+                          disabled={updatePriceMutation.isPending}
+                          className="h-6 w-6"
+                        >
+                          {updatePriceMutation.isPending ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Check className="h-3 w-3" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleCancelPriceEdit}
+                          disabled={updatePriceMutation.isPending}
+                          className="h-6 w-6"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-1 flex-1">
+                        <DollarSign className="h-4 w-4" />
+                        <p className="font-semibold text-sm">
+                          {audioBook.price?.toFixed(2) || "0.00"}
+                        </p>
+                      </div>
+                      <Separator orientation="vertical" className="h-8 ml-2" />
+                      <Button
+                        variant={"ghost"}
+                        size={"icon"}
+                        onClick={handleEditPrice}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
                 </div>
-              ) : (
-                <>
-                  <div className="flex items-center gap-1 flex-1">
-                    <DollarSign className="h-4 w-4" />
-                    <p className="font-semibold text-sm">
-                      {audioBook.price?.toFixed(2) || "0.00"}
-                    </p>
-                  </div>
-                  <Separator orientation="vertical" className="h-8 ml-2" />
+                <div className="flex gap-2">
                   <Button
-                    variant={"ghost"}
-                    size={"icon"}
-                    onClick={handleEditPrice}
+                    variant="destructive"
+                    className="w-full py-6 rounded justify-between"
+                    data-action="delete-audiobook"
                   >
-                    <Edit className="h-4 w-4" />
+                    Delete
+                    <Trash2 className="h-4 w-4" />
                   </Button>
-                </>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="destructive"
-                className="w-full py-6 rounded justify-between"
-                data-action="delete-audiobook"
-              >
-                Delete
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center gap-1 border rounded pl-2 pr-2 py-2 bg-green-400 dark:bg-green-400/50">
+                <DollarSign className="h-4 w-4" />
+                <p className="font-semibold text-sm">
+                  {audioBook.price?.toFixed(2) || "0.00"}
+                </p>
+              </div>
+            )}
           </div>
           <div className="flex flex-col flex-1 gap-2">
             <div className="grid gap-1">

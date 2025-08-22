@@ -351,6 +351,43 @@ CREATE POLICY "Users can add items to own cart" ON user_cart
 CREATE POLICY "Users can remove items from own cart" ON user_cart
     FOR DELETE USING (auth.uid() = user_id);
 
+-- Purchased Audiobooks table for tracking user purchases
+CREATE TABLE IF NOT EXISTS purchased_audiobooks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    audiobook_id UUID NOT NULL REFERENCES audiobooks(id) ON DELETE CASCADE,
+    purchase_price DECIMAL(10,2) NOT NULL,
+    purchased_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    transaction_id VARCHAR(255), -- For future payment integration
+    payment_status VARCHAR(20) DEFAULT 'completed', -- completed, pending, failed, refunded
+    UNIQUE(user_id, audiobook_id)
+);
+
+-- Purchased Audiobooks indexes
+CREATE INDEX IF NOT EXISTS idx_purchased_audiobooks_user_id ON purchased_audiobooks(user_id);
+CREATE INDEX IF NOT EXISTS idx_purchased_audiobooks_audiobook_id ON purchased_audiobooks(audiobook_id);
+CREATE INDEX IF NOT EXISTS idx_purchased_audiobooks_purchased_at ON purchased_audiobooks(purchased_at);
+CREATE INDEX IF NOT EXISTS idx_purchased_audiobooks_transaction_id ON purchased_audiobooks(transaction_id);
+
+-- Purchased Audiobooks RLS policies
+ALTER TABLE purchased_audiobooks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own purchased audiobooks" ON purchased_audiobooks
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create own purchase records" ON purchased_audiobooks
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Admins can view all purchases
+CREATE POLICY "Admins can view all purchased audiobooks" ON purchased_audiobooks
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM auth.users 
+            WHERE auth.users.id = auth.uid() 
+            AND auth.users.raw_user_meta_data->>'role' = 'admin'
+        )
+    );
+
 -- Insert some default tags
 INSERT INTO tags (name, category) VALUES
     ('Fiction', 'Genre'),

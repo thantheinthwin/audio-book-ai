@@ -81,3 +81,60 @@ export const useRemoveFromCart = () => {
     },
   });
 };
+
+// Checkout hooks
+import { checkoutAPI } from "@/lib/api";
+
+// Query keys for checkout
+export const checkoutKeys = {
+  all: ["checkout"] as const,
+  purchaseHistory: () => [...checkoutKeys.all, "purchaseHistory"] as const,
+  purchaseHistoryList: (filters: string) => [...checkoutKeys.purchaseHistory(), { filters }] as const,
+  isPurchased: (audiobookId: string) => [...checkoutKeys.all, "isPurchased", audiobookId] as const,
+};
+
+// Hook to checkout cart items
+export const useCheckout = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (cartItemIds: string[]) => {
+      const response = await checkoutAPI.checkout({ cart_item_ids: cartItemIds });
+      return response;
+    },
+    onSuccess: (response) => {
+      // Invalidate and refetch cart data
+      queryClient.invalidateQueries({ queryKey: cartKeys.lists() });
+      // Invalidate purchase history
+      queryClient.invalidateQueries({ queryKey: checkoutKeys.purchaseHistory() });
+      toast.success("Checkout completed successfully!");
+    },
+    onError: (error: any) => {
+      console.error("Failed to checkout:", error);
+      toast.error(error.response?.data?.error || "Failed to complete checkout");
+    },
+  });
+};
+
+// Hook to get purchase history
+export const usePurchaseHistory = (limit?: number, offset?: number) => {
+  return useQuery({
+    queryKey: checkoutKeys.purchaseHistoryList(`limit=${limit}&offset=${offset}`),
+    queryFn: async () => {
+      const response = await checkoutAPI.getPurchaseHistory(limit, offset);
+      return response.data;
+    },
+  });
+};
+
+// Hook to check if an audiobook is purchased
+export const useIsAudioBookPurchased = (audiobookId: string) => {
+  return useQuery({
+    queryKey: checkoutKeys.isPurchased(audiobookId),
+    queryFn: async () => {
+      const response = await checkoutAPI.isAudioBookPurchased(audiobookId);
+      return response.data?.is_purchased || false;
+    },
+    enabled: !!audiobookId,
+  });
+};

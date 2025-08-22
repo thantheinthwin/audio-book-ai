@@ -1664,3 +1664,200 @@ func (p *PostgresRepository) ClearCart(ctx context.Context, userID uuid.UUID) er
 
 	return nil
 }
+
+// Purchased Audiobook operations
+
+func (p *PostgresRepository) CreatePurchasedAudioBook(ctx context.Context, purchase *models.PurchasedAudioBook) error {
+	query := `
+		INSERT INTO purchased_audiobooks (id, user_id, audiobook_id, purchase_price, purchased_at, transaction_id, payment_status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`
+
+	now := time.Now()
+	_, err := p.pool.Exec(ctx, query,
+		purchase.ID,
+		purchase.UserID,
+		purchase.AudiobookID,
+		purchase.PurchasePrice,
+		now,
+		purchase.TransactionID,
+		purchase.PaymentStatus,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to create purchased audiobook: %w", err)
+	}
+
+	purchase.PurchasedAt = now
+	return nil
+}
+
+func (p *PostgresRepository) GetPurchasedAudioBookByID(ctx context.Context, id uuid.UUID) (*models.PurchasedAudioBook, error) {
+	query := `
+		SELECT id, user_id, audiobook_id, purchase_price, purchased_at, transaction_id, payment_status
+		FROM purchased_audiobooks
+		WHERE id = $1
+	`
+
+	var purchase models.PurchasedAudioBook
+	err := p.pool.QueryRow(ctx, query, id).Scan(
+		&purchase.ID,
+		&purchase.UserID,
+		&purchase.AudiobookID,
+		&purchase.PurchasePrice,
+		&purchase.PurchasedAt,
+		&purchase.TransactionID,
+		&purchase.PaymentStatus,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get purchased audiobook: %w", err)
+	}
+
+	return &purchase, nil
+}
+
+func (p *PostgresRepository) GetPurchasedAudioBooksByUserID(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.PurchasedAudioBookWithDetails, int, error) {
+	// Get total count
+	countQuery := `SELECT COUNT(*) FROM purchased_audiobooks WHERE user_id = $1`
+	var total int
+	err := p.pool.QueryRow(ctx, countQuery, userID).Scan(&total)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get purchased audiobooks count: %w", err)
+	}
+
+	// Get purchased audiobooks with details
+	query := `
+		SELECT 
+			pa.id,
+			pa.user_id,
+			pa.audiobook_id,
+			pa.purchase_price,
+			pa.purchased_at,
+			pa.transaction_id,
+			pa.payment_status,
+			ab.id,
+			ab.title,
+			ab.author,
+			ab.summary,
+			ab.tags,
+			ab.duration_seconds,
+			ab.cover_image_url,
+			ab.language,
+			ab.is_public,
+			ab.price,
+			ab.status,
+			ab.created_by,
+			ab.created_at,
+			ab.updated_at
+		FROM purchased_audiobooks pa
+		JOIN audiobooks ab ON pa.audiobook_id = ab.id
+		WHERE pa.user_id = $1
+		ORDER BY pa.purchased_at DESC
+		LIMIT $2 OFFSET $3
+	`
+
+	rows, err := p.pool.Query(ctx, query, userID, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get purchased audiobooks: %w", err)
+	}
+	defer rows.Close()
+
+	var purchases []models.PurchasedAudioBookWithDetails
+	for rows.Next() {
+		var purchase models.PurchasedAudioBookWithDetails
+		err := rows.Scan(
+			&purchase.ID,
+			&purchase.UserID,
+			&purchase.AudiobookID,
+			&purchase.PurchasePrice,
+			&purchase.PurchasedAt,
+			&purchase.TransactionID,
+			&purchase.PaymentStatus,
+			&purchase.AudioBook.ID,
+			&purchase.AudioBook.Title,
+			&purchase.AudioBook.Author,
+			&purchase.AudioBook.Summary,
+			&purchase.AudioBook.Tags,
+			&purchase.AudioBook.DurationSeconds,
+			&purchase.AudioBook.CoverImageURL,
+			&purchase.AudioBook.Language,
+			&purchase.AudioBook.IsPublic,
+			&purchase.AudioBook.Price,
+			&purchase.AudioBook.Status,
+			&purchase.AudioBook.CreatedBy,
+			&purchase.AudioBook.CreatedAt,
+			&purchase.AudioBook.UpdatedAt,
+		)
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to scan purchased audiobook: %w", err)
+		}
+		purchases = append(purchases, purchase)
+	}
+
+	return purchases, total, nil
+}
+
+func (p *PostgresRepository) IsAudioBookPurchased(ctx context.Context, userID, audiobookID uuid.UUID) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM purchased_audiobooks WHERE user_id = $1 AND audiobook_id = $2)`
+
+	var exists bool
+	err := p.pool.QueryRow(ctx, query, userID, audiobookID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if audiobook is purchased: %w", err)
+	}
+
+	return exists, nil
+}
+
+func (p *PostgresRepository) GetPurchaseHistory(ctx context.Context, userID uuid.UUID, limit, offset int) (*models.PurchaseHistoryResponse, error) {
+	purchases, total, err := p.GetPurchasedAudioBooksByUserID(ctx, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	// Calculate total spent
+	totalSpentQuery := `SELECT COALESCE(SUM(purchase_price), 0) FROM purchased_audiobooks WHERE user_id = $1`
+	var totalSpent float64
+	err = p.pool.QueryRow(ctx, totalSpentQuery, userID).Scan(&totalSpent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate total spent: %w", err)
+	}
+
+	return &models.PurchaseHistoryResponse{
+		Purchases:  purchases,
+		TotalItems: total,
+		TotalSpent: totalSpent,
+	}, nil
+}
+
+func (p *PostgresRepository) GetPurchasedAudioBookByUserAndAudiobook(ctx context.Context, userID, audiobookID uuid.UUID) (*models.PurchasedAudioBook, error) {
+	query := `
+		SELECT id, user_id, audiobook_id, purchase_price, purchased_at, transaction_id, payment_status
+		FROM purchased_audiobooks
+		WHERE user_id = $1 AND audiobook_id = $2
+	`
+
+	var purchase models.PurchasedAudioBook
+	err := p.pool.QueryRow(ctx, query, userID, audiobookID).Scan(
+		&purchase.ID,
+		&purchase.UserID,
+		&purchase.AudiobookID,
+		&purchase.PurchasePrice,
+		&purchase.PurchasedAt,
+		&purchase.TransactionID,
+		&purchase.PaymentStatus,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get purchased audiobook: %w", err)
+	}
+
+	return &purchase, nil
+}

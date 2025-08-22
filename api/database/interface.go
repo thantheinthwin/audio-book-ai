@@ -122,6 +122,14 @@ type Repository interface {
 	GetCartItems(ctx context.Context, userID uuid.UUID) ([]models.CartItemWithDetails, error)
 	IsInCart(ctx context.Context, userID, audiobookID uuid.UUID) (bool, error)
 	ClearCart(ctx context.Context, userID uuid.UUID) error
+
+	// Purchased Audiobook operations
+	CreatePurchasedAudioBook(ctx context.Context, purchase *models.PurchasedAudioBook) error
+	GetPurchasedAudioBookByID(ctx context.Context, id uuid.UUID) (*models.PurchasedAudioBook, error)
+	GetPurchasedAudioBooksByUserID(ctx context.Context, userID uuid.UUID, limit, offset int) ([]models.PurchasedAudioBookWithDetails, int, error)
+	IsAudioBookPurchased(ctx context.Context, userID, audiobookID uuid.UUID) (bool, error)
+	GetPurchaseHistory(ctx context.Context, userID uuid.UUID, limit, offset int) (*models.PurchaseHistoryResponse, error)
+	GetPurchasedAudioBookByUserAndAudiobook(ctx context.Context, userID, audiobookID uuid.UUID) (*models.PurchasedAudioBook, error)
 }
 
 // AudioBookStats represents statistics about audio books

@@ -431,6 +431,240 @@ func (h *Handler) IsInCart(c *fiber.Ctx) error {
 	})
 }
 
+// Checkout processes the checkout of cart items
+// POST /user/checkout
+func (h *Handler) Checkout(c *fiber.Ctx) error {
+	log.Printf("Checkout: Request received from IP %s", c.IP())
+
+	// Get user ID from context
+	userCtx, ok := c.Locals("user").(*models.UserContext)
+	if !ok || userCtx == nil {
+		log.Printf("Checkout: User not authenticated")
+		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "User not authenticated",
+		})
+	}
+
+	userID := uuid.MustParse(userCtx.ID)
+	log.Printf("Checkout: User authenticated - UserID: %s", userID)
+
+	// Parse request body
+	var req models.CheckoutRequest
+	if err := c.BodyParser(&req); err != nil {
+		log.Printf("Checkout: Failed to parse request body: %v", err)
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid request body",
+		})
+	}
+
+	// Validate request
+	if err := req.Validate(); err != nil {
+		log.Printf("Checkout: Validation failed: %v", err)
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Validation failed",
+		})
+	}
+
+	// Get cart items to verify they belong to the user
+	cartItems, err := h.repo.GetCartItems(context.Background(), userID)
+	if err != nil {
+		log.Printf("Checkout: Failed to get cart items: %v", err)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get cart items",
+		})
+	}
+
+	// Create a map of cart item IDs for quick lookup
+	cartItemMap := make(map[uuid.UUID]models.CartItemWithDetails)
+	for _, item := range cartItems {
+		cartItemMap[item.ID] = item
+	}
+
+	// Verify all requested cart items belong to the user
+	var validItems []models.CartItemWithDetails
+	var totalAmount float64
+	for _, cartItemID := range req.CartItemIDs {
+		if item, exists := cartItemMap[cartItemID]; exists {
+			validItems = append(validItems, item)
+			totalAmount += item.AudioBook.Price
+		} else {
+			log.Printf("Checkout: Cart item %s not found or doesn't belong to user", cartItemID)
+			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid cart item",
+			})
+		}
+	}
+
+	if len(validItems) == 0 {
+		log.Printf("Checkout: No valid items to checkout")
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "No items to checkout",
+		})
+	}
+
+	// Generate transaction ID (in a real app, this would come from payment processor)
+	transactionID := fmt.Sprintf("txn_%s_%d", userID.String()[:8], time.Now().Unix())
+
+	// Create purchase records for each item
+	var purchasedItems []models.PurchasedAudioBookWithDetails
+	for _, item := range validItems {
+		// Check if user already purchased this audiobook
+		alreadyPurchased, err := h.repo.IsAudioBookPurchased(context.Background(), userID, item.AudiobookID)
+		if err != nil {
+			log.Printf("Checkout: Failed to check if audiobook is purchased: %v", err)
+			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to process checkout",
+			})
+		}
+
+		if alreadyPurchased {
+			log.Printf("Checkout: User already purchased audiobook %s", item.AudiobookID)
+			continue // Skip already purchased items
+		}
+
+		// Create purchase record
+		purchase := &models.PurchasedAudioBook{
+			ID:            uuid.New(),
+			UserID:        userID,
+			AudiobookID:   item.AudiobookID,
+			PurchasePrice: item.AudioBook.Price,
+			TransactionID: &transactionID,
+			PaymentStatus: "completed", // Mock payment status
+		}
+
+		if err := h.repo.CreatePurchasedAudioBook(context.Background(), purchase); err != nil {
+			log.Printf("Checkout: Failed to create purchase record: %v", err)
+			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to process checkout",
+			})
+		}
+
+		// Add to purchased items list
+		purchasedItems = append(purchasedItems, models.PurchasedAudioBookWithDetails{
+			PurchasedAudioBook: *purchase,
+			AudioBook:          item.AudioBook,
+		})
+
+		// Remove from cart
+		if err := h.repo.RemoveFromCart(context.Background(), userID, item.AudiobookID); err != nil {
+			log.Printf("Checkout: Failed to remove item from cart: %v", err)
+			// Don't fail the checkout if cart removal fails
+		}
+	}
+
+	// Generate order ID
+	orderID := fmt.Sprintf("order_%s_%d", userID.String()[:8], time.Now().Unix())
+
+	response := models.CheckoutResponse{
+		OrderID:             orderID,
+		PurchasedItems:      purchasedItems,
+		TotalAmount:         totalAmount,
+		TransactionID:       transactionID,
+		CheckoutCompletedAt: time.Now(),
+	}
+
+	log.Printf("Checkout: Successfully processed checkout for user %s with %d items", userID, len(purchasedItems))
+
+	return c.JSON(fiber.Map{
+		"message": "Checkout completed successfully",
+		"data":    response,
+	})
+}
+
+// GetPurchaseHistory returns the user's purchase history
+// GET /user/purchases
+func (h *Handler) GetPurchaseHistory(c *fiber.Ctx) error {
+	log.Printf("GetPurchaseHistory: Request received from IP %s", c.IP())
+
+	// Get user ID from context
+	userCtx, ok := c.Locals("user").(*models.UserContext)
+	if !ok || userCtx == nil {
+		log.Printf("GetPurchaseHistory: User not authenticated")
+		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "User not authenticated",
+		})
+	}
+
+	userID := uuid.MustParse(userCtx.ID)
+	log.Printf("GetPurchaseHistory: User authenticated - UserID: %s", userID)
+
+	// Parse query parameters
+	limitStr := c.Query("limit", "20")
+	offsetStr := c.Query("offset", "0")
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100 // Cap at 100 items per page
+	}
+
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		offset = 0
+	}
+
+	// Get purchase history
+	purchaseHistory, err := h.repo.GetPurchaseHistory(context.Background(), userID, limit, offset)
+	if err != nil {
+		log.Printf("GetPurchaseHistory: Failed to get purchase history: %v", err)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to get purchase history",
+		})
+	}
+
+	log.Printf("GetPurchaseHistory: Successfully retrieved %d purchases for user %s", len(purchaseHistory.Purchases), userID)
+
+	return c.JSON(fiber.Map{
+		"data": purchaseHistory,
+	})
+}
+
+// IsAudioBookPurchased checks if a user has purchased a specific audiobook
+// GET /user/audiobooks/:audiobookId/purchased
+func (h *Handler) IsAudioBookPurchased(c *fiber.Ctx) error {
+	log.Printf("IsAudioBookPurchased: Request received from IP %s", c.IP())
+
+	// Get user ID from context
+	userCtx, ok := c.Locals("user").(*models.UserContext)
+	if !ok || userCtx == nil {
+		log.Printf("IsAudioBookPurchased: User not authenticated")
+		return c.Status(http.StatusUnauthorized).JSON(fiber.Map{
+			"error": "User not authenticated",
+		})
+	}
+
+	userID := uuid.MustParse(userCtx.ID)
+	log.Printf("IsAudioBookPurchased: User authenticated - UserID: %s", userID)
+
+	// Parse audiobook ID
+	audiobookID, err := uuid.Parse(c.Params("audiobookId"))
+	if err != nil {
+		log.Printf("IsAudioBookPurchased: Invalid audiobook ID: %v", err)
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "Invalid audiobook ID",
+		})
+	}
+
+	// Check if purchased
+	isPurchased, err := h.repo.IsAudioBookPurchased(context.Background(), userID, audiobookID)
+	if err != nil {
+		log.Printf("IsAudioBookPurchased: Failed to check if purchased: %v", err)
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to check purchase status",
+		})
+	}
+
+	log.Printf("IsAudioBookPurchased: Audiobook %s is purchased by user %s: %v", audiobookID, userID, isPurchased)
+
+	return c.JSON(fiber.Map{
+		"data": fiber.Map{
+			"is_purchased": isPurchased,
+		},
+	})
+}
+
 // DeleteAudioBook deletes an audiobook
 // DELETE /audiobooks/:id
 func (h *Handler) DeleteAudioBook(c *fiber.Ctx) error {

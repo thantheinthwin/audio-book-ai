@@ -147,6 +147,39 @@ interface CartCheckResponse {
   is_in_cart: boolean;
 }
 
+// Checkout and Purchase types
+interface CheckoutResponse {
+  order_id: string;
+  purchased_items: Array<{
+    id: string;
+    user_id: string;
+    audiobook_id: string;
+    purchase_price: number;
+    purchased_at: string;
+    transaction_id?: string;
+    payment_status: string;
+    audiobook: AudioBook;
+  }>;
+  total_amount: number;
+  transaction_id: string;
+  checkout_completed_at: string;
+}
+
+interface PurchaseHistoryResponse {
+  purchases: Array<{
+    id: string;
+    user_id: string;
+    audiobook_id: string;
+    purchase_price: number;
+    purchased_at: string;
+    transaction_id?: string;
+    payment_status: string;
+    audiobook: AudioBook;
+  }>;
+  total_items: number;
+  total_spent: number;
+}
+
 // Helper function to get the current session token
 async function getAuthToken(): Promise<string | null> {
   const supabase = createClient();
@@ -632,6 +665,30 @@ export const cartAPI = {
     ),
 };
 
+// Checkout and Purchase API functions
+export const checkoutAPI = {
+  checkout: (data: { cart_item_ids: string[] }) =>
+    apiClient<ApiResponse<CheckoutResponse>>("/user/checkout", {
+      method: "POST",
+      data,
+    }),
+
+  getPurchaseHistory: (limit?: number, offset?: number) => {
+    const params = new URLSearchParams();
+    if (limit) params.append("limit", limit.toString());
+    if (offset) params.append("offset", offset.toString());
+    
+    return apiClient<ApiResponse<PurchaseHistoryResponse>>(
+      `/user/purchases?${params.toString()}`
+    );
+  },
+
+  isAudioBookPurchased: (audiobookId: string) =>
+    apiClient<ApiResponse<{ is_purchased: boolean }>>(
+      `/user/audiobooks/${audiobookId}/purchased`
+    ),
+};
+
 // Test API without authentication
 export const testApiWithoutAuth = async () => {
   try {
@@ -723,4 +780,6 @@ export type {
   CartResponse,
   AddToCartRequest,
   CartCheckResponse,
+  CheckoutResponse,
+  PurchaseHistoryResponse,
 };

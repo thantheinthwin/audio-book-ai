@@ -53,6 +53,11 @@ func SetupProtectedRoutes(router fiber.Router, cfg *config.Config, h *handlers.H
 	router.Get("/cart", h.GetCart)
 	router.Delete("/cart/:audiobookId", h.RemoveFromCart)
 	router.Get("/cart/:audiobookId/check", h.IsInCart)
+
+	// Checkout and purchase operations
+	router.Post("/checkout", h.Checkout)
+	router.Get("/purchases", h.GetPurchaseHistory)
+	router.Get("/audiobooks/:audiobookId/purchased", h.IsAudioBookPurchased)
 }
 
 // SetupAdminRoutes configures admin-only routes
