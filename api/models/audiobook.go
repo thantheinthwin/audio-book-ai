@@ -14,12 +14,12 @@ import (
 type AudioBookStatus string
 
 const (
-	StatusPending    AudioBookStatus = "pending"
-	StatusProcessing AudioBookStatus = "processing"
+	StatusPending      AudioBookStatus = "pending"
+	StatusProcessing   AudioBookStatus = "processing"
 	StatusTranscribing AudioBookStatus = "transcribing"
-	StatusSummarizing AudioBookStatus = "summarizing"
-	StatusCompleted  AudioBookStatus = "completed"
-	StatusFailed     AudioBookStatus = "failed"
+	StatusSummarizing  AudioBookStatus = "summarizing"
+	StatusCompleted    AudioBookStatus = "completed"
+	StatusFailed       AudioBookStatus = "failed"
 )
 
 // JobType represents the type of processing job
@@ -81,17 +81,18 @@ type AudioBook struct {
 
 // Chapter represents a chapter within an audio book
 type Chapter struct {
-	ID            uuid.UUID  `json:"id" db:"id"`
-	AudiobookID   uuid.UUID  `json:"audiobook_id" db:"audiobook_id" validate:"required"`
-	UploadFileID  *uuid.UUID `json:"upload_file_id,omitempty" db:"upload_file_id"`
-	ChapterNumber int        `json:"chapter_number" db:"chapter_number" validate:"required,min=1"`
-	Title         string     `json:"title" db:"title" validate:"required,min=1,max=255"`
-	FilePath      string     `json:"file_path" db:"file_path" validate:"required"`
-	FileURL       *string    `json:"file_url,omitempty" db:"file_url"`
-	FileSizeBytes *int64     `json:"file_size_bytes,omitempty" db:"file_size_bytes"`
-	MimeType      *string    `json:"mime_type,omitempty" db:"mime_type"`
-	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
-	Content       *string    `json:"content,omitempty" db:"content"`
+	ID              uuid.UUID  `json:"id" db:"id"`
+	AudiobookID     uuid.UUID  `json:"audiobook_id" db:"audiobook_id" validate:"required"`
+	UploadFileID    *uuid.UUID `json:"upload_file_id,omitempty" db:"upload_file_id"`
+	ChapterNumber   int        `json:"chapter_number" db:"chapter_number" validate:"required,min=1"`
+	Title           string     `json:"title" db:"title" validate:"required,min=1,max=255"`
+	FilePath        string     `json:"file_path" db:"file_path" validate:"required"`
+	FileURL         *string    `json:"file_url,omitempty" db:"file_url"`
+	FileSizeBytes   *int64     `json:"file_size_bytes,omitempty" db:"file_size_bytes"`
+	MimeType        *string    `json:"mime_type,omitempty" db:"mime_type"`
+	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
+	Content         *string    `json:"content,omitempty" db:"content"`
+	DurationSeconds *int       `json:"duration_seconds,omitempty" db:"duration_seconds"`
 }
 
 // Transcript represents the transcription of an audio book
@@ -431,18 +432,18 @@ type CheckoutRequest struct {
 
 // CheckoutResponse represents the response for checkout operations
 type CheckoutResponse struct {
-	OrderID              string                        `json:"order_id"`
-	PurchasedItems       []PurchasedAudioBookWithDetails `json:"purchased_items"`
-	TotalAmount          float64                       `json:"total_amount"`
-	TransactionID        string                        `json:"transaction_id"`
-	CheckoutCompletedAt  time.Time                     `json:"checkout_completed_at"`
+	OrderID             string                          `json:"order_id"`
+	PurchasedItems      []PurchasedAudioBookWithDetails `json:"purchased_items"`
+	TotalAmount         float64                         `json:"total_amount"`
+	TransactionID       string                          `json:"transaction_id"`
+	CheckoutCompletedAt time.Time                       `json:"checkout_completed_at"`
 }
 
 // PurchaseHistoryResponse represents the response for purchase history
 type PurchaseHistoryResponse struct {
-	Purchases   []PurchasedAudioBookWithDetails `json:"purchases"`
-	TotalItems  int                             `json:"total_items"`
-	TotalSpent  float64                         `json:"total_spent"`
+	Purchases  []PurchasedAudioBookWithDetails `json:"purchases"`
+	TotalItems int                             `json:"total_items"`
+	TotalSpent float64                         `json:"total_spent"`
 }
 
 // Validate validates the purchased audiobook struct

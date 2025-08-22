@@ -60,6 +60,7 @@ import Image from "next/image";
 import { Separator } from "@/components/ui/separator";
 import { useUser } from "@/hooks";
 import { cn } from "@/lib/utils";
+import { formatDuration } from "@/lib/format-duration";
 
 export default function AudioBookDetailPage() {
   const params = useParams();
@@ -91,15 +92,15 @@ export default function AudioBookDetailPage() {
   const audioBook = audioBookResponse?.data;
   const jobStatus = jobStatusResponse?.data;
 
-  // Revalidate audiobook data when job status becomes completed
+  // Revalidate audiobook data when job status changes
   useEffect(() => {
-    if (jobStatus?.overall_status === "completed") {
-      // Invalidate the audiobook query to refetch the latest data
+    if (jobStatusResponse?.data) {
+      // Invalidate the audiobook query to refetch the latest data whenever job status changes
       queryClient.invalidateQueries({
         queryKey: audiobookKeys.detail(params.id as string),
       });
     }
-  }, [jobStatus?.overall_status, queryClient, params.id]);
+  }, [jobStatusResponse, queryClient, params.id]);
 
   // Event delegation handler for delete button clicks
   const handleContainerClick = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -625,6 +626,7 @@ export default function AudioBookDetailPage() {
                   <TableRow>
                     <TableHead className="w-16">No</TableHead>
                     <TableHead>Title</TableHead>
+                    <TableHead>Duration</TableHead>
                     <TableHead className="w-32">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -635,7 +637,9 @@ export default function AudioBookDetailPage() {
                         {chapter.chapter_number}
                       </TableCell>
                       <TableCell>{chapter.title}</TableCell>
-
+                      <TableCell>
+                        {formatDuration(chapter.duration_seconds)}
+                      </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
                           {chapter.file_url && (

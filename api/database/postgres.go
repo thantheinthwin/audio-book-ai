@@ -934,9 +934,11 @@ func (p *PostgresRepository) GetChaptersByAudioBookID(ctx context.Context, audio
 			c.file_size_bytes, 
 			c.mime_type, 
 			c.created_at, 
-			ct.content
+			ct.content,
+			uf.duration_seconds
 		FROM chapters c
 		LEFT JOIN chapter_transcripts ct ON c.id = ct.chapter_id
+		LEFT JOIN upload_files uf ON c.upload_file_id = uf.id
 		WHERE c.audiobook_id = $1
 		ORDER BY chapter_number
 	`
@@ -962,6 +964,7 @@ func (p *PostgresRepository) GetChaptersByAudioBookID(ctx context.Context, audio
 			&chapter.MimeType,
 			&chapter.CreatedAt,
 			&chapter.Content,
+			&chapter.DurationSeconds,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan chapter: %w", err)
