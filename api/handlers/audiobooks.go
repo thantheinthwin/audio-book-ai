@@ -959,6 +959,20 @@ func (h *Handler) CreateAudioBook(c *fiber.Ctx) error {
 		audiobook.CoverImageURL = req.CoverImageURL
 	}
 
+	// Calculate total duration from all upload files
+	var totalDurationSeconds int
+	for _, file := range uploadFiles {
+		if file.DurationSeconds != nil {
+			totalDurationSeconds += *file.DurationSeconds
+		}
+	}
+
+	// Set the total duration on the audiobook
+	if totalDurationSeconds > 0 {
+		audiobook.DurationSeconds = &totalDurationSeconds
+		log.Printf("CreateAudioBook: Total duration calculated: %d seconds", totalDurationSeconds)
+	}
+
 	// Handle different upload types
 	log.Printf("CreateAudioBook: Processing upload type: %s", upload.UploadType)
 	var chapters []*models.Chapter
